@@ -17,7 +17,7 @@ from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
 
 from config import Config
 from core.knowledge_engine import MeetingStore
-from core.entity_dict import EMPLOYEES, COMPANY_INFO
+from core.entity_dict import EMPLOYEES, COMPANY_INFO, get_dynamic_employee_profile
 from ui.audio_visualizer import AudioWaveVisualizer
 
 class ModernBreathingSwitch(QPushButton):
@@ -858,6 +858,302 @@ class NavButton(QPushButton):
             painter.drawText(badge_rect_x, badge_rect_y, badge_w, 18, Qt.AlignmentFlag.AlignCenter, self.badge_str)
 
 
+class ExpandableEmployeeCard(QFrame):
+    """
+    可点击展开的企业成员动态画像卡片 (Alma Obsidian 风格)
+    - 折叠状态：头像、姓名职务、音似别名、会议关联数、最新主导动态核心摘要（随会议库动态沉淀）
+    - 展开状态：平滑呈现该成员关联的历史会议时间、讨论议题、负责决策与详细发言摘要
+    - 支持一键快捷检索该成员全部会议决议与发言
+    """
+    search_requested = pyqtSignal(str)
+
+    def __init__(self, emp: dict, store: MeetingStore, color: str = "#26B0E4", parent=None):
+        super().__init__(parent)
+        self.emp = emp
+        self.store = store
+        self.brand_color = color
+        self.is_expanded = False
+
+        self.setObjectName("emp_card")
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._apply_style(hover=False)
+
+        # 主纵向布局
+        self.main_layout = QVBoxLayout(self)
+        self.main_layout.setContentsMargins(14, 12, 14, 12)
+        self.main_layout.setSpacing(8)
+
+        # 1. 顶部 Header：头像 + 姓名职务 + 关联会议徽章 + 展开指示
+        header_layout = QHBoxLayout()
+        header_layout.setSpacing(10)
+
+        # 头像
+        self.avatar_lbl = QLabel(emp["name"][:1])
+        self.avatar_lbl.setFixedSize(36, 36)
+        self.avatar_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.avatar_lbl.setStyleSheet(f"""
+            background-color: {self.brand_color};
+            color: #FFFFFF;
+            font-size: 15px;
+            font-weight: bold;
+            border-radius: 8px;
+        """)
+        header_layout.addWidget(self.avatar_lbl)
+
+        # 姓名 + 职务
+        info_box = QVBoxLayout()
+        info_box.setSpacing(1)
+        self.name_lbl = QLabel(emp["name"])
+        self.name_lbl.setStyleSheet("font-size: 14px; font-weight: bold; color: #FFFFFF;")
+        self.title_lbl = QLabel(emp["title"])
+        self.title_lbl.setStyleSheet("font-size: 11px; color: #94A3B8;")
+        info_box.addWidget(self.name_lbl)
+        info_box.addWidget(self.title_lbl)
+        header_layout.addLayout(info_box)
+
+        header_layout.addStretch()
+
+        # 右侧操作与徽章区
+        right_box = QVBoxLayout()
+        right_box.setSpacing(3)
+        right_box.setAlignment(Qt.AlignmentFlag.AlignRight)
+
+        # 关联会议计数徽章
+        self.meeting_badge = QLabel("🎙️ 关联 0 场会议")
+        self.meeting_badge.setStyleSheet("color: #64748B; font-size: 10px; background: rgba(255,255,255,0.04); padding: 2px 7px; border-radius: 4px; font-weight: 500;")
+        right_box.addWidget(self.meeting_badge, alignment=Qt.AlignmentFlag.AlignRight)
+
+        # 展开/收起指示器
+        self.toggle_lbl = QLabel("▾ 展开履历")
+        self.toggle_lbl.setStyleSheet("color: #26B0E4; font-size: 10.5px; font-weight: 600; padding-right: 2px;")
+        right_box.addWidget(self.toggle_lbl, alignment=Qt.AlignmentFlag.AlignRight)
+
+        header_layout.addLayout(right_box)
+        self.main_layout.addLayout(header_layout)
+
+        # 2. 别名与称谓标签 (音似提示)
+        aliases = emp.get("aliases", [])
+        if aliases:
+            aliases_str = " / ".join(aliases[:4])
+            alias_badge = QLabel(f"🗣️ 称谓/误读纠错: {aliases_str}")
+            alias_badge.setStyleSheet("color: #64748B; font-size: 10px; background: rgba(255,255,255,0.02); padding: 2px 6px; border-radius: 4px;")
+            self.main_layout.addWidget(alias_badge)
+
+        # 3. 基础职责描述
+        self.duties_lbl = QLabel(f"📌 {emp.get('duties', '')}")
+        self.duties_lbl.setWordWrap(True)
+        self.duties_lbl.setStyleSheet("color: #CBD5E1; font-size: 11.5px; line-height: 1.4;")
+        self.main_layout.addWidget(self.duties_lbl)
+
+        # 4. 核心动态高亮胶囊 (动态从会议切片库提取)
+        self.highlight_box = QFrame()
+        hl_layout = QVBoxLayout(self.highlight_box)
+        hl_layout.setContentsMargins(8, 6, 8, 6)
+        hl_layout.setSpacing(3)
+
+        self.hl_title_lbl = QLabel("🔥 最近主导与会议动态")
+        self.hl_title_lbl.setStyleSheet("color: #26B0E4; font-size: 10.5px; font-weight: bold;")
+        self.hl_content_lbl = QLabel("正在同步会议记忆中台...")
+        self.hl_content_lbl.setWordWrap(True)
+        self.hl_content_lbl.setStyleSheet("color: #E2E8F0; font-size: 11px; line-height: 1.35;")
+        hl_layout.addWidget(self.hl_title_lbl)
+        hl_layout.addWidget(self.hl_content_lbl)
+        self.main_layout.addWidget(self.highlight_box)
+
+        # 5. 技术栈与专业方向
+        self.tech_lbl = QLabel(f"⚡ 业务方向/技术栈: {emp.get('tech_stack', '通用业务')}")
+        self.tech_lbl.setStyleSheet("color: #64748B; font-size: 10.5px;")
+        self.main_layout.addWidget(self.tech_lbl)
+
+        # 6. 展开详细档案容器 (初始折叠)
+        self.detail_container = QWidget()
+        self.detail_container.setVisible(False)
+        self.detail_layout = QVBoxLayout(self.detail_container)
+        self.detail_layout.setContentsMargins(0, 6, 0, 0)
+        self.detail_layout.setSpacing(8)
+
+        # 分割线
+        divider = QFrame()
+        divider.setFrameShape(QFrame.Shape.HLine)
+        divider.setStyleSheet("background-color: rgba(255, 255, 255, 0.08); max-height: 1px;")
+        self.detail_layout.addWidget(divider)
+
+        # 详细档案小标题
+        footprint_title = QLabel("📋 动态会议足迹与履历档案 (实时沉淀自中台记忆)")
+        footprint_title.setStyleSheet("color: #8AC657; font-size: 11px; font-weight: bold;")
+        self.detail_layout.addWidget(footprint_title)
+
+        # 动态切片时间轴列表容器
+        self.timeline_widget = QWidget()
+        self.timeline_layout = QVBoxLayout(self.timeline_widget)
+        self.timeline_layout.setContentsMargins(0, 0, 0, 0)
+        self.timeline_layout.setSpacing(6)
+        self.detail_layout.addWidget(self.timeline_widget)
+
+        # 快捷检索按钮
+        self.query_btn = QPushButton(f"🔍 检索关于 {emp['name']} 的全部会议决议与发言")
+        self.query_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.query_btn.setStyleSheet("""
+            QPushButton {
+                background: rgba(38, 176, 228, 0.12);
+                color: #38BDF8;
+                border: 1px solid rgba(38, 176, 228, 0.35);
+                border-radius: 6px;
+                padding: 7px 12px;
+                font-size: 11px;
+                font-weight: 600;
+            }
+            QPushButton:hover {
+                background: rgba(38, 176, 228, 0.25);
+                color: #FFFFFF;
+                border-color: #26B0E4;
+            }
+        """)
+        self.query_btn.clicked.connect(self._on_search_clicked)
+        self.detail_layout.addWidget(self.query_btn)
+
+        self.main_layout.addWidget(self.detail_container)
+
+        # 初始化刷新动态档案
+        self.refresh_profile()
+
+    def _apply_style(self, hover: bool = False):
+        if self.is_expanded:
+            self.setStyleSheet("""
+                QFrame#emp_card {
+                    background-color: #141724;
+                    border: 1px solid rgba(38, 176, 228, 0.55);
+                    border-radius: 10px;
+                }
+            """)
+        elif hover:
+            self.setStyleSheet("""
+                QFrame#emp_card {
+                    background-color: #151928;
+                    border: 1px solid rgba(38, 176, 228, 0.4);
+                    border-radius: 10px;
+                }
+            """)
+        else:
+            self.setStyleSheet("""
+                QFrame#emp_card {
+                    background-color: #12151F;
+                    border: 1px solid rgba(255, 255, 255, 0.08);
+                    border-radius: 10px;
+                }
+            """)
+
+    def enterEvent(self, event):
+        if not self.is_expanded:
+            self._apply_style(hover=True)
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        if not self.is_expanded:
+            self._apply_style(hover=False)
+        super().leaveEvent(event)
+
+    def toggle_expand(self):
+        self.is_expanded = not self.is_expanded
+        self.detail_container.setVisible(self.is_expanded)
+        self.toggle_lbl.setText("▴ 收起履历" if self.is_expanded else "▾ 展开履历")
+        self._apply_style(hover=False)
+
+    def mousePressEvent(self, event):
+        child = self.childAt(event.pos())
+        if isinstance(child, QPushButton):
+            super().mousePressEvent(event)
+            return
+        self.toggle_expand()
+        super().mousePressEvent(event)
+
+    def _on_search_clicked(self):
+        self.search_requested.emit(f"关于{self.emp['name']}在过往会议中的发言、决策与负责事项")
+
+    def refresh_profile(self):
+        """从 store 动态反查该成员的最新会议切片并重新计算画像"""
+        profile = get_dynamic_employee_profile(self.store, self.emp)
+        m_count = profile.get("meeting_count", 0)
+
+        # 1. 更新关联会议计数 Badge
+        if m_count > 0:
+            self.meeting_badge.setText(f"🎙️ 关联 {m_count} 场会议")
+            self.meeting_badge.setStyleSheet(
+                "color: #26B0E4; font-size: 10px; background: rgba(38,176,228,0.12); "
+                "border: 1px solid rgba(38,176,228,0.25); padding: 2px 7px; border-radius: 4px; font-weight: 600;"
+            )
+        else:
+            self.meeting_badge.setText("🎙️ 暂无关联会议")
+            self.meeting_badge.setStyleSheet(
+                "color: #64748B; font-size: 10px; background: rgba(255,255,255,0.04); "
+                "border: 1px solid rgba(255,255,255,0.05); padding: 2px 7px; border-radius: 4px;"
+            )
+
+        # 2. 更新最新主导与动态高亮胶囊
+        core_hl = profile.get("core_highlight", "")
+        if m_count > 0:
+            self.hl_title_lbl.setText("🔥 最近主导与会议决策")
+            self.hl_title_lbl.setStyleSheet("color: #26B0E4; font-size: 10.5px; font-weight: bold;")
+            self.highlight_box.setStyleSheet("""
+                QFrame {
+                    background: rgba(38, 176, 228, 0.07);
+                    border-left: 3px solid #26B0E4;
+                    border-radius: 4px;
+                    padding: 6px 10px;
+                }
+            """)
+        else:
+            self.hl_title_lbl.setText("🎯 现阶段核心职责与关注")
+            self.hl_title_lbl.setStyleSheet("color: #8AC657; font-size: 10.5px; font-weight: bold;")
+            self.highlight_box.setStyleSheet("""
+                QFrame {
+                    background: rgba(138, 198, 87, 0.07);
+                    border-left: 3px solid #8AC657;
+                    border-radius: 4px;
+                    padding: 6px 10px;
+                }
+            """)
+        self.hl_content_lbl.setText(core_hl)
+
+        # 3. 清理并重新填充详细时间轴切片
+        while self.timeline_layout.count() > 0:
+            child = self.timeline_layout.takeAt(0)
+            if child.widget():
+                child.widget().deleteLater()
+
+        actions = profile.get("actions", [])
+        if actions:
+            for act in actions:
+                item_frame = QFrame()
+                item_frame.setStyleSheet("""
+                    QFrame {
+                        background: rgba(255, 255, 255, 0.03);
+                        border: 1px solid rgba(255, 255, 255, 0.05);
+                        border-radius: 6px;
+                        padding: 6px 8px;
+                    }
+                """)
+                item_layout = QVBoxLayout(item_frame)
+                item_layout.setContentsMargins(8, 6, 8, 6)
+                item_layout.setSpacing(3)
+
+                header_lbl = QLabel(f"📅 {act.get('time', '近期')} · 【{act.get('topic', '常规议题')}】")
+                header_lbl.setStyleSheet("color: #94A3B8; font-size: 10.5px; font-weight: bold;")
+
+                desc_lbl = QLabel(f"💬 {act.get('highlight', '')}")
+                desc_lbl.setWordWrap(True)
+                desc_lbl.setStyleSheet("color: #E2E8F0; font-size: 11px; line-height: 1.35;")
+
+                item_layout.addWidget(header_lbl)
+                item_layout.addWidget(desc_lbl)
+                self.timeline_layout.addWidget(item_frame)
+        else:
+            no_act_lbl = QLabel("💡 暂无直接关联的历史会议切片。后续会议讨论中若提及或由其发言，系统将自动汇总沉淀于此。")
+            no_act_lbl.setWordWrap(True)
+            no_act_lbl.setStyleSheet("color: #64748B; font-size: 10.5px; font-style: italic; padding: 4px;")
+            self.timeline_layout.addWidget(no_act_lbl)
+
+
 class MainWindow(QMainWindow):
     record_toggled = pyqtSignal(bool)
     query_submitted = pyqtSignal(str)
@@ -1133,6 +1429,8 @@ class MainWindow(QMainWindow):
         self.stack.setCurrentIndex(index)
         titles = ["对讲与即时检索", "会议记忆切片库", "企业组织通讯录", "系统引擎与状态"]
         self.breadcrumb_lbl.setText(f"DeskEcho / {titles[index]}")
+        if index == 2 and hasattr(self, "refresh_roster"):
+            self.refresh_roster()
 
     # ---------------- 顶部栏构建 ----------------
     def _build_top_bar(self, parent_layout: QVBoxLayout):
@@ -1531,6 +1829,62 @@ class MainWindow(QMainWindow):
 
     # ---------------- Page 2: 企业通讯录 (Org Directory) ----------------
     def _build_page_roster(self, stack: QStackedWidget):
+        page = QWidget()
+        page_layout = QVBoxLayout(page)
+        page_layout.setContentsMargins(16, 12, 16, 16)
+        page_layout.setSpacing(10)
+
+        # 1. 顶部操作与筛选栏
+        filter_bar = QHBoxLayout()
+        filter_bar.setSpacing(10)
+
+        self.roster_search_input = QLineEdit()
+        self.roster_search_input.setPlaceholderText("🔍 快速筛选成员姓名、职务、职责或技能关键词...")
+        self.roster_search_input.setStyleSheet("""
+            QLineEdit {
+                background-color: #12151F;
+                color: #FFFFFF;
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 8px;
+                padding: 7px 14px;
+                font-size: 12px;
+            }
+            QLineEdit:focus {
+                border-color: #26B0E4;
+                background-color: #161A28;
+            }
+        """)
+        self.roster_search_input.textChanged.connect(self._filter_roster_cards)
+        filter_bar.addWidget(self.roster_search_input, 1)
+
+        self.roster_stat_lbl = QLabel(f"👥 共收录 {len(EMPLOYEES)} 位核心成员 · 实时关联中台会议动态画像")
+        self.roster_stat_lbl.setStyleSheet("color: #8AC657; font-size: 11px; font-weight: 600; padding: 0 4px;")
+        filter_bar.addWidget(self.roster_stat_lbl)
+
+        refresh_roster_btn = QPushButton("🔄 刷新画像")
+        refresh_roster_btn.setToolTip("重新从会议记忆中台反查提取最新的成员参与决议与动态")
+        refresh_roster_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        refresh_roster_btn.setStyleSheet("""
+            QPushButton {
+                background: rgba(255, 255, 255, 0.05);
+                color: #CBD5E1;
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 6px;
+                padding: 6px 12px;
+                font-size: 11px;
+            }
+            QPushButton:hover {
+                background: rgba(255, 255, 255, 0.1);
+                color: #FFFFFF;
+                border-color: #26B0E4;
+            }
+        """)
+        refresh_roster_btn.clicked.connect(self.refresh_roster)
+        filter_bar.addWidget(refresh_roster_btn)
+
+        page_layout.addLayout(filter_bar)
+
+        # 2. 滚动区域与双列瀑布流容器
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -1542,74 +1896,78 @@ class MainWindow(QMainWindow):
             }
         """)
 
-        container = QWidget()
-        container.setStyleSheet("background: transparent;")
-        grid = QGridLayout(container)
-        grid.setContentsMargins(4, 4, 14, 40)
-        grid.setSpacing(12)
+        cards_container = QWidget()
+        cards_container.setStyleSheet("background: transparent;")
 
-        # 美好智能 VI 品牌色谱：靛青 #13459D、海青 #26B0E4、鹦鹉绿 #8AC657 及其和声衍生色
+        columns_layout = QHBoxLayout(cards_container)
+        columns_layout.setContentsMargins(0, 0, 8, 20)
+        columns_layout.setSpacing(12)
+        columns_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+
+        self.col_left = QVBoxLayout()
+        self.col_left.setSpacing(12)
+        self.col_left.setAlignment(Qt.AlignmentFlag.AlignTop)
+
+        self.col_right = QVBoxLayout()
+        self.col_right.setSpacing(12)
+        self.col_right.setAlignment(Qt.AlignmentFlag.AlignTop)
+
+        columns_layout.addLayout(self.col_left, 1)
+        columns_layout.addLayout(self.col_right, 1)
+
+        # 美好智能 VI 品牌色谱
         colors = ["#13459D", "#26B0E4", "#8AC657", "#1E60B8", "#17A2B8", "#6DAE3E", "#2C75D3", "#38BDF8", "#78B847"]
 
+        self.employee_cards = []
         for idx, emp in enumerate(EMPLOYEES):
-            row = idx // 2
-            col = idx % 2
-
-            card = QFrame()
-            card.setObjectName("card")
-            card_layout = QVBoxLayout(card)
-            card_layout.setContentsMargins(14, 12, 14, 12)
-            card_layout.setSpacing(6)
-
-            # 头像 + 姓名 + 岗位
-            top_h = QHBoxLayout()
-            avatar = QLabel(emp["name"][:1])
-            avatar.setFixedSize(34, 34)
-            avatar.setAlignment(Qt.AlignmentFlag.AlignCenter)
             c = colors[idx % len(colors)]
-            avatar.setStyleSheet(f"""
-                background-color: {c};
-                color: #FFFFFF;
-                font-size: 14px;
-                font-weight: bold;
-                border-radius: 8px;
-            """)
+            card = ExpandableEmployeeCard(emp, self.store, color=c)
+            card.search_requested.connect(self._on_roster_search_requested)
+            self.employee_cards.append(card)
 
-            info_box = QVBoxLayout()
-            info_box.setSpacing(1)
-            name_lbl = QLabel(emp["name"])
-            name_lbl.setStyleSheet("font-size: 13.5px; font-weight: bold; color: #FFFFFF;")
-            title_lbl = QLabel(emp["title"])
-            title_lbl.setStyleSheet("font-size: 11px; color: #94A3B8;")
-            info_box.addWidget(name_lbl)
-            info_box.addWidget(title_lbl)
+            if idx % 2 == 0:
+                self.col_left.addWidget(card)
+            else:
+                self.col_right.addWidget(card)
 
-            top_h.addWidget(avatar)
-            top_h.addLayout(info_box)
-            top_h.addStretch()
+        scroll.setWidget(cards_container)
+        page_layout.addWidget(scroll, 1)
+        stack.addWidget(page)
 
-            # 别名标签
-            aliases_str = " / ".join(emp.get("aliases", [])[:3])
-            alias_badge = QLabel(f"音似: {aliases_str}")
-            alias_badge.setStyleSheet("color: #64748B; font-size: 10px; background: rgba(255,255,255,0.04); padding: 3px 6px; border-radius: 4px;")
-            top_h.addWidget(alias_badge)
+    def _on_roster_search_requested(self, query: str):
+        """卡片内一键点击检索发起跳转对讲搜索"""
+        self._switch_nav(0)
+        self.query_input.setText(query)
+        self._handle_query()
 
-            card_layout.addLayout(top_h)
+    def _filter_roster_cards(self, text: str):
+        """实时响应通讯录搜索过滤"""
+        kw = text.strip().lower()
+        matched_count = 0
+        for card in self.employee_cards:
+            emp = card.emp
+            is_match = (
+                not kw or
+                kw in emp.get("name", "").lower() or
+                kw in emp.get("title", "").lower() or
+                kw in emp.get("duties", "").lower() or
+                kw in emp.get("tech_stack", "").lower() or
+                any(kw in a.lower() for a in emp.get("aliases", []))
+            )
+            card.setVisible(is_match)
+            if is_match:
+                matched_count += 1
 
-            # 职责与技术栈
-            duties_lbl = QLabel(f"📌 {emp['duties']}")
-            duties_lbl.setWordWrap(True)
-            duties_lbl.setStyleSheet("color: #CBD5E1; font-size: 11.5px; line-height: 1.4;")
-            card_layout.addWidget(duties_lbl)
+        if kw:
+            self.roster_stat_lbl.setText(f"🔍 筛选出 {matched_count} 位成员 (共 {len(EMPLOYEES)} 位)")
+        else:
+            self.roster_stat_lbl.setText(f"👥 共收录 {len(EMPLOYEES)} 位核心成员 · 实时关联中台会议动态画像")
 
-            tech_lbl = QLabel(f"⚡ 技术栈/方向: {emp.get('tech_stack', '通用业务')}")
-            tech_lbl.setStyleSheet("color: #26B0E4; font-size: 11px;")
-            card_layout.addWidget(tech_lbl)
-
-            grid.addWidget(card, row, col)
-
-        scroll.setWidget(container)
-        stack.addWidget(scroll)
+    def refresh_roster(self):
+        """刷新所有成员卡片的动态画像与最新会议关联"""
+        if hasattr(self, "employee_cards"):
+            for card in self.employee_cards:
+                card.refresh_profile()
 
     # ---------------- Page 3: 引擎配置与状态 (Settings & Status) ----------------
     def _build_page_settings(self, stack: QStackedWidget):
@@ -1725,6 +2083,9 @@ class MainWindow(QMainWindow):
 
             if records and self.mem_list.count() > 0:
                 self.mem_list.setCurrentRow(0)
+
+            if hasattr(self, "refresh_roster"):
+                self.refresh_roster()
 
         except Exception as e:
             print(f"[MainWindow] 刷新记录失败: {e}")

@@ -155,6 +155,27 @@ class MeetingStore:
             print(f"[MeetingStore] 关键词加权检索异常: {e}")
             return []
 
+    def query_slices_by_entity_names(self, names: List[str], limit: int = 8) -> List[Dict[str, Any]]:
+        """根据人名或别名反查涉及该人员的历史会议切片（用于实体动态画像）"""
+        if not names:
+            return []
+        conditions = []
+        params = []
+        for name in names:
+            conditions.append("(raw_text LIKE ? OR summary LIKE ?)")
+            params.extend([f"%{name}%", f"%{name}%"])
+        
+        where_clause = " OR ".join(conditions)
+        sql = f"SELECT id, start_time, end_time, raw_text, summary FROM meeting_slices WHERE {where_clause} ORDER BY start_time DESC LIMIT ?"
+        params.append(limit)
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute(sql, params)
+            return [dict(r) for r in cursor.fetchall()]
+        except Exception as e:
+            print(f"[MeetingStore] 实体关联切片查询失败: {e}")
+            return []
+
     def get_total_count(self) -> int:
         try:
             cursor = self.conn.cursor()
