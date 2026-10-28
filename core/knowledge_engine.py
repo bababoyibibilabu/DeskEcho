@@ -149,6 +149,20 @@ class MeetingStore:
         rows = cursor.fetchall()
         return [dict(row) for row in rows]
 
+    def get_records_by_ids(self, slice_ids: List[str]) -> List[Dict[str, Any]]:
+        """按切片 ID 列表批量拉取历史切片详情"""
+        if not slice_ids:
+            return []
+        try:
+            placeholders = ",".join(["?"] * len(slice_ids))
+            cursor = self.conn.cursor()
+            cursor.execute(f"SELECT * FROM meeting_slices WHERE id IN ({placeholders})", slice_ids)
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+        except Exception as e:
+            print(f"[MeetingStore] 按ID获取切片异常: {e}")
+            return []
+
     def query_by_time_range(self, start_date_str: str, end_date_str: str) -> List[Dict[str, Any]]:
         cursor = self.conn.cursor()
         cursor.execute(

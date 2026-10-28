@@ -32,7 +32,7 @@ class AppSignals(QObject):
     slice_processed = pyqtSignal(str, str) # topic, time_str
     instant_ack = pyqtSignal(str)          # ack_audio_path
     stage_progress = pyqtSignal(int, str, str) # step, title, detail
-    query_answered = pyqtSignal(str, str, str)  # query_text, answer_markdown, tts_audio_path
+    query_answered = pyqtSignal(str, str, str, bool, str)  # query_text, answer_markdown, tts_audio_path, is_followup, focal_topic
 
 class DeskEchoApp:
     def __init__(self):
@@ -75,8 +75,9 @@ class DeskEchoApp:
         self.signals.stage_progress.connect(self._handle_stage_progress)
         self.signals.query_answered.connect(self._handle_query_answered)
 
-        # 文字提问 (直接汇聚至知识溯源主解答区)
+        # 文字提问与新话题控制
         self.main_window.query_submitted.connect(self._process_text_query)
+        self.main_window.new_session_requested.connect(self._handle_new_session)
 
         # 录制开关与托盘联动
         self.main_window.record_toggled.connect(self._on_main_record_toggled)
@@ -249,15 +250,17 @@ class DeskEchoApp:
         result = self.rag.answer_query(query_text, on_progress=on_rag_progress)
         answer_markdown = result["answer"]
         spoken_text = result.get("spoken_text", "")
+        is_followup = result.get("is_followup", False)
+        focal_topic = result.get("focal_topic", "")
 
         def on_tts_ready(audio_path: str):
-            self.signals.query_answered.emit(query_text, answer_markdown, audio_path)
+            self.signals.query_answered.emit(query_text, answer_markdown, audio_path, is_followup, focal_topic)
 
         if Config.ENABLE_TTS and spoken_text:
             self.tts.speak_async(spoken_text, on_audio_ready=on_tts_ready)
-            self.signals.query_answered.emit(query_text, answer_markdown, "")
+            self.signals.query_answered.emit(query_text, answer_markdown, "", is_followup, focal_topic)
         else:
-            self.signals.query_answered.emit(query_text, answer_markdown, "")
+            self.signals.query_answered.emit(query_text, answer_markdown, "", is_followup, focal_topic)
 
     def _process_text_query(self, query_text: str):
         # 无论此前是否正在播报，新提问立即打断前一次播报
@@ -276,26 +279,38 @@ class DeskEchoApp:
             result = self.rag.answer_query(query_text, on_progress=on_rag_progress)
             answer_markdown = result["answer"]
             spoken_text = result.get("spoken_text", "")
+            is_followup = result.get("is_followup", False)
+            focal_topic = result.get("focal_topic", "")
 
             def on_tts_ready(audio_path: str):
-                self.signals.query_answered.emit(query_text, answer_markdown, audio_path)
+                self.signals.query_answered.emit(query_text, answer_markdown, audio_path, is_followup, focal_topic)
 
             if Config.ENABLE_TTS and spoken_text:
                 self.tts.speak_async(spoken_text, on_audio_ready=on_tts_ready)
-                self.signals.query_answered.emit(query_text, answer_markdown, "")
+                self.signals.query_answered.emit(query_text, answer_markdown, "", is_followup, focal_topic)
             else:
-                self.signals.query_answered.emit(query_text, answer_markdown, "")
+                self.signals.query_answered.emit(query_text, answer_markdown, "", is_followup, focal_topic)
 
         threading.Thread(target=_worker, daemon=True).start()
 
-    def _handle_query_answered(self, query_text: str, answer_markdown: str, audio_path: str):
+    def _handle_new_session(self):
+        """用户点击清空/开启新会话时重置上下文"""
+        self.rag.reset_session()
+        print("[DeskEchoApp] 对话上下文已重置，开启全新独立提问。")
+
+    def _handle_query_answered(self, query_text: str, answer_markdown: str, audio_path: str, is_followup: bool = False, focal_topic: str = ""):
         # 1. 自动同步提问文本至搜索框，方便提问人核对、复制或重新编辑
         if query_text and query_text != "未识别到语音输入":
             self.main_window.query_input.setText(query_text)
 
-        # 2. 将提问内容以优雅的问答卡形式置于回答卡片顶部
-        formatted_answer = f"> ❓ **语音提问**：{query_text}\n\n{answer_markdown}" if (query_text and query_text != "未识别到语音输入") else answer_markdown
-        self.main_window.display_answer(formatted_answer, audio_path)
+        # 2. 将提问内容以优雅的问答卡形式置于回答卡片顶部 (区分首问与追问)
+        if query_text and query_text != "未识别到语音输入":
+            q_label = "连续追问" if is_followup else "语音提问"
+            formatted_answer = f"> ❓ **{q_label}**：{query_text}\n\n{answer_markdown}"
+        else:
+            formatted_answer = answer_markdown
+
+        self.main_window.display_answer(formatted_answer, audio_path, is_followup=is_followup, focal_topic=focal_topic)
 
         # 3. 若无 TTS 音频播放，立即恢复背景会议录制；若有播放，由 MainWindow.tts_playback_finished 在播完后恢复
         if not audio_path or not os.path.exists(audio_path):

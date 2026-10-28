@@ -117,17 +117,39 @@ class ModernBreathingSwitch(QPushButton):
 
 class StreamTextDisplay(QTextBrowser):
     """
-    Alma 风格的打字机流式输出渲染器 (富文本 Markdown 转换)
+    Alma 风格的打字机流式输出渲染器 (富文本 Markdown 转换，支持多轮对话卡片连续追加)
     """
     def __init__(self, parent=None):
         super().__init__(parent)
+        self._history_turns = []
         self._full_text = ""
         self._current_index = 0
         self._timer = QTimer(self)
         self._timer.setInterval(16)
         self._timer.timeout.connect(self._stream_step)
 
-    def start_streaming(self, markdown_text: str):
+    def clear_history(self):
+        """清空历史追问卡片，恢复默认导引页"""
+        self._timer.stop()
+        self._history_turns.clear()
+        self._full_text = ""
+        self._current_index = 0
+        self.setHtml(
+            "<div style='color: #475569; text-align: center; padding-top: 100px; line-height: 1.8;'>"
+            "💡 在上方输入问题回车，或长按 <b>右 Alt</b> 启动语音对讲 (免按 Fn，空格键右侧直达)<br>"
+            "系统将自动完成 <b>Query Rewriting 意图蒸馏</b> 与 <b>Hybrid RAG 混合检索</b><br>"
+            "并以<b>音视分离</b>策略给出结论播报与精准上下文溯源"
+            "</div>"
+        )
+
+    def start_streaming(self, markdown_text: str, is_followup: bool = False):
+        if not is_followup:
+            self._history_turns.clear()
+        else:
+            # 追问时最多保留前序 2 轮卡片，防止界面过度冗长
+            if len(self._history_turns) > 2:
+                self._history_turns = self._history_turns[-2:]
+
         self._full_text = markdown_text
         self._current_index = 0
         self._timer.start()
@@ -137,19 +159,66 @@ class StreamTextDisplay(QTextBrowser):
             step_chunk = random.randint(2, 4)
             self._current_index = min(len(self._full_text), self._current_index + step_chunk)
             partial = self._full_text[:self._current_index]
-            self._render_content(partial, is_streaming=(self._current_index < len(self._full_text)))
+            self._render_combined(partial, is_streaming=(self._current_index < len(self._full_text)))
         else:
             self._timer.stop()
-            self._render_content(self._full_text, is_streaming=False)
+            completed_turn_html = self._format_turn_html(self._full_text, is_streaming=False)
+            self._history_turns.append(completed_turn_html)
+            self._render_combined(self._full_text, is_streaming=False, use_cached_latest=True)
 
-    def _render_content(self, text: str, is_streaming: bool):
+    def _render_combined(self, active_text: str, is_streaming: bool, use_cached_latest: bool = False):
+        parts = []
+        if use_cached_latest:
+            for i, card_html in enumerate(self._history_turns):
+                if i > 0:
+                    parts.append(self._get_divider_html())
+                parts.append(card_html)
+        else:
+            for i, card_html in enumerate(self._history_turns):
+                if i > 0:
+                    parts.append(self._get_divider_html())
+                parts.append(card_html)
+            if self._history_turns:
+                parts.append(self._get_divider_html())
+            parts.append(self._format_turn_html(active_text, is_streaming=is_streaming))
+
+        html_body = f"""<div style="line-height: 1.6; color: #E2E8F0; font-size: 12.5px; font-family: 'Segoe UI', -apple-system, sans-serif;">{''.join(parts)}</div>"""
+        self.setHtml(html_body)
+        
+        # 滚轮自动吸底跟随打字流
+        sb = self.verticalScrollBar()
+        if sb:
+            sb.setValue(sb.maximum())
+
+    def _get_divider_html(self) -> str:
+        return """
+        <div style="margin: 18px 0 14px 0; border-top: 1px dashed rgba(38, 176, 228, 0.28); text-align: center;">
+            <span style="background-color: #0A0C10; padding: 2px 12px; color: #8AC657; font-size: 10px; font-weight: bold; border-radius: 4px; border: 1px solid rgba(138, 198, 87, 0.3);">
+                ⏱️ 连续追问上下文 · 上下文延续中
+            </span>
+        </div>
+        """
+
+    def _format_turn_html(self, text: str, is_streaming: bool) -> str:
         escaped = html.escape(text.strip())
 
-        # 0. 重点渲染 > ❓ **语音提问**：
+        # 0. 重点渲染 > ❓ **连续追问**：或 > ❓ **语音提问**：或 **文字提问**
         def format_question(m):
-            content = m.group(1).strip()
-            return f'<div style="background: rgba(38, 176, 228, 0.12); border-left: 3px solid #26B0E4; border-radius: 6px; padding: 7px 12px; margin: 4px 0 8px 0;"><div style="color: #26B0E4; font-weight: bold; font-size: 10px; margin-bottom: 2px;">❓ 识别提问</div><div style="color: #FFFFFF; font-size: 13px; font-weight: 600;">“{content}”</div></div>'
-        escaped = re.sub(r'&gt;\s*❓?\s*\*\*语音提问\*\*[：:]\s*(.+?)(?=(?:\n\n|\n&lt;|\n#|$))', format_question, escaped, flags=re.DOTALL)
+            q_type = m.group(1).strip()
+            content = m.group(2).strip()
+            if "追问" in q_type:
+                return (
+                    f'<div style="background: rgba(138, 198, 87, 0.12); border-left: 3px solid #8AC657; border-radius: 6px; padding: 7px 12px; margin: 4px 0 8px 0;">'
+                    f'<div style="color: #8AC657; font-weight: bold; font-size: 10px; margin-bottom: 2px;">⚡ 连续追问 (已继承上下文)</div>'
+                    f'<div style="color: #FFFFFF; font-size: 13px; font-weight: 600;">“{content}”</div></div>'
+                )
+            else:
+                return (
+                    f'<div style="background: rgba(38, 176, 228, 0.12); border-left: 3px solid #26B0E4; border-radius: 6px; padding: 7px 12px; margin: 4px 0 8px 0;">'
+                    f'<div style="color: #26B0E4; font-weight: bold; font-size: 10px; margin-bottom: 2px;">❓ 识别提问</div>'
+                    f'<div style="color: #FFFFFF; font-size: 13px; font-weight: 600;">“{content}”</div></div>'
+                )
+        escaped = re.sub(r'&gt;\s*❓?\s*\*\*(语音提问|连续追问|文字提问)\*\*[：:]\s*(.+?)(?=(?:\n\n|\n&lt;|\n#|$))', format_question, escaped, flags=re.DOTALL)
 
         # 1. 重点渲染 > 🎙️ **结论播报**：为 美好智能 VI 风格三色渐变醒目标签卡
         def format_spoken(m):
@@ -173,9 +242,7 @@ class StreamTextDisplay(QTextBrowser):
             escaped = escaped[4:].strip()
 
         cursor = " <span style='color: #26B0E4; font-weight: bold; font-size: 13px;'>▌</span>" if is_streaming else ""
-
-        html_body = f"""<div style="line-height: 1.6; color: #E2E8F0; font-size: 12.5px; font-family: 'Segoe UI', -apple-system, sans-serif;">{escaped}{cursor}</div>"""
-        self.setHtml(html_body)
+        return f"<div>{escaped}{cursor}</div>"
 
 
 class IntercomBanner(QFrame):
@@ -365,10 +432,10 @@ class IntercomBanner(QFrame):
         self.wave_vis.set_mode("speaking")
         self.wave_vis.set_active(True)
 
-    def set_completed(self):
+    def set_completed(self, focal_topic: str = "", is_followup: bool = False):
         self.stop_btn.hide()
         self.wave_vis.set_active(False)
-        self.badge_lbl.setText("✅ 检索完成")
+        self.badge_lbl.setText("⚡ 连续就绪" if is_followup else "✅ 检索完成")
         self.badge_lbl.setStyleSheet("""
             background-color: rgba(38, 176, 228, 0.15);
             color: #81D4FA;
@@ -377,7 +444,10 @@ class IntercomBanner(QFrame):
             padding: 3px 8px;
             border-radius: 5px;
         """)
-        self.status_lbl.setText("回答已就绪，已定位历史会议切片上下文")
+        if focal_topic:
+            self.status_lbl.setText(f"回答已就绪 · 当前焦点「{focal_topic}」，长按【右 Alt】可针对该话题直接追问")
+        else:
+            self.status_lbl.setText("回答已就绪 · 长按【右 Alt】随时语音对讲追问")
         self.status_lbl.setStyleSheet("color: #94A3B8; font-size: 11.5px;")
         self._reset_timer.start(8000)
 
@@ -507,6 +577,7 @@ class MainWindow(QMainWindow):
     query_submitted = pyqtSignal(str)
     inject_demo_requested = pyqtSignal()
     tts_playback_finished = pyqtSignal()
+    new_session_requested = pyqtSignal()
 
     def __init__(self, meeting_store: MeetingStore):
         super().__init__()
@@ -907,6 +978,28 @@ class MainWindow(QMainWindow):
         ans_title.setStyleSheet("font-size: 14px; font-weight: 700; color: #FFFFFF;")
         ans_title_row.addWidget(ans_title)
         ans_title_row.addStretch()
+
+        self.new_session_btn = QPushButton("🔄 开启新会话")
+        self.new_session_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.new_session_btn.setToolTip("清空上下文，开启全新的独立话题")
+        self.new_session_btn.setStyleSheet("""
+            QPushButton {
+                background: rgba(255, 255, 255, 0.05);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 6px;
+                color: #94A3B8;
+                font-size: 11px;
+                padding: 3px 8px;
+                font-weight: 500;
+            }
+            QPushButton:hover {
+                background: rgba(38, 176, 228, 0.16);
+                border-color: #26B0E4;
+                color: #26B0E4;
+            }
+        """)
+        self.new_session_btn.clicked.connect(self.clear_answer_session)
+        ans_title_row.addWidget(self.new_session_btn)
 
         copy_btn = QPushButton("复制内容")
         copy_btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -1427,15 +1520,21 @@ class MainWindow(QMainWindow):
         else:
             self.intercom_banner.set_stage(step, title, detail)
 
-    def display_answer(self, markdown_text: str, audio_path: str = ""):
+    def clear_answer_session(self):
+        """清空当前问答界面和会话上下文"""
+        self.answer_browser.clear_history()
+        self.intercom_banner.set_idle()
+        self.new_session_requested.emit()
+
+    def display_answer(self, markdown_text: str, audio_path: str = "", is_followup: bool = False, focal_topic: str = ""):
         self.search_status_lbl.setText("")
-        self.answer_browser.start_streaming(markdown_text)
+        self.answer_browser.start_streaming(markdown_text, is_followup=is_followup)
         if audio_path and os.path.exists(audio_path):
             self.intercom_banner.set_speaking()
             self.player.setSource(QUrl.fromLocalFile(os.path.abspath(audio_path)))
             self.player.play()
         else:
-            self.intercom_banner.set_completed()
+            self.intercom_banner.set_completed(focal_topic=focal_topic, is_followup=is_followup)
 
     def show_interrupted_status(self):
         self.intercom_banner.set_interrupted()
