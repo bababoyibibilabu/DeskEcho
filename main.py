@@ -32,7 +32,7 @@ class AppSignals(QObject):
     slice_processed = pyqtSignal(str, str) # topic, time_str
     instant_ack = pyqtSignal(str)          # ack_audio_path
     stage_progress = pyqtSignal(int, str, str) # step, title, detail
-    query_answered = pyqtSignal(str, str, str, bool, str)  # query_text, answer_markdown, tts_audio_path, is_followup, focal_topic
+    query_answered = pyqtSignal(str, str, str, bool, str, str)  # query_text, answer_markdown, tts_audio_path, is_followup, focal_topic, response_mode
 
 class DeskEchoApp:
     def __init__(self):
@@ -253,15 +253,16 @@ class DeskEchoApp:
         spoken_text = result.get("spoken_text", "")
         is_followup = result.get("is_followup", False)
         focal_topic = result.get("focal_topic", "")
+        response_mode = result.get("response_mode", "MEETING")
 
         def on_tts_ready(audio_path: str):
-            self.signals.query_answered.emit(query_text, answer_markdown, audio_path, is_followup, focal_topic)
+            self.signals.query_answered.emit(query_text, answer_markdown, audio_path, is_followup, focal_topic, response_mode)
 
         if Config.ENABLE_TTS and spoken_text:
             self.tts.speak_async(spoken_text, on_audio_ready=on_tts_ready)
-            self.signals.query_answered.emit(query_text, answer_markdown, "", is_followup, focal_topic)
+            self.signals.query_answered.emit(query_text, answer_markdown, "", is_followup, focal_topic, response_mode)
         else:
-            self.signals.query_answered.emit(query_text, answer_markdown, "", is_followup, focal_topic)
+            self.signals.query_answered.emit(query_text, answer_markdown, "", is_followup, focal_topic, response_mode)
 
     def _process_text_query(self, query_text: str):
         # 无论此前是否正在播报，新提问立即打断前一次播报
@@ -282,15 +283,16 @@ class DeskEchoApp:
             spoken_text = result.get("spoken_text", "")
             is_followup = result.get("is_followup", False)
             focal_topic = result.get("focal_topic", "")
+            response_mode = result.get("response_mode", "MEETING")
 
             def on_tts_ready(audio_path: str):
-                self.signals.query_answered.emit(query_text, answer_markdown, audio_path, is_followup, focal_topic)
+                self.signals.query_answered.emit(query_text, answer_markdown, audio_path, is_followup, focal_topic, response_mode)
 
             if Config.ENABLE_TTS and spoken_text:
                 self.tts.speak_async(spoken_text, on_audio_ready=on_tts_ready)
-                self.signals.query_answered.emit(query_text, answer_markdown, "", is_followup, focal_topic)
+                self.signals.query_answered.emit(query_text, answer_markdown, "", is_followup, focal_topic, response_mode)
             else:
-                self.signals.query_answered.emit(query_text, answer_markdown, "", is_followup, focal_topic)
+                self.signals.query_answered.emit(query_text, answer_markdown, "", is_followup, focal_topic, response_mode)
 
         threading.Thread(target=_worker, daemon=True).start()
 
@@ -304,7 +306,7 @@ class DeskEchoApp:
         self.rag.load_session(session_id)
         print(f"[DeskEchoApp] 已切换并激活历史会话上下文: {session_id}")
 
-    def _handle_query_answered(self, query_text: str, answer_markdown: str, audio_path: str, is_followup: bool = False, focal_topic: str = ""):
+    def _handle_query_answered(self, query_text: str, answer_markdown: str, audio_path: str, is_followup: bool = False, focal_topic: str = "", response_mode: str = "MEETING"):
         # 1. 自动同步提问文本至搜索框，方便提问人核对、复制或重新编辑
         if query_text and query_text != "未识别到语音输入":
             self.main_window.query_input.setText(query_text)
@@ -316,7 +318,7 @@ class DeskEchoApp:
         else:
             formatted_answer = answer_markdown
 
-        self.main_window.display_answer(formatted_answer, audio_path, is_followup=is_followup, focal_topic=focal_topic)
+        self.main_window.display_answer(formatted_answer, audio_path, is_followup=is_followup, focal_topic=focal_topic, response_mode=response_mode)
 
         # 3. 若无 TTS 音频播放，立即恢复背景会议录制；若有播放，由 MainWindow.tts_playback_finished 在播完后恢复
         if not audio_path or not os.path.exists(audio_path):

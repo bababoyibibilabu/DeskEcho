@@ -18,21 +18,32 @@ QA_SYSTEM_PROMPT = """你是一个常驻企业桌面会议记忆助理 DeskEcho�
 回答原则：
 1. 【音视分离架构】：
    - 用户主要是通过语音对讲（耳朵听 + 眼睛看屏幕）。
-   - **TTS 语音播报必须极其精炼、干脆利落**！原则上只说 1~2 句话（30~50字以内），直奔答案人名、时间或核心决议，杜绝长篇大论和念诵时间戳；遇到复杂逻辑仅做最简短的核心概括。
+   - **TTS 语音播报必须极其精炼、干脆利落**！原则上只说 1~2 句话（35~50字以内），直奔答案人名、时间或核心决议，杜绝长篇大论和念诵时间戳；遇到复杂逻辑仅做最简短的核心概括。
    - **屏幕视觉展示必须详实严密**，包含具体时间段、表格、会议原始对话佐证，供用户抬眼查阅。
 2. 【多轮追问与释义深化支持】：
    - 若用户表示“没太懂/详细解释下/举个例子/为什么”：
      * 语音结论播报使用**生活化、通俗生动的比喻**，一语点破本质；
      * 屏幕详细说明展开技术原语、具体会议讨论争论细节及量化指标，绝不重复上一轮的表面套话。
-3. 【严格输出格式规范】：
-   请严格按照以下两段式结构输出：
+3. 【切片相关性核对与双轨自适应输出】：
+   请仔细核对下方的【参考会议记忆片段】是否与【用户提问】真正相关：
+   
+   ▶ 轨道 A：【会议有记录】（参考片段中确实讨论了该议题）：
+     - 严格基于内部会议记录与组织档案回答，绝不捏造；
+     - 输出结构：
+       > 🎙️ **结论播报**：[用1~2句极简、口语化的自然句子直接给出结论]
+       
+       ### 详细说明与溯源依据
+       [在此展开详细的背景、具体会议时间点（如 2026-10-28 14:00）、发言人、各切片佐证与逻辑推导]
 
-> 🎙️ **结论播报**：[用1~2句极简、口语化的自然句子直接给出结论，专供耳机/喇叭语音播报，不要带时间戳和冗余客套话]
+   ▶ 轨道 B：【会议无记录 / 外部通用问题】（参考片段中完全未涉及用户所问主题，如询问全网常识、外部知名公司、日常科技知识、通用概念等）：
+     - 自动触发全网通用知识拓展，切勿生硬拒绝，而是礼貌说明会议无记录并给出客观科普；
+     - 输出结构：
+       > 🎙️ **结论播报**：会议暂无记录。全网常识显示：[用1句话直接给出通用常识核心要点]
 
-### 详细说明与溯源依据
-[在此展开详细的背景、具体会议时间点（如 2026-10-25 09:30）、各切片佐证与逻辑推导，供屏幕阅读]
+       > 🌐 **全网通用知识解答**：过往内部会议中未检索到相关讨论，以下内容基于通用 AI 知识推导，非企业内部决策依据。
 
-4. 【实事求是】：若会议与组织档案均无依据，结论播报直接说：“过往会议记录中暂未找到相关信息”，绝不捏造。
+       ### 详细说明与科普
+       [在此条理清晰地展开 2~3 个维度的通用科普介绍，使用 Markdown 排版，重点加粗]
 """
 
 QA_USER_PROMPT = """{dialogue_context}【参考会议记忆片段】：
@@ -41,7 +52,33 @@ QA_USER_PROMPT = """{dialogue_context}【参考会议记忆片段】：
 【用户提问】：
 {query}
 
-{strategy_hint}请基于上述会议记忆片段与组织架构背景，给出带极简播报与详尽溯源的解答：
+{strategy_hint}请仔细核对上述会议记忆片段与组织架构背景，给出带极简播报与详尽溯源的解答：
+"""
+
+GENERAL_FALLBACK_SYSTEM_PROMPT = """你是一个常驻企业桌面会议记忆助理 DeskEcho。
+当前用户提出的问题在企业过往的会议记忆知识库中【完全未检索到任何讨论记录】。
+系统现已触发【全网通用常识拓展模式（General Knowledge Fallback）】。
+
+回答原则：
+1. 【音视分离架构】：
+   - **TTS 语音播报（结论播报）**：必须开门见山声明“会议暂无记录”，然后用 1~2 句话直接给出通用常识核心要点（35~50字），供语音播放。
+     示例：“会议暂无记录。全网常识显示：谷歌是一家全球领先的科技巨头，核心业务涵盖搜索引擎、Android 系统与云计算。”
+   - **屏幕视觉展示**：包含一段标准紫色卡片声明，随后条理分明地展开详细知识、背景科普或操作指引。
+2. 【严格输出格式规范】：
+   必须严格按照以下格式输出：
+
+> 🎙️ **结论播报**：会议暂无记录。[紧接着用1句话概括全网通识核心答案]
+
+> 🌐 **全网通用知识解答**：过往内部会议中未检索到相关讨论，以下内容基于通用 AI 知识推导，非企业内部决策依据。
+
+### 详细说明与科普
+[在此条理清晰地展开 2~3 个维度的详细介绍，使用 Markdown 排版，重点加粗]
+"""
+
+GENERAL_FALLBACK_USER_PROMPT = """{dialogue_context}【用户提问】：
+{query}
+
+请基于全网通用知识为用户提供客观、详实的常识解答（请严格遵照音视分离与双引言格式）：
 """
 
 class RAGEngine:
@@ -149,24 +186,36 @@ class RAGEngine:
                     part = f"【时间段】: {rec['start_time']} 至 {rec['end_time']}\n【结构化纪要】:\n{rec['summary']}\n【原始对话】:\n{rec['raw_text']}"
                     context_parts.append(part)
 
+        # 组装前序对话历史
+        dialogue_context = ""
+        if has_history:
+            hist_parts = []
+            for t_idx, turn in enumerate(history[-2:], 1):
+                hist_parts.append(f"轮次 {t_idx}：\n提问：{turn.user_query}\n回答要点：{turn.spoken_summary}")
+            dialogue_context = f"【前序问答交互脉络】：\n" + "\n\n".join(hist_parts) + "\n\n--------------------\n\n"
+
         if not context_parts:
-            default_reject = "过往会议记录中暂未找到相关信息。"
+            if on_progress:
+                on_progress("全网通识拓展", "🌐 会议库未命中该议题，已自动切换至全网通用知识解答...")
+            
+            answer, spoken_text = self._generate_general_fallback(query, dialogue_context=dialogue_context)
             turn = ConversationTurn(
                 user_query=query,
                 rewritten_query=search_query,
-                spoken_summary=default_reject,
-                detailed_markdown=f"> 🎙️ **结论播报**：{default_reject}\n\n### 详细说明与溯源依据\n当前会议知识库中未检索到与此相关的讨论片段。",
+                spoken_summary=spoken_text,
+                detailed_markdown=answer,
                 focal_topic=focal_topic,
                 slice_ids=[]
             )
             self.session_manager.add_turn(turn)
             return {
-                "answer": turn.detailed_markdown,
-                "spoken_text": default_reject,
+                "answer": answer,
+                "spoken_text": spoken_text,
                 "sources": [],
                 "is_followup": is_followup,
                 "action_type": action_type,
-                "focal_topic": focal_topic
+                "focal_topic": focal_topic,
+                "response_mode": "GENERAL"
             }
 
         matched_count = len(seen_ids)
@@ -220,6 +269,12 @@ class RAGEngine:
             answer = f"> 🎙️ **结论播报**：已为您匹配到相关会议片段，请查看屏幕卡片。\n\n### 详细说明与溯源依据\n{first_doc[:300]}..."
             spoken_text = "已为您匹配到相关会议片段，请查看屏幕卡片。"
 
+        # 判定最终返回模式：MEETING 还是 GENERAL
+        if "> 🌐 **全网通用知识解答**" in answer or "会议暂无记录" in spoken_text:
+            response_mode = "GENERAL"
+        else:
+            response_mode = "MEETING"
+
         # 6. 保存本轮会话记录
         new_turn = ConversationTurn(
             user_query=query,
@@ -227,20 +282,51 @@ class RAGEngine:
             spoken_summary=spoken_text,
             detailed_markdown=answer,
             focal_topic=focal_topic,
-            slice_ids=list(seen_ids)
+            slice_ids=list(seen_ids) if response_mode == "MEETING" else []
         )
         self.session_manager.add_turn(new_turn)
 
         return {
             "answer": answer,
             "spoken_text": spoken_text,
-            "sources": list(seen_ids),
+            "sources": list(seen_ids) if response_mode == "MEETING" else [],
             "rewrite_info": rewrite_result,
             "is_followup": is_followup,
             "action_type": action_type,
             "focal_topic": focal_topic,
+            "response_mode": response_mode,
             "turn_count": len(self.session_manager.turns)
         }
+
+    def _generate_general_fallback(self, query: str, dialogue_context: str = "") -> tuple:
+        """当内部会议库 0 匹配时，直接触发大模型全网通用知识解答"""
+        if not self.client:
+            default_txt = "过往会议记录中暂未找到相关信息。"
+            ans = f"> 🎙️ **结论播报**：{default_txt}\n\n> 🌐 **全网通用知识解答**：过往内部会议中未检索到相关讨论，当前未配置大模型密钥，无法推导演绎。\n\n### 详细说明\n知识库未命中该议题。"
+            return ans, default_txt
+
+        try:
+            sys_prompt = GENERAL_FALLBACK_SYSTEM_PROMPT
+            user_prompt = GENERAL_FALLBACK_USER_PROMPT.format(
+                dialogue_context=dialogue_context,
+                query=query
+            )
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": sys_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                temperature=0.3
+            )
+            answer = response.choices[0].message.content.strip()
+            spoken_text = self._extract_spoken_text(answer)
+            return answer, spoken_text
+        except Exception as e:
+            print(f"[RAGEngine] 全网通识推导异常: {e}")
+            default_txt = "会议暂无记录，外部大模型推导异常。"
+            ans = f"> 🎙️ **结论播报**：{default_txt}\n\n> 🌐 **全网通用知识解答**：过往内部会议未命中此话题，通用接口访问受阻。"
+            return ans, default_txt
 
     def _extract_spoken_text(self, markdown_answer: str) -> str:
         """从大模型输出中智能提取专门用于 TTS 极简朗读的结论句子"""

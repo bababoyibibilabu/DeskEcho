@@ -245,6 +245,18 @@ class StreamTextDisplay(QTextBrowser):
                 )
         escaped = re.sub(r'&gt;\s*❓?\s*\*\*(语音提问|连续追问|文字提问)\*\*[：:]\s*(.+?)(?=(?:\n\n|\n&lt;|\n#|$))', format_question, escaped, flags=re.DOTALL)
 
+        # 0.5 重点渲染 > 🌐 **全网通用知识解答**：
+        def format_general_badge(m):
+            content = m.group(1).strip()
+            return (
+                f'<div style="background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 rgba(139, 92, 246, 0.22), stop:1 rgba(168, 85, 247, 0.12)); '
+                f'border-left: 3px solid #8B5CF6; border-radius: 6px; padding: 8px 12px; margin: 6px 0 10px 0;">'
+                f'<div style="color: #C084FC; font-weight: bold; font-size: 10.5px; margin-bottom: 3px; letter-spacing: 0.5px;">'
+                f'🌐 全网通用知识解答 (非企业内部会议决策依据)</div>'
+                f'<div style="color: #E2E8F0; font-size: 12px; line-height: 1.5;">{content}</div></div>'
+            )
+        escaped = re.sub(r'&gt;\s*🌐?\s*\*\*全网通用知识解答\*\*[：:]\s*(.+?)(?=(?:\n\n|\n&lt;|\n#|$))', format_general_badge, escaped, flags=re.DOTALL)
+
         # 1. 重点渲染 > 🎙️ **结论播报**：为 美好智能 VI 风格三色渐变醒目标签卡
         def format_spoken(m):
             content = m.group(1).strip()
@@ -457,23 +469,36 @@ class IntercomBanner(QFrame):
         self.wave_vis.set_mode("speaking")
         self.wave_vis.set_active(True)
 
-    def set_completed(self, focal_topic: str = "", is_followup: bool = False):
+    def set_completed(self, focal_topic: str = "", is_followup: bool = False, response_mode: str = "MEETING"):
         self.stop_btn.hide()
         self.wave_vis.set_active(False)
-        self.badge_lbl.setText("⚡ 连续就绪" if is_followup else "✅ 检索完成")
-        self.badge_lbl.setStyleSheet("""
-            background-color: rgba(38, 176, 228, 0.15);
-            color: #81D4FA;
-            font-size: 11px;
-            font-weight: bold;
-            padding: 3px 8px;
-            border-radius: 5px;
-        """)
-        if focal_topic:
-            self.status_lbl.setText(f"回答已就绪 · 当前焦点「{focal_topic}」，长按【右 Alt】可针对该话题直接追问")
+        if response_mode == "GENERAL":
+            self.badge_lbl.setText("🌐 全网通用常识")
+            self.badge_lbl.setStyleSheet("""
+                background-color: rgba(139, 92, 246, 0.22);
+                color: #C084FC;
+                font-size: 11px;
+                font-weight: bold;
+                padding: 3px 8px;
+                border-radius: 5px;
+            """)
+            self.status_lbl.setText("未检索到内部会议记录 · 已自动降级为全网通用大模型知识解答")
+            self.status_lbl.setStyleSheet("color: #D8B4FE; font-size: 11.5px;")
         else:
-            self.status_lbl.setText("回答已就绪 · 长按【右 Alt】随时语音对讲追问")
-        self.status_lbl.setStyleSheet("color: #94A3B8; font-size: 11.5px;")
+            self.badge_lbl.setText("⚡ 连续就绪" if is_followup else "✅ 会议精准溯源")
+            self.badge_lbl.setStyleSheet("""
+                background-color: rgba(38, 176, 228, 0.15);
+                color: #81D4FA;
+                font-size: 11px;
+                font-weight: bold;
+                padding: 3px 8px;
+                border-radius: 5px;
+            """)
+            if focal_topic:
+                self.status_lbl.setText(f"回答已就绪 · 当前焦点「{focal_topic}」，长按【右 Alt】可针对该话题直接追问")
+            else:
+                self.status_lbl.setText("回答已就绪，已定位历史会议切片上下文")
+            self.status_lbl.setStyleSheet("color: #94A3B8; font-size: 11.5px;")
         self._reset_timer.start(8000)
 
     def set_interrupted(self):
@@ -1229,9 +1254,10 @@ class MainWindow(QMainWindow):
         splitter.setStyleSheet("QSplitter::handle { background: transparent; }")
 
         # 左卡：回答区域
-        ans_card = QFrame()
-        ans_card.setObjectName("card")
-        ans_layout = QVBoxLayout(ans_card)
+        self.ans_card = QFrame()
+        self.ans_card.setObjectName("ans_card")
+        self._set_ans_card_style("MEETING")
+        ans_layout = QVBoxLayout(self.ans_card)
         ans_layout.setContentsMargins(18, 16, 18, 16)
         ans_layout.setSpacing(10)
 
@@ -1330,7 +1356,7 @@ class MainWindow(QMainWindow):
         )
         ans_content_row.addWidget(self.answer_browser, 1)
         ans_layout.addLayout(ans_content_row, 1)
-        splitter.addWidget(ans_card)
+        splitter.addWidget(self.ans_card)
 
         # 右卡：近期切片资产动态流
         stream_card = QFrame()
@@ -1868,27 +1894,50 @@ class MainWindow(QMainWindow):
         self.clear_answer_session()
         self.search_status_lbl.setText("✓ 历史会话已删除")
 
+    def _set_ans_card_style(self, mode: str = "MEETING"):
+        """根据当前回答来源动态切换解答卡边框：科技青(内部会议) vs 灵动紫(全网通识)"""
+        if not hasattr(self, 'ans_card'):
+            return
+        if mode == "GENERAL":
+            self.ans_card.setStyleSheet("""
+                QFrame#ans_card {
+                    background-color: #0E1019;
+                    border: 1.5px solid rgba(139, 92, 246, 0.65);
+                    border-radius: 12px;
+                }
+            """)
+        else:
+            self.ans_card.setStyleSheet("""
+                QFrame#ans_card {
+                    background-color: #0E1017;
+                    border: 1px solid rgba(38, 176, 228, 0.28);
+                    border-radius: 12px;
+                }
+            """)
+
     def clear_answer_session(self):
         """清空当前问答界面和会话上下文"""
+        self._set_ans_card_style("MEETING")
         self.answer_browser.clear_history()
         self.intercom_banner.set_idle()
         if hasattr(self, 'session_drawer'):
             self.session_drawer.set_active_session("")
-            if self.session_drawer.isVisible():
+            if not self.session_drawer.isHidden():
                 self.session_drawer.refresh_sessions()
         self.new_session_requested.emit()
 
-    def display_answer(self, markdown_text: str, audio_path: str = "", is_followup: bool = False, focal_topic: str = ""):
+    def display_answer(self, markdown_text: str, audio_path: str = "", is_followup: bool = False, focal_topic: str = "", response_mode: str = "MEETING"):
         self.search_status_lbl.setText("")
+        self._set_ans_card_style(response_mode)
         self.answer_browser.start_streaming(markdown_text, is_followup=is_followup)
-        if hasattr(self, 'session_drawer') and self.session_drawer.isVisible():
+        if hasattr(self, 'session_drawer') and not self.session_drawer.isHidden():
             self.session_drawer.refresh_sessions()
         if audio_path and os.path.exists(audio_path):
             self.intercom_banner.set_speaking()
             self.player.setSource(QUrl.fromLocalFile(os.path.abspath(audio_path)))
             self.player.play()
         else:
-            self.intercom_banner.set_completed(focal_topic=focal_topic, is_followup=is_followup)
+            self.intercom_banner.set_completed(focal_topic=focal_topic, is_followup=is_followup, response_mode=response_mode)
 
     def show_interrupted_status(self):
         self.intercom_banner.set_interrupted()
