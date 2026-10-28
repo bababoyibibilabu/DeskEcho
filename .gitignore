@@ -50,6 +50,7 @@ OpenSSH-Win64/
 setup_*.ps1
 remote_*.ps1
 run_laptop.bat
+push_to_github.bat
 
 # =======================================================
 # 6. Python 与操作系统运行时缓存 (Runtime & Cache)
