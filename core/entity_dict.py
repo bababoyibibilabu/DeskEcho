@@ -16,6 +16,7 @@ EMPLOYEES: List[Dict[str, Any]] = [
     {
         "name": "张明",
         "title": "董事长 / 战略决策层",
+        "status": "active",
         "aliases": ["张总", "董事长", "老板"],
         "duties": "公司董事长，统筹公司全局方向、长期发展战略与关键资本规划",
         "tech_stack": "战略规划 / 资本运作 / 商业决策",
@@ -24,6 +25,7 @@ EMPLOYEES: List[Dict[str, Any]] = [
     {
         "name": "李志成",
         "title": "核心算法团队负责人",
+        "status": "active",
         "aliases": ["李工", "算法李", "志成"],
         "duties": "负责自适应学习系统、知识追踪模型（BKT）与算法工程落地",
         "tech_stack": "Python / PyTorch / BKT / 深度学习",
@@ -32,6 +34,7 @@ EMPLOYEES: List[Dict[str, Any]] = [
     {
         "name": "王程",
         "title": "产品总监 / 架构协调",
+        "status": "active",
         "aliases": ["王总", "程哥", "产品王"],
         "duties": "负责 DeskEcho 客户端体验、上线排期与跨部门研发试点推进",
         "tech_stack": "产品规划 / 敏捷交付 / 系统架构",
@@ -40,6 +43,7 @@ EMPLOYEES: List[Dict[str, Any]] = [
     {
         "name": "陈佳",
         "title": "供应链与采购总监",
+        "status": "active",
         "aliases": ["陈总监", "佳姐", "陈经理"],
         "duties": "负责硬件设备采购、算力集群设备招标及供应链把关",
         "tech_stack": "采购供应链 / 招投标 / 成本控制",
@@ -48,6 +52,7 @@ EMPLOYEES: List[Dict[str, Any]] = [
     {
         "name": "赵文",
         "title": "人力资源与组织发展总监",
+        "status": "active",
         "aliases": ["赵总监", "文姐", "赵主管"],
         "duties": "统筹全公司职级晋升、薪酬绩效考核及组织人才发展",
         "tech_stack": "HRBP / 绩效激励体系 / 组织发展",
@@ -56,6 +61,7 @@ EMPLOYEES: List[Dict[str, Any]] = [
     {
         "name": "周工",
         "title": "系统架构师 / 运维容灾专家",
+        "status": "active",
         "aliases": ["老周", "周工", "架构师"],
         "duties": "负责公司高可用服务器架构、双活灾备网络及专线容灾系统",
         "tech_stack": "高可用架构 / BGP多线容灾 / 故障应急",
@@ -64,6 +70,7 @@ EMPLOYEES: List[Dict[str, Any]] = [
     {
         "name": "刘晓",
         "title": "市场公关与商业合作经理",
+        "status": "active",
         "aliases": ["刘经理", "刘总", "市场公关"],
         "duties": "负责全球科技峰会参展布展、特装展位搭建及媒体公关合作",
         "tech_stack": "公关传播 / 展会统筹 / 商务合作",
@@ -72,6 +79,7 @@ EMPLOYEES: List[Dict[str, Any]] = [
     {
         "name": "林浩",
         "title": "质量监控与数据埋点工程师",
+        "status": "active",
         "aliases": ["林经理", "小林", "质量监控"],
         "duties": "负责客户端稳定性监控、核心用户行为埋点收集与故障告警",
         "tech_stack": "数据埋点 / APM 监控 / 日志分析",
@@ -80,10 +88,32 @@ EMPLOYEES: List[Dict[str, Any]] = [
     {
         "name": "李华",
         "title": "产品 UI / UE 视觉与交互专家",
+        "status": "active",
         "aliases": ["华哥", "李设计师", "UI", "设计"],
         "duties": "负责产品全链路视觉系统、Alma 美学黑曜石科技风格沉淀",
         "tech_stack": "UI/UE 设计 / 动效交互 / 视觉传达",
         "current_focus": "桌面回响三色渐变极光微交互与通讯录动态卡片体验"
+    },
+    # 过往确认离职成员 (折叠归档，信息暂时留存并支持溯源)
+    {
+        "name": "孙伟",
+        "title": "原前端与客户端架构负责人 (已离职)",
+        "status": "departed",
+        "departure_date": "2026-08-31",
+        "aliases": ["孙工", "老孙", "前端孙", "架构孙"],
+        "duties": "原前端架构与跨平台客户端研发负责人，主导了早期客户端技术选型与跨进程通信协议方案制定",
+        "tech_stack": "C++ / Qt / Electron / 跨平台架构",
+        "current_focus": "已于2026年8月离职移交；历史基础架构方案由王程与林浩承接演进"
+    },
+    {
+        "name": "钱敏",
+        "title": "原算法预研专家 (已离职)",
+        "status": "departed",
+        "departure_date": "2026-07-20",
+        "aliases": ["钱工", "小钱", "算法钱"],
+        "duties": "原知识追踪模型选型预研负责人，早期主导了 DKT 与 BKT 的理论对比与基准评测",
+        "tech_stack": "Python / 贝叶斯网络 / DKT / 预研评估",
+        "current_focus": "已于2026年7月离职移交；算法工程落地由李志成全面负责推进"
     }
 ]
 
@@ -154,9 +184,10 @@ def get_entity_context_prompt() -> str:
     lines.append(f"【核心业务】：{', '.join(COMPANY_INFO['projects'])}")
     lines.append("【组织架构与团队成员档案】：")
     for emp in EMPLOYEES:
-        aliases_str = f"（语音常见别名/误读：{', '.join(emp['aliases'])}）" if emp['aliases'] else ""
+        aliases_str = f"（语音常见别名/误读：{', '.join(emp['aliases'])}）" if emp.get('aliases') else ""
+        status_tag = "【状态：已离职，历史贡献档案留存】" if emp.get("status") == "departed" else "【状态：在职】"
         lines.append(
-            f"- {emp['name']}{aliases_str}：{emp['title']}。职责：{emp['duties']}。技术栈/特长：{emp['tech_stack']}。"
+            f"- {emp['name']}{aliases_str}：{emp['title']} {status_tag}。职责：{emp['duties']}。技术栈/特长：{emp['tech_stack']}。"
         )
     return "\n".join(lines)
 

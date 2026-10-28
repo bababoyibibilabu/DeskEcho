@@ -873,6 +873,7 @@ class ExpandableEmployeeCard(QFrame):
         self.store = store
         self.brand_color = color
         self.is_expanded = False
+        self.is_departed = (emp.get("status") == "departed")
 
         self.setObjectName("emp_card")
         self.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -887,12 +888,13 @@ class ExpandableEmployeeCard(QFrame):
         header_layout = QHBoxLayout()
         header_layout.setSpacing(10)
 
-        # 头像
+        # 头像 (若已离职使用沉稳暗灰色调)
+        avatar_bg = "#475569" if self.is_departed else self.brand_color
         self.avatar_lbl = QLabel(emp["name"][:1])
         self.avatar_lbl.setFixedSize(36, 36)
         self.avatar_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.avatar_lbl.setStyleSheet(f"""
-            background-color: {self.brand_color};
+            background-color: {avatar_bg};
             color: #FFFFFF;
             font-size: 15px;
             font-weight: bold;
@@ -917,6 +919,12 @@ class ExpandableEmployeeCard(QFrame):
         right_box = QVBoxLayout()
         right_box.setSpacing(3)
         right_box.setAlignment(Qt.AlignmentFlag.AlignRight)
+
+        # 离职状态徽章
+        if self.is_departed:
+            self.status_badge = QLabel("📁 已离职 · 档案留存")
+            self.status_badge.setStyleSheet("color: #94A3B8; font-size: 9.5px; background: rgba(148, 163, 184, 0.12); border: 1px solid rgba(148, 163, 184, 0.25); padding: 2px 6px; border-radius: 4px; font-weight: 600;")
+            right_box.addWidget(self.status_badge, alignment=Qt.AlignmentFlag.AlignRight)
 
         # 关联会议计数徽章
         self.meeting_badge = QLabel("🎙️ 关联 0 场会议")
@@ -1018,30 +1026,56 @@ class ExpandableEmployeeCard(QFrame):
         self.refresh_profile()
 
     def _apply_style(self, hover: bool = False):
-        if self.is_expanded:
-            self.setStyleSheet("""
-                QFrame#emp_card {
-                    background-color: #141724;
-                    border: 1px solid rgba(38, 176, 228, 0.55);
-                    border-radius: 10px;
-                }
-            """)
-        elif hover:
-            self.setStyleSheet("""
-                QFrame#emp_card {
-                    background-color: #151928;
-                    border: 1px solid rgba(38, 176, 228, 0.4);
-                    border-radius: 10px;
-                }
-            """)
+        if self.is_departed:
+            if self.is_expanded:
+                self.setStyleSheet("""
+                    QFrame#emp_card {
+                        background-color: #121522;
+                        border: 1px solid rgba(148, 163, 184, 0.45);
+                        border-radius: 10px;
+                    }
+                """)
+            elif hover:
+                self.setStyleSheet("""
+                    QFrame#emp_card {
+                        background-color: #121624;
+                        border: 1px dashed rgba(148, 163, 184, 0.35);
+                        border-radius: 10px;
+                    }
+                """)
+            else:
+                self.setStyleSheet("""
+                    QFrame#emp_card {
+                        background-color: #0E1119;
+                        border: 1px dashed rgba(255, 255, 255, 0.09);
+                        border-radius: 10px;
+                    }
+                """)
         else:
-            self.setStyleSheet("""
-                QFrame#emp_card {
-                    background-color: #12151F;
-                    border: 1px solid rgba(255, 255, 255, 0.08);
-                    border-radius: 10px;
-                }
-            """)
+            if self.is_expanded:
+                self.setStyleSheet("""
+                    QFrame#emp_card {
+                        background-color: #141724;
+                        border: 1px solid rgba(38, 176, 228, 0.55);
+                        border-radius: 10px;
+                    }
+                """)
+            elif hover:
+                self.setStyleSheet("""
+                    QFrame#emp_card {
+                        background-color: #151928;
+                        border: 1px solid rgba(38, 176, 228, 0.4);
+                        border-radius: 10px;
+                    }
+                """)
+            else:
+                self.setStyleSheet("""
+                    QFrame#emp_card {
+                        background-color: #12151F;
+                        border: 1px solid rgba(255, 255, 255, 0.08);
+                        border-radius: 10px;
+                    }
+                """)
 
     def enterEvent(self, event):
         if not self.is_expanded:
@@ -1068,7 +1102,8 @@ class ExpandableEmployeeCard(QFrame):
         super().mousePressEvent(event)
 
     def _on_search_clicked(self):
-        self.search_requested.emit(f"关于{self.emp['name']}在过往会议中的发言、决策与负责事项")
+        action_word = "历史会议决议、交接与发言" if self.is_departed else "发言、决策与负责事项"
+        self.search_requested.emit(f"关于{self.emp['name']}在过往会议中的{action_word}")
 
     def refresh_profile(self):
         """从 store 动态反查该成员的最新会议切片并重新计算画像"""
@@ -1077,10 +1112,14 @@ class ExpandableEmployeeCard(QFrame):
 
         # 1. 更新关联会议计数 Badge
         if m_count > 0:
-            self.meeting_badge.setText(f"🎙️ 关联 {m_count} 场会议")
+            prefix = "🎙️ 历史关联" if self.is_departed else "🎙️ 关联"
+            self.meeting_badge.setText(f"{prefix} {m_count} 场会议")
+            badge_color = "#94A3B8" if self.is_departed else "#26B0E4"
+            badge_bg = "rgba(148,163,184,0.12)" if self.is_departed else "rgba(38,176,228,0.12)"
+            badge_bd = "rgba(148,163,184,0.25)" if self.is_departed else "rgba(38,176,228,0.25)"
             self.meeting_badge.setStyleSheet(
-                "color: #26B0E4; font-size: 10px; background: rgba(38,176,228,0.12); "
-                "border: 1px solid rgba(38,176,228,0.25); padding: 2px 7px; border-radius: 4px; font-weight: 600;"
+                f"color: {badge_color}; font-size: 10px; background: {badge_bg}; "
+                f"border: 1px solid {badge_bd}; padding: 2px 7px; border-radius: 4px; font-weight: 600;"
             )
         else:
             self.meeting_badge.setText("🎙️ 暂无关联会议")
@@ -1091,7 +1130,18 @@ class ExpandableEmployeeCard(QFrame):
 
         # 2. 更新最新主导与动态高亮胶囊
         core_hl = profile.get("core_highlight", "")
-        if m_count > 0:
+        if self.is_departed:
+            self.hl_title_lbl.setText("📜 历史主导与交接决策" if m_count > 0 else "📋 离职交接与历史档案留存")
+            self.hl_title_lbl.setStyleSheet("color: #94A3B8; font-size: 10.5px; font-weight: bold;")
+            self.highlight_box.setStyleSheet("""
+                QFrame {
+                    background: rgba(148, 163, 184, 0.07);
+                    border-left: 3px solid #64748B;
+                    border-radius: 4px;
+                    padding: 6px 10px;
+                }
+            """)
+        elif m_count > 0:
             self.hl_title_lbl.setText("🔥 最近主导与会议决策")
             self.hl_title_lbl.setStyleSheet("color: #26B0E4; font-size: 10.5px; font-weight: bold;")
             self.highlight_box.setStyleSheet("""
@@ -1389,7 +1439,8 @@ class MainWindow(QMainWindow):
         self.nav_btns.append(self.btn_memory)
         side_layout.addWidget(self.btn_memory)
 
-        self.btn_roster = NavButton("👥", "企业通讯录", "9人")
+        active_roster_count = len([e for e in EMPLOYEES if e.get("status") != "departed"])
+        self.btn_roster = NavButton("👥", "企业通讯录", f"{active_roster_count}人")
         self.btn_roster.clicked.connect(lambda: self._switch_nav(2))
         self.nav_btns.append(self.btn_roster)
         side_layout.addWidget(self.btn_roster)
@@ -1857,7 +1908,10 @@ class MainWindow(QMainWindow):
         self.roster_search_input.textChanged.connect(self._filter_roster_cards)
         filter_bar.addWidget(self.roster_search_input, 1)
 
-        self.roster_stat_lbl = QLabel(f"👥 共收录 {len(EMPLOYEES)} 位核心成员 · 实时关联中台会议动态画像")
+        active_emps = [e for e in EMPLOYEES if e.get("status") != "departed"]
+        departed_emps = [e for e in EMPLOYEES if e.get("status") == "departed"]
+
+        self.roster_stat_lbl = QLabel(f"👥 在职成员 {len(active_emps)} 位 · 归档离职 {len(departed_emps)} 位 · 会议画像全量留存")
         self.roster_stat_lbl.setStyleSheet("color: #8AC657; font-size: 11px; font-weight: 600; padding: 0 4px;")
         filter_bar.addWidget(self.roster_stat_lbl)
 
@@ -1898,11 +1952,17 @@ class MainWindow(QMainWindow):
 
         cards_container = QWidget()
         cards_container.setStyleSheet("background: transparent;")
+        cards_vbox = QVBoxLayout(cards_container)
+        cards_vbox.setContentsMargins(0, 0, 8, 20)
+        cards_vbox.setSpacing(14)
+        cards_vbox.setAlignment(Qt.AlignmentFlag.AlignTop)
 
-        columns_layout = QHBoxLayout(cards_container)
-        columns_layout.setContentsMargins(0, 0, 8, 20)
-        columns_layout.setSpacing(12)
-        columns_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        # 在职成员双列容器
+        active_container = QWidget()
+        active_columns_layout = QHBoxLayout(active_container)
+        active_columns_layout.setContentsMargins(0, 0, 0, 0)
+        active_columns_layout.setSpacing(12)
+        active_columns_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
         self.col_left = QVBoxLayout()
         self.col_left.setSpacing(12)
@@ -1912,27 +1972,129 @@ class MainWindow(QMainWindow):
         self.col_right.setSpacing(12)
         self.col_right.setAlignment(Qt.AlignmentFlag.AlignTop)
 
-        columns_layout.addLayout(self.col_left, 1)
-        columns_layout.addLayout(self.col_right, 1)
+        active_columns_layout.addLayout(self.col_left, 1)
+        active_columns_layout.addLayout(self.col_right, 1)
+        cards_vbox.addWidget(active_container)
 
         # 美好智能 VI 品牌色谱
         colors = ["#13459D", "#26B0E4", "#8AC657", "#1E60B8", "#17A2B8", "#6DAE3E", "#2C75D3", "#38BDF8", "#78B847"]
 
         self.employee_cards = []
-        for idx, emp in enumerate(EMPLOYEES):
+        self.active_cards = []
+        self.departed_cards = []
+
+        # 填充在职成员卡片
+        for idx, emp in enumerate(active_emps):
             c = colors[idx % len(colors)]
             card = ExpandableEmployeeCard(emp, self.store, color=c)
             card.search_requested.connect(self._on_roster_search_requested)
             self.employee_cards.append(card)
+            self.active_cards.append(card)
 
             if idx % 2 == 0:
                 self.col_left.addWidget(card)
             else:
                 self.col_right.addWidget(card)
 
+        # 3. 已离职成员折叠区分隔与展开栏 (直接折叠收起，信息留存)
+        self.departed_toggle_btn = QPushButton(f"📁 已离职成员归档 ({len(departed_emps)} 人)  ▾ 点击展开历史沉淀档案")
+        self.departed_toggle_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.departed_toggle_btn.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(255, 255, 255, 0.02);
+                color: #94A3B8;
+                border: 1px dashed rgba(255, 255, 255, 0.12);
+                border-radius: 8px;
+                padding: 10px 14px;
+                font-size: 11.5px;
+                font-weight: 600;
+                text-align: left;
+            }
+            QPushButton:hover {
+                background-color: rgba(255, 255, 255, 0.05);
+                color: #E2E8F0;
+                border-color: rgba(38, 176, 228, 0.3);
+            }
+        """)
+        self.departed_toggle_btn.clicked.connect(self._toggle_departed_section)
+        cards_vbox.addWidget(self.departed_toggle_btn)
+
+        # 4. 已离职成员卡片容器 (默认折叠隐藏)
+        self.departed_container = QWidget()
+        self.departed_expanded = False
+        self.departed_container.setVisible(False)
+        dep_columns_layout = QHBoxLayout(self.departed_container)
+        dep_columns_layout.setContentsMargins(0, 2, 0, 0)
+        dep_columns_layout.setSpacing(12)
+        dep_columns_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+
+        self.col_dep_left = QVBoxLayout()
+        self.col_dep_left.setSpacing(12)
+        self.col_dep_left.setAlignment(Qt.AlignmentFlag.AlignTop)
+
+        self.col_dep_right = QVBoxLayout()
+        self.col_dep_right.setSpacing(12)
+        self.col_dep_right.setAlignment(Qt.AlignmentFlag.AlignTop)
+
+        dep_columns_layout.addLayout(self.col_dep_left, 1)
+        dep_columns_layout.addLayout(self.col_dep_right, 1)
+
+        # 填充已离职成员卡片
+        for idx, emp in enumerate(departed_emps):
+            card = ExpandableEmployeeCard(emp, self.store, color="#475569")
+            card.search_requested.connect(self._on_roster_search_requested)
+            self.employee_cards.append(card)
+            self.departed_cards.append(card)
+
+            if idx % 2 == 0:
+                self.col_dep_left.addWidget(card)
+            else:
+                self.col_dep_right.addWidget(card)
+
+        cards_vbox.addWidget(self.departed_container)
+
         scroll.setWidget(cards_container)
         page_layout.addWidget(scroll, 1)
         stack.addWidget(page)
+
+    def _toggle_departed_section(self):
+        """展开或折叠已离职成员历史档案"""
+        self.departed_expanded = not getattr(self, "departed_expanded", False)
+        self.departed_container.setVisible(self.departed_expanded)
+        dep_count = len(self.departed_cards)
+        if self.departed_expanded:
+            self.departed_toggle_btn.setText(f"📁 已离职成员归档 ({dep_count} 人)  ▴ 点击收起历史归档")
+            self.departed_toggle_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: rgba(38, 176, 228, 0.05);
+                    color: #26B0E4;
+                    border: 1px solid rgba(38, 176, 228, 0.25);
+                    border-radius: 8px;
+                    padding: 10px 14px;
+                    font-size: 11.5px;
+                    font-weight: 600;
+                    text-align: left;
+                }
+            """)
+        else:
+            self.departed_toggle_btn.setText(f"📁 已离职成员归档 ({dep_count} 人)  ▾ 点击展开历史沉淀档案")
+            self.departed_toggle_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: rgba(255, 255, 255, 0.02);
+                    color: #94A3B8;
+                    border: 1px dashed rgba(255, 255, 255, 0.12);
+                    border-radius: 8px;
+                    padding: 10px 14px;
+                    font-size: 11.5px;
+                    font-weight: 600;
+                    text-align: left;
+                }
+                QPushButton:hover {
+                    background-color: rgba(255, 255, 255, 0.05);
+                    color: #E2E8F0;
+                    border-color: rgba(38, 176, 228, 0.3);
+                }
+            """)
 
     def _on_roster_search_requested(self, query: str):
         """卡片内一键点击检索发起跳转对讲搜索"""
@@ -1944,6 +2106,7 @@ class MainWindow(QMainWindow):
         """实时响应通讯录搜索过滤"""
         kw = text.strip().lower()
         matched_count = 0
+        departed_matched = 0
         for card in self.employee_cards:
             emp = card.emp
             is_match = (
@@ -1957,11 +2120,27 @@ class MainWindow(QMainWindow):
             card.setVisible(is_match)
             if is_match:
                 matched_count += 1
+                if getattr(card, "is_departed", False):
+                    departed_matched += 1
+
+        active_count = len(self.active_cards)
+        dep_total = len(self.departed_cards)
 
         if kw:
             self.roster_stat_lbl.setText(f"🔍 筛选出 {matched_count} 位成员 (共 {len(EMPLOYEES)} 位)")
+            if departed_matched > 0:
+                self.departed_container.setVisible(True)
+                self.departed_expanded = True
+                self.departed_toggle_btn.setText(f"📁 已离职成员归档 (包含 {departed_matched} 位搜索命中)  ▴ 已自动展开")
+            else:
+                self.departed_container.setVisible(False)
+                self.departed_expanded = False
+                self.departed_toggle_btn.setText(f"📁 已离职成员归档 ({dep_total} 人)  ▾ 点击展开历史沉淀档案")
         else:
-            self.roster_stat_lbl.setText(f"👥 共收录 {len(EMPLOYEES)} 位核心成员 · 实时关联中台会议动态画像")
+            self.roster_stat_lbl.setText(f"👥 在职成员 {active_count} 位 · 归档离职 {dep_total} 位 · 会议画像全量留存")
+            self.departed_container.setVisible(False)
+            self.departed_expanded = False
+            self.departed_toggle_btn.setText(f"📁 已离职成员归档 ({dep_total} 人)  ▾ 点击展开历史沉淀档案")
 
     def refresh_roster(self):
         """刷新所有成员卡片的动态画像与最新会议关联"""
