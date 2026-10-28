@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QLineEdit, QTextBrowser, QFrame, QSplitter,
     QListWidget, QListWidgetItem, QGraphicsDropShadowEffect,
-    QStackedWidget, QScrollArea, QGridLayout, QSizePolicy
+    QStackedWidget, QScrollArea, QGridLayout, QSizePolicy, QMenu
 )
 from PyQt6.QtGui import QColor, QFont, QIcon, QPainter, QBrush, QPen, QLinearGradient
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
@@ -141,6 +141,31 @@ class StreamTextDisplay(QTextBrowser):
             "并以<b>音视分离</b>策略给出结论播报与精准上下文溯源"
             "</div>"
         )
+
+    def load_history_session(self, turns: list):
+        """一次性加载整场历史会话的所有问答卡片"""
+        self._timer.stop()
+        self._history_turns.clear()
+        self._full_text = ""
+        self._current_index = 0
+
+        if not turns:
+            self.clear_history()
+            return
+
+        for i, t in enumerate(turns):
+            user_q = t.get("user_query", "").strip()
+            markdown_body = t.get("detailed_markdown", "").strip()
+            is_follow = (i > 0)
+            q_label = "连续追问" if is_follow else "语音提问"
+            if user_q and not markdown_body.startswith("> ❓"):
+                full_card_text = f"> ❓ **{q_label}**：{user_q}\n\n{markdown_body}"
+            else:
+                full_card_text = markdown_body
+            card_html = self._format_turn_html(full_card_text, is_streaming=False)
+            self._history_turns.append(card_html)
+
+        self._render_combined("", is_streaming=False, use_cached_latest=True)
 
     def start_streaming(self, markdown_text: str, is_followup: bool = False):
         if not is_followup:
@@ -500,6 +525,242 @@ class IntercomBanner(QFrame):
         self._reset_timer.start(3500)
 
 
+class SessionDrawer(QFrame):
+    """
+    ChatGPT / Cursor 风格的侧边折叠历史会话列表抽屉
+    - 支持按时间（今日/昨日/更早）分组展现历史问答
+    - 支持实时模糊搜索会话主题
+    - 点击即刻回溯历史问答卡片并继承上下文继续追问
+    - 右键快捷删除会话
+    """
+    session_selected = pyqtSignal(str)       # session_id
+    new_chat_clicked = pyqtSignal()
+    session_deleted = pyqtSignal(str)        # session_id
+
+    def __init__(self, meeting_store: MeetingStore, parent=None):
+        super().__init__(parent)
+        self.store = meeting_store
+        self.setFixedWidth(240)
+        self.setObjectName("sessionDrawer")
+        self.setStyleSheet("""
+            QFrame#sessionDrawer {
+                background-color: #0A0D14;
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 10px;
+            }
+        """)
+
+        self._active_session_id = ""
+        self._all_sessions = []
+        self._setup_ui()
+
+    def _setup_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(8)
+
+        # 1. 顶栏：标题 + 新建 + 关闭
+        top_row = QHBoxLayout()
+        top_row.setSpacing(6)
+        
+        title_lbl = QLabel("📜 会话历史")
+        title_lbl.setStyleSheet("color: #FFFFFF; font-size: 13px; font-weight: 700;")
+        top_row.addWidget(title_lbl)
+        top_row.addStretch()
+
+        self.new_btn = QPushButton("➕ 新建")
+        self.new_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.new_btn.setToolTip("开启全新问答话题")
+        self.new_btn.setStyleSheet("""
+            QPushButton {
+                background: rgba(38, 176, 228, 0.15);
+                border: 1px solid rgba(38, 176, 228, 0.4);
+                color: #26B0E4;
+                border-radius: 6px;
+                padding: 3px 8px;
+                font-size: 11px;
+                font-weight: 600;
+            }
+            QPushButton:hover {
+                background: rgba(38, 176, 228, 0.3);
+                color: #FFFFFF;
+            }
+        """)
+        self.new_btn.clicked.connect(self.new_chat_clicked.emit)
+        top_row.addWidget(self.new_btn)
+
+        self.close_btn = QPushButton("✕")
+        self.close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.close_btn.setToolTip("收起历史列表")
+        self.close_btn.setStyleSheet("""
+            QPushButton {
+                background: transparent;
+                border: none;
+                color: #64748B;
+                font-size: 12px;
+                padding: 2px 6px;
+            }
+            QPushButton:hover {
+                color: #F8FAFC;
+            }
+        """)
+        self.close_btn.clicked.connect(self.hide)
+        top_row.addWidget(self.close_btn)
+        layout.addLayout(top_row)
+
+        # 2. 搜索框
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("🔍 搜索历史话题...")
+        self.search_input.setStyleSheet("""
+            QLineEdit {
+                background-color: #121622;
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 6px;
+                padding: 5px 8px;
+                font-size: 11px;
+                color: #FFFFFF;
+            }
+            QLineEdit:focus {
+                border-color: #26B0E4;
+            }
+        """)
+        self.search_input.textChanged.connect(self._filter_sessions)
+        layout.addWidget(self.search_input)
+
+        # 3. 会话列表
+        self.list_widget = QListWidget()
+        self.list_widget.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.list_widget.setVerticalScrollMode(QListWidget.ScrollMode.ScrollPerPixel)
+        self.list_widget.setStyleSheet("""
+            QListWidget {
+                background-color: transparent;
+                border: none;
+                outline: none;
+            }
+            QListWidget::item {
+                background-color: #121724;
+                border: 1px solid rgba(255, 255, 255, 0.04);
+                border-radius: 8px;
+                padding: 8px 10px;
+                margin-bottom: 6px;
+                color: #CBD5E1;
+            }
+            QListWidget::item:hover {
+                background-color: #162032;
+                border-color: rgba(38, 176, 228, 0.4);
+            }
+            QListWidget::item:selected {
+                background-color: #132742;
+                border-color: #26B0E4;
+                color: #FFFFFF;
+            }
+        """)
+        self.list_widget.itemClicked.connect(self._on_item_clicked)
+        self.list_widget.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.list_widget.customContextMenuRequested.connect(self._show_context_menu)
+        layout.addWidget(self.list_widget, 1)
+
+    def set_active_session(self, session_id: str):
+        self._active_session_id = session_id
+        for i in range(self.list_widget.count()):
+            item = self.list_widget.item(i)
+            sid = item.data(Qt.ItemDataRole.UserRole)
+            if sid == session_id:
+                self.list_widget.setCurrentItem(item)
+                break
+
+    def refresh_sessions(self):
+        try:
+            self._all_sessions = self.store.get_all_sessions(limit=60)
+        except Exception as e:
+            print(f"[SessionDrawer] 加载会话列表失败: {e}")
+            self._all_sessions = []
+        self._render_items(self._all_sessions)
+
+    def _filter_sessions(self, text: str):
+        query = text.strip().lower()
+        if not query:
+            self._render_items(self._all_sessions)
+            return
+        filtered = [
+            s for s in self._all_sessions
+            if query in s.get("title", "").lower()
+        ]
+        self._render_items(filtered)
+
+    def _render_items(self, sessions):
+        self.list_widget.clear()
+        if not sessions:
+            empty_item = QListWidgetItem("暂无历史问答记录")
+            empty_item.setFlags(Qt.ItemFlag.NoItemFlags)
+            empty_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.list_widget.addItem(empty_item)
+            return
+
+        now = datetime.datetime.now()
+        today_str = now.strftime("%Y-%m-%d")
+        yesterday_str = (now - datetime.timedelta(days=1)).strftime("%Y-%m-%d")
+
+        for s in sessions:
+            sid = s["id"]
+            title = s.get("title") or "未命名会话"
+            turn_count = s.get("turn_count", 1)
+            updated_at = s.get("updated_at", "")
+
+            date_part = updated_at.split(" ")[0] if " " in updated_at else updated_at
+            time_part = updated_at.split(" ")[1][:5] if " " in updated_at else ""
+            if date_part == today_str:
+                group_tag = f"今天 {time_part}"
+            elif date_part == yesterday_str:
+                group_tag = f"昨天 {time_part}"
+            else:
+                group_tag = f"{date_part}"
+
+            item = QListWidgetItem()
+            item.setData(Qt.ItemDataRole.UserRole, sid)
+            item_text = f"💬 {title}\n    ⏱️ {group_tag} · {turn_count} 轮"
+            item.setText(item_text)
+            self.list_widget.addItem(item)
+            if sid == self._active_session_id:
+                item.setSelected(True)
+
+    def _on_item_clicked(self, item: QListWidgetItem):
+        sid = item.data(Qt.ItemDataRole.UserRole)
+        if sid:
+            self._active_session_id = sid
+            self.session_selected.emit(sid)
+
+    def _show_context_menu(self, pos):
+        item = self.list_widget.itemAt(pos)
+        if not item:
+            return
+        sid = item.data(Qt.ItemDataRole.UserRole)
+        if not sid:
+            return
+
+        menu = QMenu(self)
+        menu.setStyleSheet("""
+            QMenu {
+                background-color: #121724;
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                color: #E2E8F0;
+                font-size: 11px;
+                padding: 4px;
+            }
+            QMenu::item:selected {
+                background-color: #EF4444;
+                color: #FFFFFF;
+                border-radius: 4px;
+            }
+        """)
+        del_action = menu.addAction("🗑️ 删除此会话")
+        action = menu.exec(self.list_widget.mapToGlobal(pos))
+        if action == del_action:
+            self.store.delete_session(sid)
+            self.session_deleted.emit(sid)
+            self.refresh_sessions()
+
+
 class NavButton(QPushButton):
     """
     Alma 风格的侧边栏导航按钮 (激活状态带微光指示条与柔和高亮)
@@ -578,6 +839,7 @@ class MainWindow(QMainWindow):
     inject_demo_requested = pyqtSignal()
     tts_playback_finished = pyqtSignal()
     new_session_requested = pyqtSignal()
+    session_switched = pyqtSignal(str)
 
     def __init__(self, meeting_store: MeetingStore):
         super().__init__()
@@ -979,6 +1241,27 @@ class MainWindow(QMainWindow):
         ans_title_row.addWidget(ans_title)
         ans_title_row.addStretch()
 
+        self.history_btn = QPushButton("📜 会话历史")
+        self.history_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.history_btn.setToolTip("展开/收起历史追问会话列表 (ChatGPT风格抽屉)")
+        self.history_btn.setStyleSheet("""
+            QPushButton {
+                background: rgba(38, 176, 228, 0.12);
+                border: 1px solid rgba(38, 176, 228, 0.35);
+                border-radius: 6px;
+                color: #26B0E4;
+                font-size: 11px;
+                padding: 4px 10px;
+                font-weight: 600;
+            }
+            QPushButton:hover {
+                background: rgba(38, 176, 228, 0.25);
+                color: #FFFFFF;
+            }
+        """)
+        self.history_btn.clicked.connect(self.toggle_history_drawer)
+        ans_title_row.addWidget(self.history_btn)
+
         self.new_session_btn = QPushButton("🔄 开启新会话")
         self.new_session_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.new_session_btn.setToolTip("清空上下文，开启全新的独立话题")
@@ -1013,6 +1296,18 @@ class MainWindow(QMainWindow):
         self.intercom_banner.interrupted_clicked.connect(self.stop_speaking)
         ans_layout.addWidget(self.intercom_banner)
 
+        # 核心解答与历史会话抽屉布局 (水平排布：左抽屉折叠展开，右文本流)
+        ans_content_row = QHBoxLayout()
+        ans_content_row.setContentsMargins(0, 0, 0, 0)
+        ans_content_row.setSpacing(10)
+
+        self.session_drawer = SessionDrawer(self.store, parent=self)
+        self.session_drawer.hide()
+        self.session_drawer.session_selected.connect(self._on_history_session_selected)
+        self.session_drawer.new_chat_clicked.connect(self.clear_answer_session)
+        self.session_drawer.session_deleted.connect(self._on_history_session_deleted)
+        ans_content_row.addWidget(self.session_drawer)
+
         self.answer_browser = StreamTextDisplay()
         self.answer_browser.setOpenExternalLinks(True)
         self.answer_browser.setStyleSheet("""
@@ -1033,7 +1328,8 @@ class MainWindow(QMainWindow):
             "并以<b>音视分离</b>策略给出结论播报与精准上下文溯源"
             "</div>"
         )
-        ans_layout.addWidget(self.answer_browser, 1)
+        ans_content_row.addWidget(self.answer_browser, 1)
+        ans_layout.addLayout(ans_content_row, 1)
         splitter.addWidget(ans_card)
 
         # 右卡：近期切片资产动态流
@@ -1520,15 +1816,73 @@ class MainWindow(QMainWindow):
         else:
             self.intercom_banner.set_stage(step, title, detail)
 
+    def toggle_history_drawer(self):
+        """展开或收起历史会话抽屉"""
+        if not self.session_drawer.isHidden():
+            self.session_drawer.hide()
+            self.history_btn.setStyleSheet("""
+                QPushButton {
+                    background: rgba(38, 176, 228, 0.12);
+                    border: 1px solid rgba(38, 176, 228, 0.35);
+                    border-radius: 6px;
+                    color: #26B0E4;
+                    font-size: 11px;
+                    padding: 4px 10px;
+                    font-weight: 600;
+                }
+                QPushButton:hover {
+                    background: rgba(38, 176, 228, 0.25);
+                    color: #FFFFFF;
+                }
+            """)
+        else:
+            self.session_drawer.refresh_sessions()
+            self.session_drawer.show()
+            self.history_btn.setStyleSheet("""
+                QPushButton {
+                    background: #26B0E4;
+                    border: 1px solid #26B0E4;
+                    border-radius: 6px;
+                    color: #0A0C10;
+                    font-size: 11px;
+                    padding: 4px 10px;
+                    font-weight: 700;
+                }
+            """)
+
+    def _on_history_session_selected(self, session_id: str):
+        turns = self.store.get_session_turns(session_id)
+        self.answer_browser.load_history_session(turns)
+        self.session_switched.emit(session_id)
+        
+        title = "历史话题"
+        sessions = self.store.get_all_sessions(limit=100)
+        for s in sessions:
+            if s["id"] == session_id:
+                title = s.get("title", "")
+                break
+        self.intercom_banner.set_completed(focal_topic=title, is_followup=True)
+        self.search_status_lbl.setText(f"✓ 已载入历史话题「{title}」，可长按【右 Alt】直接追问")
+
+    def _on_history_session_deleted(self, session_id: str):
+        self.clear_answer_session()
+        self.search_status_lbl.setText("✓ 历史会话已删除")
+
     def clear_answer_session(self):
         """清空当前问答界面和会话上下文"""
         self.answer_browser.clear_history()
         self.intercom_banner.set_idle()
+        if hasattr(self, 'session_drawer'):
+            self.session_drawer.set_active_session("")
+            if self.session_drawer.isVisible():
+                self.session_drawer.refresh_sessions()
         self.new_session_requested.emit()
 
     def display_answer(self, markdown_text: str, audio_path: str = "", is_followup: bool = False, focal_topic: str = ""):
         self.search_status_lbl.setText("")
         self.answer_browser.start_streaming(markdown_text, is_followup=is_followup)
+        if hasattr(self, 'session_drawer') and self.session_drawer.isVisible():
+            self.session_drawer.refresh_sessions()
         if audio_path and os.path.exists(audio_path):
             self.intercom_banner.set_speaking()
             self.player.setSource(QUrl.fromLocalFile(os.path.abspath(audio_path)))

@@ -1,4 +1,5 @@
 import time
+import uuid
 from dataclasses import dataclass, field
 from typing import List, Optional, Dict, Any
 
@@ -22,19 +23,98 @@ class SessionManager:
     - 借鉴 Dify 与 LangChain 会话缓冲模型
     - 支持时间衰减 (默认 10 分钟未交互自动断开上下文)
     - 滑动窗口截断 (保留最近 K=3 轮高保真问答)
+    - 支持 SQLite 会话与轮次全量持久化
     """
-    def __init__(self, ttl_seconds: float = 600.0, max_turns: int = 3):
+    def __init__(self, store=None, ttl_seconds: float = 600.0, max_turns: int = 3):
+        self.store = store
         self.ttl_seconds = ttl_seconds
         self.max_turns = max_turns
         self.turns: List[ConversationTurn] = []
         self.last_active_time = 0.0
+        self.current_session_id = f"session_{int(time.time())}_{uuid.uuid4().hex[:6]}"
+        self.current_session_title = ""
+        self.current_total_turns = 0
+
+    def start_new_session(self) -> str:
+        """主动清空当前内存上下文，开启全新的独立会话"""
+        self.clear()
+        self.current_session_id = f"session_{int(time.time())}_{uuid.uuid4().hex[:6]}"
+        self.current_session_title = ""
+        self.current_total_turns = 0
+        return self.current_session_id
 
     def add_turn(self, turn: ConversationTurn):
-        """记录新一轮对话"""
+        """记录新一轮对话，并持久化至 SQLite 会话存储"""
         self.turns.append(turn)
         if len(self.turns) > self.max_turns:
             self.turns.pop(0)
         self.last_active_time = time.time()
+        self.current_total_turns += 1
+
+        # 提炼会话标题 (若尚未命名，用焦点话题或首个问题提炼)
+        if not self.current_session_title:
+            if turn.focal_topic and turn.focal_topic not in ("无", "通用"):
+                self.current_session_title = f"{turn.focal_topic}探讨"
+            else:
+                self.current_session_title = turn.user_query[:20].strip()
+
+        # 持久化到存储
+        if self.store:
+            try:
+                self.store.create_or_update_session(
+                    session_id=self.current_session_id,
+                    title=self.current_session_title,
+                    turn_count=self.current_total_turns
+                )
+                turn_id = f"turn_{int(time.time() * 1000)}_{uuid.uuid4().hex[:4]}"
+                self.store.save_chat_turn(
+                    turn_id=turn_id,
+                    session_id=self.current_session_id,
+                    turn_index=self.current_total_turns,
+                    user_query=turn.user_query,
+                    rewritten_query=turn.rewritten_query,
+                    spoken_summary=turn.spoken_summary,
+                    detailed_markdown=turn.detailed_markdown,
+                    focal_topic=turn.focal_topic,
+                    slice_ids=turn.slice_ids
+                )
+            except Exception as e:
+                print(f"[SessionManager] 持久化会话轮次失败: {e}")
+
+    def load_session(self, session_id: str) -> List[ConversationTurn]:
+        """从 SQLite 加载指定历史会话，恢复上下文并设为当前活跃会话"""
+        self.clear()
+        self.current_session_id = session_id
+        if not self.store:
+            return []
+        
+        db_turns = self.store.get_session_turns(session_id)
+        if not db_turns:
+            return []
+
+        self.current_total_turns = len(db_turns)
+        sessions = self.store.get_all_sessions(limit=100)
+        for s in sessions:
+            if s["id"] == session_id:
+                self.current_session_title = s.get("title", "")
+                break
+
+        loaded_turns = []
+        for t in db_turns:
+            ct = ConversationTurn(
+                user_query=t.get("user_query", ""),
+                rewritten_query=t.get("rewritten_query", ""),
+                spoken_summary=t.get("spoken_summary", ""),
+                detailed_markdown=t.get("detailed_markdown", ""),
+                focal_topic=t.get("focal_topic", ""),
+                slice_ids=t.get("slice_ids", [])
+            )
+            loaded_turns.append(ct)
+
+        self.turns = loaded_turns[-self.max_turns:]
+        self.last_active_time = time.time()
+        print(f"[SessionManager] 已恢复会话 {session_id}，载入 {len(self.turns)} 轮上下文。")
+        return self.turns
 
     def get_valid_history(self) -> List[ConversationTurn]:
         """获取未超时的有效会话历史"""

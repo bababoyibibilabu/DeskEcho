@@ -39,6 +39,30 @@ class MeetingStore:
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
+            self.conn.execute("""
+                CREATE TABLE IF NOT EXISTS chat_sessions (
+                    id TEXT PRIMARY KEY,
+                    title TEXT,
+                    turn_count INTEGER DEFAULT 1,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            self.conn.execute("""
+                CREATE TABLE IF NOT EXISTS chat_turns (
+                    id TEXT PRIMARY KEY,
+                    session_id TEXT NOT NULL,
+                    turn_index INTEGER,
+                    user_query TEXT,
+                    rewritten_query TEXT,
+                    spoken_summary TEXT,
+                    detailed_markdown TEXT,
+                    focal_topic TEXT,
+                    slice_ids TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY(session_id) REFERENCES chat_sessions(id) ON DELETE CASCADE
+                )
+            """)
 
     def insert_record(self, slice_id: str, start_time: str, end_time: str, raw_text: str, summary: str, audio_path: str = ""):
         with self.conn:
@@ -171,3 +195,66 @@ class MeetingStore:
         )
         rows = cursor.fetchall()
         return [dict(row) for row in rows]
+
+    # ---------------- 历史问答与多轮会话持久化 ----------------
+    def create_or_update_session(self, session_id: str, title: str, turn_count: int = 1):
+        """创建或更新会话元数据"""
+        with self.conn:
+            self.conn.execute("""
+                INSERT INTO chat_sessions (id, title, turn_count, updated_at)
+                VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(id) DO UPDATE SET
+                    title = excluded.title,
+                    turn_count = excluded.turn_count,
+                    updated_at = CURRENT_TIMESTAMP
+            """, (session_id, title, turn_count))
+
+    def save_chat_turn(self, turn_id: str, session_id: str, turn_index: int, user_query: str,
+                       rewritten_query: str, spoken_summary: str, detailed_markdown: str,
+                       focal_topic: str, slice_ids: List[str]):
+        """持久化保存会话的单轮问答详情"""
+        import json
+        with self.conn:
+            self.conn.execute("""
+                INSERT OR REPLACE INTO chat_turns
+                (id, session_id, turn_index, user_query, rewritten_query, spoken_summary, detailed_markdown, focal_topic, slice_ids)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (turn_id, session_id, turn_index, user_query, rewritten_query, spoken_summary,
+                  detailed_markdown, focal_topic, json.dumps(slice_ids, ensure_ascii=False)))
+
+    def get_all_sessions(self, limit: int = 50) -> List[Dict[str, Any]]:
+        """获取所有历史会话概要（按最后活跃时间倒序）"""
+        cursor = self.conn.cursor()
+        cursor.execute("""
+            SELECT id, title, turn_count, created_at, updated_at
+            FROM chat_sessions
+            ORDER BY updated_at DESC
+            LIMIT ?
+        """, (limit,))
+        return [dict(row) for row in cursor.fetchall()]
+
+    def get_session_turns(self, session_id: str) -> List[Dict[str, Any]]:
+        """拉取指定会话下的全部历史问答卡片（按轮次正序）"""
+        import json
+        cursor = self.conn.cursor()
+        cursor.execute("""
+            SELECT id, session_id, turn_index, user_query, rewritten_query, spoken_summary, detailed_markdown, focal_topic, slice_ids, created_at
+            FROM chat_turns
+            WHERE session_id = ?
+            ORDER BY turn_index ASC
+        """, (session_id,))
+        rows = []
+        for r in cursor.fetchall():
+            d = dict(r)
+            try:
+                d["slice_ids"] = json.loads(d["slice_ids"]) if d.get("slice_ids") else []
+            except Exception:
+                d["slice_ids"] = []
+            rows.append(d)
+        return rows
+
+    def delete_session(self, session_id: str):
+        """删除指定历史会话及其关联问答卡片"""
+        with self.conn:
+            self.conn.execute("DELETE FROM chat_turns WHERE session_id = ?", (session_id,))
+            self.conn.execute("DELETE FROM chat_sessions WHERE id = ?", (session_id,))

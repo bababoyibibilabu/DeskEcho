@@ -52,7 +52,7 @@ class RAGEngine:
         self.model = Config.LLM_MODEL
         self.client = None
         self.rewriter = QueryRewriter()
-        self.session_manager = SessionManager(ttl_seconds=600.0, max_turns=3)
+        self.session_manager = SessionManager(store=self.store, ttl_seconds=600.0, max_turns=3)
         self.entity_context = get_entity_context_prompt()
         
         if self.api_key:
@@ -67,8 +67,12 @@ class RAGEngine:
 
     def reset_session(self):
         """主动清空会话上下文 (开启新对话)"""
-        self.session_manager.clear()
-        print("[RAGEngine] 会话上下文已清空，开启新话题。")
+        self.session_manager.start_new_session()
+        print("[RAGEngine] 会话上下文已清空，开启全新独立话题。")
+
+    def load_session(self, session_id: str):
+        """加载历史会话并激活上下文"""
+        return self.session_manager.load_session(session_id)
 
     def answer_query(self, query: str, on_progress: Optional[Callable[[str, str], None]] = None) -> Dict[str, Any]:
         """

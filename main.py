@@ -78,6 +78,7 @@ class DeskEchoApp:
         # 文字提问与新话题控制
         self.main_window.query_submitted.connect(self._process_text_query)
         self.main_window.new_session_requested.connect(self._handle_new_session)
+        self.main_window.session_switched.connect(self._handle_session_switched)
 
         # 录制开关与托盘联动
         self.main_window.record_toggled.connect(self._on_main_record_toggled)
@@ -297,6 +298,11 @@ class DeskEchoApp:
         """用户点击清空/开启新会话时重置上下文"""
         self.rag.reset_session()
         print("[DeskEchoApp] 对话上下文已重置，开启全新独立提问。")
+
+    def _handle_session_switched(self, session_id: str):
+        """用户从历史抽屉切换回某个历史会话时，恢复其多轮上下文"""
+        self.rag.load_session(session_id)
+        print(f"[DeskEchoApp] 已切换并激活历史会话上下文: {session_id}")
 
     def _handle_query_answered(self, query_text: str, answer_markdown: str, audio_path: str, is_followup: bool = False, focal_topic: str = ""):
         # 1. 自动同步提问文本至搜索框，方便提问人核对、复制或重新编辑
