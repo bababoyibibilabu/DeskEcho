@@ -82,7 +82,7 @@ class SessionManager:
                 print(f"[SessionManager] 持久化会话轮次失败: {e}")
 
     def load_session(self, session_id: str) -> List[ConversationTurn]:
-        """从 SQLite 加载指定历史会话，恢复上下文并设为当前活跃会话"""
+        """从 SQLite 加载指定历史会话，若在 TTL 内则恢复上下文；若已超时则仅载入供回溯，不激活追问"""
         self.clear()
         self.current_session_id = session_id
         if not self.store:
@@ -94,10 +94,28 @@ class SessionManager:
 
         self.current_total_turns = len(db_turns)
         sessions = self.store.get_all_sessions(limit=100)
+        updated_at = ""
         for s in sessions:
             if s["id"] == session_id:
                 self.current_session_title = s.get("title", "")
+                updated_at = s.get("updated_at", "")
                 break
+
+        # 检查会话是否已超过 TTL (默认 600 秒)
+        is_active = False
+        if updated_at:
+            try:
+                import datetime
+                clean_str = updated_at.replace("T", " ")
+                if "." in clean_str:
+                    dt = datetime.datetime.strptime(clean_str.split(".")[0], "%Y-%m-%d %H:%M:%S")
+                else:
+                    dt = datetime.datetime.strptime(clean_str, "%Y-%m-%d %H:%M:%S")
+                diff_local = abs((datetime.datetime.now() - dt).total_seconds())
+                diff_utc = abs((datetime.datetime.utcnow() - dt).total_seconds())
+                is_active = (min(diff_local, diff_utc) <= self.ttl_seconds)
+            except Exception:
+                is_active = False
 
         loaded_turns = []
         for t in db_turns:
@@ -111,10 +129,15 @@ class SessionManager:
             )
             loaded_turns.append(ct)
 
-        self.turns = loaded_turns[-self.max_turns:]
-        self.last_active_time = time.time()
-        print(f"[SessionManager] 已恢复会话 {session_id}，载入 {len(self.turns)} 轮上下文。")
-        return self.turns
+        if is_active:
+            self.turns = loaded_turns[-self.max_turns:]
+            self.last_active_time = time.time()
+            print(f"[SessionManager] 历史会话 {session_id} 处于有效 TTL 内，已激活 {len(self.turns)} 轮连续追问上下文。")
+        else:
+            self.turns = []
+            self.last_active_time = 0.0
+            print(f"[SessionManager] 历史会话 {session_id} 已过期 (> {self.ttl_seconds}s)，仅作为只读归档展示，不继承上下文。")
+        return loaded_turns
 
     def get_valid_history(self) -> List[ConversationTurn]:
         """获取未超时的有效会话历史"""

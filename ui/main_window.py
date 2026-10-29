@@ -760,12 +760,22 @@ class CollapsibleSessionMenu(QWidget):
     def _on_new_btn_clicked(self):
         self.new_chat_clicked.emit()
 
+    def collapse(self):
+        self.is_expanded = False
+        self.body_container.setVisible(False)
+        self.arrow_lbl.setText("▸")
+
+    def expand(self):
+        self.is_expanded = True
+        self.body_container.setVisible(True)
+        self.arrow_lbl.setText("▾")
+        self.refresh_sessions()
+
     def toggle_expanded(self):
-        self.is_expanded = not self.is_expanded
-        self.body_container.setVisible(self.is_expanded)
-        self.arrow_lbl.setText("▾" if self.is_expanded else "▸")
         if self.is_expanded:
-            self.refresh_sessions()
+            self.collapse()
+        else:
+            self.expand()
 
     def set_active_session(self, session_id: str):
         self._active_session_id = session_id
@@ -1465,6 +1475,7 @@ class MainWindow(QMainWindow):
         self._init_ui()
         self._setup_timer()
         self.refresh_records()
+        self.clear_answer_session()
 
     def _init_ui(self):
         # Alma 风格全局深邃 Obsidian 调色盘与极致流线型滚动条
@@ -1945,6 +1956,7 @@ class MainWindow(QMainWindow):
             }
         """)
         self.query_input.returnPressed.connect(self._handle_query)
+        self.query_input.textChanged.connect(lambda: self.search_status_lbl.setText(""))
         cmd_layout.addWidget(self.query_input, 1)
 
         self.search_status_lbl = QLabel("")
@@ -3593,20 +3605,48 @@ class MainWindow(QMainWindow):
             self._switch_nav(0)
         turns = self.store.get_session_turns(session_id)
         self.answer_browser.load_history_session(turns)
-        self.session_switched.emit(session_id)
         
         title = "历史话题"
+        updated_at = ""
         sessions = self.store.get_all_sessions(limit=100)
         for s in sessions:
             if s["id"] == session_id:
                 title = s.get("title", "")
+                updated_at = s.get("updated_at", "")
                 break
-        self.intercom_banner.set_completed(focal_topic=title, is_followup=True)
-        self.search_status_lbl.setText(f"✓ 已载入历史话题「{title}」，可长按【右 Alt】直接追问")
+
+        # 判断会话是否处于有效活跃交互 TTL 窗口内 (默认 600 秒)
+        is_active = False
+        if updated_at:
+            try:
+                import datetime
+                clean_str = updated_at.replace("T", " ")
+                if "." in clean_str:
+                    dt = datetime.datetime.strptime(clean_str.split(".")[0], "%Y-%m-%d %H:%M:%S")
+                else:
+                    dt = datetime.datetime.strptime(clean_str, "%Y-%m-%d %H:%M:%S")
+                diff_local = abs((datetime.datetime.now() - dt).total_seconds())
+                diff_utc = abs((datetime.datetime.utcnow() - dt).total_seconds())
+                is_active = (min(diff_local, diff_utc) <= 600.0)
+            except Exception:
+                is_active = False
+
+        if is_active:
+            self.session_switched.emit(session_id)
+            self.intercom_banner.set_completed(focal_topic=title, is_followup=True)
+            self.search_status_lbl.setText(f"✓ 已载入活跃话题「{title}」，可继续追问")
+        else:
+            self.new_session_requested.emit()
+            self.intercom_banner.set_idle()
+            self.search_status_lbl.setText(f"📚 已载入历史会话回顾「{title}」")
+
+        # 3.5 秒后自动消隐提示，绝不永久常驻
+        QTimer.singleShot(3500, lambda: self.search_status_lbl.setText(""))
 
     def _on_history_session_deleted(self, session_id: str):
         self.clear_answer_session()
         self.search_status_lbl.setText("✓ 历史会话已删除")
+        QTimer.singleShot(3000, lambda: self.search_status_lbl.setText(""))
 
     def _set_ans_card_style(self, mode: str = "MEETING"):
         """根据当前回答来源动态切换解答卡边框：科技青(内部会议) vs 灵动紫(全网通识) vs 琥珀金(敏捷指令)"""
@@ -3642,10 +3682,14 @@ class MainWindow(QMainWindow):
         if self.stack.currentIndex() != 0:
             self._switch_nav(0)
         self._set_ans_card_style("MEETING")
+        self.search_status_lbl.setText("")
+        if hasattr(self, 'query_input'):
+            self.query_input.clear()
         self.answer_browser.clear_history()
         self.intercom_banner.set_idle()
         if hasattr(self, 'session_menu'):
             self.session_menu.set_active_session("")
+            self.session_menu.collapse()
             self.session_menu.refresh_sessions()
         self.new_session_requested.emit()
 
