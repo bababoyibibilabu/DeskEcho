@@ -35,7 +35,12 @@ class UpdateChecker:
     """
     def __init__(self, current_version: str = APP_VERSION, app_dir: Optional[Path] = None):
         self.current_version = current_version
-        self.app_dir = app_dir or Path(__file__).resolve().parent.parent
+        if app_dir:
+            self.app_dir = app_dir
+        elif getattr(sys, 'frozen', False):
+            self.app_dir = Path(sys.executable).resolve().parent
+        else:
+            self.app_dir = Path(__file__).resolve().parent.parent
 
     def check_update(self) -> Optional[Dict[str, Any]]:
         """检查是否有新版本，若有则返回元数据字典，否则返回 None"""

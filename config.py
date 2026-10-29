@@ -1,15 +1,22 @@
+import sys
 import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-# 加载 .env 文件
-env_path = Path(__file__).parent / ".env"
-if env_path.exists():
-    load_dotenv(dotenv_path=env_path)
+if getattr(sys, 'frozen', False):
+    APP_ROOT = Path(sys.executable).resolve().parent
+else:
+    APP_ROOT = Path(__file__).resolve().parent
+
+# 加载 .env 文件 (优先可执行程序根目录)
+for p in [APP_ROOT / ".env", Path.cwd() / ".env", Path(__file__).parent / ".env"]:
+    if p.exists():
+        load_dotenv(dotenv_path=p, override=True)
+        break
 
 class Config:
     # 路径配置
-    BASE_DIR = Path(__file__).resolve().parent
+    BASE_DIR = APP_ROOT
     raw_data_dir = os.getenv("DATA_DIR", "./omni_data")
     if os.path.isabs(raw_data_dir):
         DATA_DIR = Path(raw_data_dir).resolve()
