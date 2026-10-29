@@ -15,7 +15,7 @@ from PyQt6.QtWidgets import (
     QStackedWidget, QScrollArea, QGridLayout, QSizePolicy, QMenu,
     QMessageBox
 )
-from PyQt6.QtGui import QColor, QFont, QIcon, QPainter, QBrush, QPen, QLinearGradient
+from PyQt6.QtGui import QColor, QFont, QIcon, QPainter, QBrush, QPen, QLinearGradient, QFontMetrics
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
 
 from config import Config
@@ -1272,13 +1272,46 @@ class ExpandableEmployeeCard(QFrame):
             self.timeline_layout.addWidget(no_act_lbl)
 
 
+class ElidedLabel(QLabel):
+    """
+    单行自适应省略号文本组件：
+    严格固定单行显示，末尾自适应添加 '...'，彻底杜绝文字折行、挤压或纵向截断
+    """
+    def __init__(self, text: str = "", color: str = "#CBD5E1", font_size: float = 11, font_weight: int = 400, parent=None):
+        super().__init__(text, parent)
+        self.full_text = text
+        self.text_color = color
+        self.font_size = font_size
+        self.font_weight = font_weight
+        self.setWordWrap(False)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+
+    def setText(self, text: str):
+        self.full_text = text
+        super().setText(text)
+        self.update()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        f = self.font()
+        if self.font_size:
+            f.setPointSizeF(self.font_size)
+        f.setWeight(QFont.Weight(self.font_weight))
+        painter.setFont(f)
+        metrics = QFontMetrics(f)
+        avail_w = max(10, self.width() - 2)
+        elided = metrics.elidedText(self.full_text, Qt.TextElideMode.ElideRight, avail_w)
+        painter.setPen(QColor(self.text_color))
+        painter.drawText(self.rect(), int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter), elided)
+
+
 class TrashSliceItemWidget(QWidget):
     """
     或许没用切片列表单项组件
-    采用三行清晰纵向布局与自动折行，彻底消除文字截断：
     第 1 行：🗑️ 时间戳 + 右侧【✨ 有用】恢复按钮
-    第 2 行：⚠️ 判定原因（红底标签，支持长文本换行）
-    第 3 行：💬 议题/纪要提炼内容（完整展示，支持自动折行）
+    第 2 行：AI 研判理由红底标签 (单行展示)
+    第 3 行：💬 议题提炼文本 (固定单行白字，末尾自动 ...，右侧有完整详情)
     """
     def __init__(self, rec: dict, list_item: QListWidgetItem, list_widget: QListWidget, on_restore_callback, parent=None):
         super().__init__(parent)
@@ -1297,7 +1330,7 @@ class TrashSliceItemWidget(QWidget):
         self.setToolTip(f"【AI 研判理由】: {reason}\n【切片时间】: {time_str}\n【切片完整纪要】:\n{summary}")
 
         root_layout = QVBoxLayout(self)
-        root_layout.setContentsMargins(4, 2, 4, 4)
+        root_layout.setContentsMargins(6, 4, 6, 4)
         root_layout.setSpacing(4)
 
         # 第 1 行：时间戳 + 恢复按钮
@@ -1332,19 +1365,20 @@ class TrashSliceItemWidget(QWidget):
         row1.addWidget(self.btn_useful, 0)
         root_layout.addLayout(row1)
 
-        # 第 2 行：AI 研判理由
-        lbl_reason = QLabel(f"⚠️ 研判原因：{reason}")
-        lbl_reason.setStyleSheet("color: #FCA5A5; font-size: 10px; background: rgba(239, 68, 68, 0.12); border-radius: 3px; padding: 2px 5px;")
-        lbl_reason.setWordWrap(True)
-        lbl_reason.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-        root_layout.addWidget(lbl_reason)
+        # 第 2 行：AI 研判理由 (红底胶囊单行展示)
+        reason_frame = QFrame()
+        reason_frame.setStyleSheet("background: rgba(239, 68, 68, 0.12); border-radius: 3px;")
+        r_layout = QHBoxLayout(reason_frame)
+        r_layout.setContentsMargins(5, 1, 5, 1)
+        lbl_reason = ElidedLabel(f"⚠️ 研判原因：{reason}", color="#FCA5A5", font_size=10, font_weight=500)
+        lbl_reason.setFixedHeight(16)
+        r_layout.addWidget(lbl_reason)
+        root_layout.addWidget(reason_frame)
 
-        # 第 3 行：切片提炼文本 (完全展示，自适应折行)
-        lbl_title = QLabel(f"💬 {first_line}")
-        lbl_title.setStyleSheet("color: #CBD5E1; font-size: 11px; line-height: 1.35; padding-top: 1px;")
-        lbl_title.setWordWrap(True)
-        lbl_title.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-        root_layout.addWidget(lbl_title)
+        # 第 3 行：切片提炼白字部分 (严格固定单行，末尾自动 ...)
+        self.lbl_title = ElidedLabel(f"💬 {first_line}", color="#E2E8F0", font_size=11, font_weight=400)
+        self.lbl_title.setFixedHeight(18)
+        root_layout.addWidget(self.lbl_title)
 
     def _handle_restore(self):
         if self.on_restore_callback:
@@ -2097,6 +2131,8 @@ class MainWindow(QMainWindow):
 
         # 左栏：容器 (新切片静默浮动提示胶囊 + 切片列表)
         left_container = QWidget()
+        left_container.setMinimumWidth(300)
+        left_container.setMaximumWidth(420)
         left_layout = QVBoxLayout(left_container)
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.setSpacing(6)
@@ -2246,7 +2282,9 @@ class MainWindow(QMainWindow):
         right_layout.addWidget(self.mem_detail_browser, 1)
 
         splitter.addWidget(right_detail_container)
-        splitter.setSizes([340, 600])
+        splitter.setStretchFactor(0, 0)
+        splitter.setStretchFactor(1, 1)
+        splitter.setSizes([320, 680])
 
         page_layout.addWidget(splitter, 1)
         stack.addWidget(page)
@@ -2980,6 +3018,8 @@ class MainWindow(QMainWindow):
                 Path("C:/DeskEcho/action_result.json").write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding='utf-8')
                 trigger_file.unlink()
                 return
+
+            if action == "inspect_trash":
                 # 切换到会议记忆切片库 (Page 1)
                 self._switch_nav(1)
                 # 切换到或许没用分类
@@ -3141,7 +3181,7 @@ class MainWindow(QMainWindow):
 
             if self.current_mem_mode == "trash":
                 item = QListWidgetItem()
-                item.setSizeHint(QSize(280, 108))
+                item.setSizeHint(QSize(280, 88))
                 item.setData(Qt.ItemDataRole.UserRole, rec)
                 self.mem_list.addItem(item)
                 widget = TrashSliceItemWidget(
@@ -3381,7 +3421,7 @@ class MainWindow(QMainWindow):
 
             if self.current_mem_mode == "trash":
                 item = QListWidgetItem()
-                item.setSizeHint(QSize(280, 108))
+                item.setSizeHint(QSize(280, 88))
                 item.setData(Qt.ItemDataRole.UserRole, rec)
                 self.mem_list.addItem(item)
                 widget = TrashSliceItemWidget(

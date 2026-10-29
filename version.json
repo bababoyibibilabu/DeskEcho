@@ -1,14 +1,14 @@
 {
-  "version": "0.2.1",
+  "version": "0.2.2",
   "release_date": "2026-10-29",
-  "title": "DeskEcho v0.2.1 单一 Windows EXE 正式发版与自动更新重启",
+  "title": "DeskEcho v0.2.2 列表单行自适应省略号排版与无打断更新体验",
   "changelog": [
-    "优化‘或许没用’切片列表布局，改用三行多段排版与自适应折行，彻底消除文字截断",
-    "新增常驻【软件更新】管理面板与顶栏版本快捷入口，支持托盘一键直达更新页面",
-    "全面支持单一 Windows EXE 独立可执行程序发版与 GitHub Releases 云端分发",
-    "客户端收到发版推送时，支持自动完成更新并在 3 秒内倒计时无缝自动重启生效"
+    "重构‘或许没用’切片列表项白字议题部分为严格固定单行显示（ElidedLabel），末尾自适应添加省略号（...），右侧配合四象限卡片完整详情，界面极致规整紧凑",
+    "优化切片库双栏分割器布局比例（锁定左栏最小安全宽度 300px），彻底消除窄视口导致的文字挤压与横向裁切",
+    "移除首屏右上角冗余的‘刷新列表’按钮，改由新切片静默浮动药丸（新切片置顶查看）无感更新，杜绝打断操作员过往纪要查阅",
+    "支持自动更新检测与单文件 Windows EXE 官方发版同步升级"
   ],
-  "download_url": "https://github.com/bababoyibibilabu/DeskEcho/releases/download/v0.2.1/DeskEcho.exe",
-  "zip_url": "https://github.com/bababoyibibilabu/DeskEcho/archive/refs/tags/v0.2.1.zip",
+  "download_url": "https://github.com/bababoyibibilabu/DeskEcho/releases/download/v0.2.2/DeskEcho.exe",
+  "zip_url": "https://github.com/bababoyibibilabu/DeskEcho/archive/refs/tags/v0.2.2.zip",
   "min_version": "0.1.0"
 }

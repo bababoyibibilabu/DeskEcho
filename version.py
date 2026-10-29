@@ -1,4 +1,4 @@
-APP_VERSION = "0.2.1"
+APP_VERSION = "0.2.2"
 APP_NAME = "DeskEcho"
 RELEASE_DATE = "2026-10-29"
 GITHUB_REPO = "bababoyibibilabu/DeskEcho"
