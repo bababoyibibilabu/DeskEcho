@@ -305,19 +305,21 @@ class StreamTextDisplay(QTextBrowser):
             content = m.group(2).strip()
             text_c = "#0F172A" if is_light else "#FFFFFF"
             if "追问" in q_type:
-                bg = "rgba(22, 163, 74, 0.08)" if is_light else "rgba(138, 198, 87, 0.12)"
-                border_c = "#16A34A" if is_light else "#8AC657"
+                bg = "rgba(22, 163, 74, 0.08)" if is_light else "rgba(138, 198, 87, 0.10)"
+                border_c = "rgba(22, 163, 74, 0.3)" if is_light else "rgba(138, 198, 87, 0.35)"
+                title_c = "#16A34A" if is_light else "#8AC657"
                 return (
-                    f'<div style="background: {bg}; border-left: 3px solid {border_c}; border-radius: 6px; padding: 7px 12px; margin: 4px 0 8px 0;">'
-                    f'<div style="color: {border_c}; font-weight: bold; font-size: 10.5px; margin-bottom: 2px;">连续追问 (已继承上下文)</div>'
+                    f'<div style="background: {bg}; border: 1px solid {border_c}; border-radius: 6px; padding: 8px 12px; margin: 4px 0 8px 0;">'
+                    f'<div style="color: {title_c}; font-weight: bold; font-size: 10.5px; margin-bottom: 2px;">连续追问 (已继承上下文)</div>'
                     f'<div style="color: {text_c}; font-size: 13px; font-weight: 600;">“{content}”</div></div>'
                 )
             else:
-                bg = "rgba(2, 132, 199, 0.08)" if is_light else "rgba(38, 176, 228, 0.12)"
-                border_c = "#0284C7" if is_light else "#26B0E4"
+                bg = "rgba(2, 132, 199, 0.06)" if is_light else "rgba(38, 176, 228, 0.08)"
+                border_c = "rgba(2, 132, 199, 0.25)" if is_light else "rgba(38, 176, 228, 0.3)"
+                title_c = "#0284C7" if is_light else "#38BDF8"
                 return (
-                    f'<div style="background: {bg}; border-left: 3px solid {border_c}; border-radius: 6px; padding: 7px 12px; margin: 4px 0 8px 0;">'
-                    f'<div style="color: {border_c}; font-weight: bold; font-size: 10.5px; margin-bottom: 2px;">识别提问</div>'
+                    f'<div style="background: {bg}; border: 1px solid {border_c}; border-radius: 6px; padding: 8px 12px; margin: 4px 0 8px 0;">'
+                    f'<div style="color: {title_c}; font-weight: bold; font-size: 10.5px; margin-bottom: 2px;">识别提问</div>'
                     f'<div style="color: {text_c}; font-size: 13px; font-weight: 600;">“{content}”</div></div>'
                 )
         escaped = re.sub(r'&gt;\s*❓?\s*\*\*(语音提问|连续追问|文字提问)\*\*[：:]\s*(.+?)(?=(?:\n\n|\n&lt;|\n#|$))', format_question, escaped, flags=re.DOTALL)
@@ -325,11 +327,12 @@ class StreamTextDisplay(QTextBrowser):
         # 0.4 重点渲染 > **敏捷自进化工单**：
         def format_instruction_pill(m):
             info = m.group(1).strip()
-            bg = "rgba(245, 158, 11, 0.12)" if is_light else "rgba(245, 158, 11, 0.18)"
+            bg = "rgba(245, 158, 11, 0.08)" if is_light else "rgba(245, 158, 11, 0.14)"
+            border_c = "rgba(217, 119, 6, 0.3)" if is_light else "rgba(245, 158, 11, 0.35)"
             title_c = "#D97706" if is_light else "#FBBF24"
             desc_c = "#334155" if is_light else "#94A3B8"
             return (
-                f'<div style="background: {bg}; border: 1px solid rgba(245, 158, 11, 0.45); border-radius: 6px; padding: 6px 12px; margin: 4px 0 8px 0;">'
+                f'<div style="background: {bg}; border: 1px solid {border_c}; border-radius: 6px; padding: 6px 12px; margin: 4px 0 8px 0;">'
                 f'<span style="color: {title_c}; font-weight: bold; font-size: 11px;">敏捷自进化工单已立项</span>'
                 f'<span style="color: {desc_c}; font-size: 11px; margin-left: 8px;">{info}</span></div>'
             )
@@ -340,14 +343,13 @@ class StreamTextDisplay(QTextBrowser):
             content = m.group(1).strip()
             if is_light:
                 return (
-                    f'<div style="background: rgba(147, 51, 234, 0.08); border-left: 3px solid #9333EA; border-radius: 6px; padding: 8px 12px; margin: 6px 0 10px 0;">'
+                    f'<div style="background: rgba(147, 51, 234, 0.06); border: 1px solid rgba(147, 51, 234, 0.25); border-radius: 6px; padding: 8px 12px; margin: 6px 0 10px 0;">'
                     f'<div style="color: #9333EA; font-weight: bold; font-size: 10.5px; margin-bottom: 3px; letter-spacing: 0.5px;">'
                     f'全网通用知识解答 (非企业内部会议决策依据)</div>'
                     f'<div style="color: #0F172A; font-size: 12px; line-height: 1.5;">{content}</div></div>'
                 )
             return (
-                f'<div style="background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 rgba(139, 92, 246, 0.22), stop:1 rgba(168, 85, 247, 0.12)); '
-                f'border-left: 3px solid #8B5CF6; border-radius: 6px; padding: 8px 12px; margin: 6px 0 10px 0;">'
+                f'<div style="background: rgba(139, 92, 246, 0.12); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 6px; padding: 8px 12px; margin: 6px 0 10px 0;">'
                 f'<div style="color: #C084FC; font-weight: bold; font-size: 10.5px; margin-bottom: 3px; letter-spacing: 0.5px;">'
                 f'全网通用知识解答 (非企业内部会议决策依据)</div>'
                 f'<div style="color: #E2E8F0; font-size: 12px; line-height: 1.5;">{content}</div></div>'
@@ -360,24 +362,22 @@ class StreamTextDisplay(QTextBrowser):
             content = m.group(2).strip()
             text_c = "#0F172A" if is_light else "#FFFFFF"
             if "架构师" in tag:
-                bg = "rgba(245, 158, 11, 0.12)" if is_light else "rgba(245, 158, 11, 0.28)"
-                border_c = "#D97706" if is_light else "#F59E0B"
+                bg = "rgba(245, 158, 11, 0.08)" if is_light else "rgba(245, 158, 11, 0.16)"
+                border_c = "rgba(217, 119, 6, 0.3)" if is_light else "rgba(245, 158, 11, 0.35)"
                 title_c = "#D97706" if is_light else "#FBBF24"
                 return (
-                    f'<div style="background: {bg}; border-left: 3px solid {border_c}; border-radius: 6px; padding: 8px 14px; margin: 6px 0 10px 0;">'
+                    f'<div style="background: {bg}; border: 1px solid {border_c}; border-radius: 6px; padding: 8px 14px; margin: 6px 0 10px 0;">'
                     f'<div style="color: {title_c}; font-weight: bold; font-size: 10.5px; letter-spacing: 0.5px; margin-bottom: 3px;">架构师响应 (已录入自进化队列)</div>'
                     f'<div style="color: {text_c}; font-size: 13px; font-weight: 600; line-height: 1.45;">{content}</div></div>'
                 )
             if is_light:
                 return (
-                    f'<div style="background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 rgba(2, 132, 199, 0.08), stop:1 rgba(22, 163, 74, 0.05)); '
-                    f'border-left: 3px solid #0284C7; border-radius: 6px; padding: 8px 14px; margin: 6px 0 10px 0;">'
+                    f'<div style="background: rgba(2, 132, 199, 0.06); border: 1px solid rgba(2, 132, 199, 0.22); border-radius: 6px; padding: 8px 14px; margin: 6px 0 10px 0;">'
                     f'<div style="color: #0284C7; font-weight: bold; font-size: 10.5px; letter-spacing: 0.5px; margin-bottom: 3px;">结论播报 (TTS 极简朗读)</div>'
                     f'<div style="color: #0F172A; font-size: 13px; font-weight: 600; line-height: 1.45;">{content}</div></div>'
                 )
             return (
-                f'<div style="background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 rgba(19, 69, 157, 0.28), stop:0.55 rgba(38, 176, 228, 0.16), stop:1 rgba(138, 198, 87, 0.12)); '
-                f'border-left: 3px solid #26B0E4; border-radius: 6px; padding: 8px 14px; margin: 6px 0 10px 0;">'
+                f'<div style="background: rgba(38, 176, 228, 0.10); border: 1px solid rgba(38, 176, 228, 0.28); border-radius: 6px; padding: 8px 14px; margin: 6px 0 10px 0;">'
                 f'<div style="color: #26B0E4; font-weight: bold; font-size: 10.5px; letter-spacing: 0.5px; margin-bottom: 3px;">结论播报 (TTS 极简朗读)</div>'
                 f'<div style="color: #FFFFFF; font-size: 13px; font-weight: 600; line-height: 1.45;">{content}</div></div>'
             )
@@ -1600,23 +1600,23 @@ class ExpandableEmployeeCard(QFrame):
         if self.is_departed:
             self.hl_title_lbl.setText("历史主导与交接决策" if m_count > 0 else "离职交接与历史档案留存")
             self.hl_title_lbl.setStyleSheet("color: #64748B; font-size: 10.5px; font-weight: bold;")
-            self.highlight_box.setStyleSheet("""
-                QFrame {
-                    background: rgba(100, 116, 139, 0.08);
-                    border-left: 3px solid #64748B;
-                    border-radius: 4px;
-                    padding: 6px 10px;
-                }
+            self.highlight_box.setStyleSheet(f"""
+                QFrame {{
+                    background: {'rgba(100, 116, 139, 0.06)' if is_light else 'rgba(100, 116, 139, 0.12)'};
+                    border: 1px solid {'#CBD5E1' if is_light else 'rgba(255, 255, 255, 0.1)'};
+                    border-radius: 6px;
+                    padding: 7px 10px;
+                }}
             """)
         elif m_count > 0:
             self.hl_title_lbl.setText("最近主导与会议决策")
             self.hl_title_lbl.setStyleSheet(f"color: {'#0284C7' if is_light else '#26B0E4'}; font-size: 10.5px; font-weight: bold;")
             self.highlight_box.setStyleSheet(f"""
                 QFrame {{
-                    background: {'rgba(2, 132, 199, 0.08)' if is_light else 'rgba(38, 176, 228, 0.07)'};
-                    border-left: 3px solid {'#0284C7' if is_light else '#26B0E4'};
-                    border-radius: 4px;
-                    padding: 6px 10px;
+                    background: {'rgba(2, 132, 199, 0.05)' if is_light else 'rgba(38, 176, 228, 0.07)'};
+                    border: 1px solid {'rgba(2, 132, 199, 0.22)' if is_light else 'rgba(38, 176, 228, 0.25)'};
+                    border-radius: 6px;
+                    padding: 7px 10px;
                 }}
             """)
         else:
@@ -1624,10 +1624,10 @@ class ExpandableEmployeeCard(QFrame):
             self.hl_title_lbl.setStyleSheet(f"color: {'#16A34A' if is_light else '#8AC657'}; font-size: 10.5px; font-weight: bold;")
             self.highlight_box.setStyleSheet(f"""
                 QFrame {{
-                    background: {'rgba(22, 163, 74, 0.08)' if is_light else 'rgba(138, 198, 87, 0.07)'};
-                    border-left: 3px solid {'#16A34A' if is_light else '#8AC657'};
-                    border-radius: 4px;
-                    padding: 6px 10px;
+                    background: {'rgba(22, 163, 74, 0.05)' if is_light else 'rgba(138, 198, 87, 0.07)'};
+                    border: 1px solid {'rgba(22, 163, 74, 0.22)' if is_light else 'rgba(138, 198, 87, 0.25)'};
+                    border-radius: 6px;
+                    padding: 7px 10px;
                 }}
             """)
         self.hl_content_lbl.setText(core_hl)

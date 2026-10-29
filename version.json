@@ -1,15 +1,14 @@
 {
-  "version": "0.2.7",
+  "version": "0.2.8",
   "release_date": "2026-10-29",
-  "title": "DeskEcho v0.2.7 实用配置中心重构、品牌主显互换与次级切片视觉减负",
+  "title": "DeskEcho v0.2.8 基于 Impeccable 设计规范体系的整体工业级重塑",
   "changelog": [
-    "品牌标识主次互换：左上角 DeskEcho 升格为主产品名并强化字号层级，'美好智能'转为品牌副标，剔除冗余英文前缀",
-    "倾听开关崩溃根因修复：修复 ModernBreathingSwitch 暂停态 QColor 参数类型异常导致的瞬时闪退，点击响应平稳顺畅",
-    "系统引擎页重塑为配置中心：剔除静态死技术参数堆砌，重构为实用设置面板，支持大模型 API Key/Base URL/模型修改、ASR 凭据管理、三角色 TTS 音色切换（带即时试听）与对讲热键配置",
-    "预留生态扩展插槽：在设置面板开辟企业机器人 Webhook、私有化模型与本地知识库插槽，为后续灵活升级奠定空间",
-    "或许没用切片库视觉减负：彻底去除刺眼黄色警告横幅与高亮红色色块，采用内敛统一的中性素雅质感，杜绝视觉污染"
+    "确立设计权威真相：基于 Impeccable 规范正式建立 PRODUCT.md 与 DESIGN.md，固化产品愿景与全量设计系统 Token",
+    "根除 AI Slop 模板痕迹：经 Impeccable 静态与动态检测，彻底清零 10 处粗侧边 border-left 反模式，代之以精致克制的 1px 微微全边框",
+    "Operate 生产力模式纯化：全量界面聚焦高扫描率、严谨字重阶梯与原生直觉，去除浮夸彩色块与嵌套卡片",
+    "桌面交互微表面打磨：全局统一文本选区高亮配色、细窄圆滑滚动条与精准焦点色环，满足专业级桌面软件手感"
   ],
-  "download_url": "https://github.com/bababoyibibilabu/DeskEcho/releases/download/v0.2.7/DeskEcho.exe",
-  "zip_url": "https://github.com/bababoyibibilabu/DeskEcho/archive/refs/tags/v0.2.7.zip",
+  "download_url": "https://github.com/bababoyibibilabu/DeskEcho/releases/download/v0.2.8/DeskEcho.exe",
+  "zip_url": "https://github.com/bababoyibibilabu/DeskEcho/archive/refs/tags/v0.2.8.zip",
   "min_version": "0.1.0"
 }

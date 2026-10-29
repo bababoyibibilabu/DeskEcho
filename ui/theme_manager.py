@@ -250,4 +250,8 @@ class ThemeManager(QObject):
                 padding: 5px 8px;
                 font-size: 11px;
             }}
+            QLineEdit, QTextBrowser, QListWidget, QComboBox {{
+                selection-background-color: {c['brand_accent']};
+                selection-color: #FFFFFF;
+            }}
         """
