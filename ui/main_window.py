@@ -3001,6 +3001,33 @@ class MainWindow(QMainWindow):
                 trigger_file.unlink()
                 return
 
+            if action == "test_instruction":
+                self._switch_nav(0)
+                from core.instruction_handler import InstructionHandler
+                h = InstructionHandler()
+                query = content.get("query", "改进一下：把设置页面的文字间距再调宽一点")
+                res = h.handle_instruction(query)
+                self.display_answer(
+                    markdown_text=res["answer"],
+                    audio_path="",
+                    is_followup=False,
+                    focal_topic=res.get("focal_topic", "需求工单"),
+                    response_mode="INSTRUCTION"
+                )
+                from PyQt6.QtWidgets import QApplication
+                QApplication.processEvents()
+                pix = self.grab()
+                pix.save(out_img)
+                result = {
+                    "status": "success",
+                    "task_id": res.get("task_id"),
+                    "focal_topic": res.get("focal_topic"),
+                    "image_saved": out_img
+                }
+                Path("C:/DeskEcho/action_result.json").write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding='utf-8')
+                trigger_file.unlink()
+                return
+
             if action == "test_non_intrusive_update":
                 # 切换到切片库
                 self._switch_nav(1)
