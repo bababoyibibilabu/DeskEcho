@@ -2095,11 +2095,14 @@ class MainWindow(QMainWindow):
 
     def _switch_mem_mode(self, mode: str):
         """切换正式切片资产 vs 或许没用次要切片"""
+        if self.current_mem_mode == mode:
+            return
         self.current_mem_mode = mode
+        self.current_selected_record = None
         self._update_mem_tab_styles()
         self.trash_banner.setVisible(mode == "trash")
-        self.trash_detail_action_bar.setVisible(mode == "trash" and self.current_selected_record is not None)
-        self._render_mem_list()
+        self.trash_detail_action_bar.setVisible(False)
+        self._render_mem_list(preserve_selection=False)
 
     def _update_mem_tab_styles(self):
         if not hasattr(self, 'btn_mem_normal'):
@@ -2513,7 +2516,11 @@ class MainWindow(QMainWindow):
     def refresh_records(self):
         try:
             records = self.store.query_recent(limit=200)
-            self.cached_records = records
+
+            # 比对数据库记录指纹 (ID、开始时间及纪要)，判断数据库切片是否发生新增、删除或变更
+            old_keys = [(r.get("id"), r.get("start_time"), r.get("summary")) for r in getattr(self, "cached_records", [])]
+            new_keys = [(r.get("id"), r.get("start_time"), r.get("summary")) for r in records]
+            data_changed = (old_keys != new_keys)
 
             normal_recs = []
             trash_recs = []
@@ -2529,6 +2536,7 @@ class MainWindow(QMainWindow):
                 else:
                     normal_recs.append(rec_copy)
 
+            self.cached_records = records
             self.cached_normal_records = normal_recs
             self.cached_trash_records = trash_recs
 
@@ -2539,23 +2547,41 @@ class MainWindow(QMainWindow):
             if hasattr(self, 'sub_btn_memory'):
                 self.sub_btn_memory.setText(f"🧠 会议记忆库 ({len(normal_recs)})")
 
-            self._render_mem_list()
-
-            if hasattr(self, "refresh_roster"):
-                self.refresh_roster()
+            # 仅当数据库内容切实发生变动时才重绘切片列表，并保持当前选中项与滚动条位置，杜绝自动跳顶
+            if data_changed:
+                self._render_mem_list(preserve_selection=True)
+                if hasattr(self, "refresh_roster"):
+                    self.refresh_roster()
 
         except Exception as e:
             print(f"[MainWindow] 刷新记录失败: {e}")
 
-    def _render_mem_list(self):
-        self.mem_list.clear()
+    def _render_mem_list(self, preserve_selection: bool = True):
+        # 若搜索框当前有关键词，转入搜索渲染并保持选中
+        if hasattr(self, "mem_search_input") and self.mem_search_input.text().strip():
+            self._search_memory_slices(preserve_selection=preserve_selection)
+            return
+
         target_records = self.cached_trash_records if self.current_mem_mode == "trash" else self.cached_normal_records
 
         # 兼容备用 dummy slice_list
         if hasattr(self, "slice_list"):
             self.slice_list.clear()
 
+        # 记录当前已选切片 ID 及滚动条位置
+        selected_id = None
+        if preserve_selection and hasattr(self, "current_selected_record") and self.current_selected_record:
+            selected_id = self.current_selected_record.get("id")
+
+        list_scroll = self.mem_list.verticalScrollBar().value()
+        detail_scroll = self.mem_detail_browser.verticalScrollBar().value()
+
+        # 暂时阻塞列表信号，防止 clear 及循环 addItem 时误发 currentRowChanged 重置详情视口
+        self.mem_list.blockSignals(True)
+        self.mem_list.clear()
+
         if not target_records:
+            self.mem_list.blockSignals(False)
             empty_msg = "🎉 暂无低价值次要切片，会议记忆库非常健康！" if self.current_mem_mode == "trash" else "暂无沉淀正式切片数据"
             empty_item = QListWidgetItem(empty_msg)
             empty_item.setFlags(Qt.ItemFlag.NoItemFlags)
@@ -2567,7 +2593,8 @@ class MainWindow(QMainWindow):
             self.current_selected_record = None
             return
 
-        for rec in target_records:
+        target_row_to_select = -1
+        for idx, rec in enumerate(target_records):
             time_str = rec.get("start_time", "")
             summary = rec.get("summary", "")
             first_line = summary.split("\n")[0] if summary else "常驻录音切片"
@@ -2585,8 +2612,24 @@ class MainWindow(QMainWindow):
             item.setData(Qt.ItemDataRole.UserRole, rec)
             self.mem_list.addItem(item)
 
-        if self.mem_list.count() > 0:
-            self.mem_list.setCurrentRow(0)
+            if selected_id and rec.get("id") == selected_id:
+                target_row_to_select = idx
+
+        self.mem_list.blockSignals(False)
+
+        if target_row_to_select >= 0:
+            # 成功找回此前选中的切片：静默恢复选中并维持滚动位置，绝不重新调用 setHtml 导致详情重置滚动
+            self.mem_list.blockSignals(True)
+            self.mem_list.setCurrentRow(target_row_to_select)
+            self.mem_list.blockSignals(False)
+            self.mem_list.verticalScrollBar().setValue(list_scroll)
+            self.mem_detail_browser.verticalScrollBar().setValue(detail_scroll)
+        else:
+            # 切换 Tab 或原切片被清理：选中第一项
+            if self.mem_list.count() > 0:
+                self.mem_list.setCurrentRow(0)
+            else:
+                self.current_selected_record = None
 
     def _on_slice_clicked(self, item: QListWidgetItem):
         rec = item.data(Qt.ItemDataRole.UserRole)
@@ -2594,13 +2637,24 @@ class MainWindow(QMainWindow):
             self._render_record_to_detail(rec, self.answer_browser)
 
     def _on_mem_item_selected(self, row: int):
-        target_records = self.cached_trash_records if self.current_mem_mode == "trash" else self.cached_normal_records
-        if row < 0 or row >= len(target_records):
+        if row < 0 or row >= self.mem_list.count():
             self.current_selected_record = None
             if hasattr(self, "trash_detail_action_bar"):
                 self.trash_detail_action_bar.setVisible(False)
             return
-        rec = target_records[row]
+
+        item = self.mem_list.item(row)
+        rec = item.data(Qt.ItemDataRole.UserRole) if item else None
+        if not rec:
+            self.current_selected_record = None
+            if hasattr(self, "trash_detail_action_bar"):
+                self.trash_detail_action_bar.setVisible(False)
+            return
+
+        # 若已经是当前选中的切片，避免重复 setHtml 导致详情窗口滚动条跳顶
+        if self.current_selected_record and self.current_selected_record.get("id") == rec.get("id"):
+            return
+
         self.current_selected_record = rec
         self._render_record_to_detail(rec, self.mem_detail_browser)
 
@@ -2667,6 +2721,7 @@ class MainWindow(QMainWindow):
             success = self.store.delete_slice(sid)
             if success:
                 self.search_status_lbl.setText("✓ 次要切片已删除")
+                self.current_selected_record = None
                 self.refresh_records()
             else:
                 QMessageBox.warning(self, "删除失败", f"删除切片 {sid} 遇到错误，请检查日志。")
@@ -2689,6 +2744,7 @@ class MainWindow(QMainWindow):
         if reply == QMessageBox.StandardButton.Yes:
             deleted_count = self.store.delete_slices(trash_ids)
             self.search_status_lbl.setText(f"✓ 已一键清理 {deleted_count} 段次要切片")
+            self.current_selected_record = None
             self.refresh_records()
 
     def _show_mem_list_context_menu(self, pos):
@@ -2722,10 +2778,10 @@ class MainWindow(QMainWindow):
         if action == del_action:
             self._delete_current_selected_slice()
 
-    def _search_memory_slices(self):
+    def _search_memory_slices(self, preserve_selection: bool = False):
         kw = self.mem_search_input.text().strip()
         if not kw:
-            self._render_mem_list()
+            self._render_mem_list(preserve_selection=preserve_selection)
             return
 
         target_records = self.cached_trash_records if self.current_mem_mode == "trash" else self.cached_normal_records
@@ -2733,8 +2789,19 @@ class MainWindow(QMainWindow):
             r for r in target_records
             if kw.lower() in (r.get("summary", "") + " " + r.get("raw_text", "")).lower()
         ]
+
+        selected_id = None
+        if preserve_selection and hasattr(self, "current_selected_record") and self.current_selected_record:
+            selected_id = self.current_selected_record.get("id")
+
+        list_scroll = self.mem_list.verticalScrollBar().value()
+        detail_scroll = self.mem_detail_browser.verticalScrollBar().value()
+
+        self.mem_list.blockSignals(True)
         self.mem_list.clear()
-        for rec in filtered:
+
+        target_row_to_select = -1
+        for idx, rec in enumerate(filtered):
             time_str = rec.get("start_time", "")
             summary = rec.get("summary", "")
             first_line = summary.split("\n")[0] if summary else "匹配切片"
@@ -2742,13 +2809,25 @@ class MainWindow(QMainWindow):
             item = QListWidgetItem(f"{prefix}{time_str}\n   🔍 {first_line[:26]}")
             item.setData(Qt.ItemDataRole.UserRole, rec)
             self.mem_list.addItem(item)
+            if selected_id and rec.get("id") == selected_id:
+                target_row_to_select = idx
+
+        self.mem_list.blockSignals(False)
 
         if filtered:
-            self.mem_list.setCurrentRow(0)
+            if target_row_to_select >= 0:
+                self.mem_list.blockSignals(True)
+                self.mem_list.setCurrentRow(target_row_to_select)
+                self.mem_list.blockSignals(False)
+                self.mem_list.verticalScrollBar().setValue(list_scroll)
+                self.mem_detail_browser.verticalScrollBar().setValue(detail_scroll)
+            else:
+                self.mem_list.setCurrentRow(0)
         else:
             self.mem_detail_browser.setHtml(f"<p style='color:#64748B; text-align:center; padding-top:100px;'>在当前分类下未检索到与 <b>“{kw}”</b> 相关的会议切片。</p>")
             if hasattr(self, "trash_detail_action_bar"):
                 self.trash_detail_action_bar.setVisible(False)
+            self.current_selected_record = None
 
     def _handle_query(self):
         text = self.query_input.text().strip()
