@@ -3081,6 +3081,35 @@ class MainWindow(QMainWindow):
                 trigger_file.unlink()
                 return
 
+            if action == "test_query":
+                self._switch_nav(0)
+                query = content.get("query", "")
+                self.query_input.setText(query)
+                self.query_submitted.emit(query)
+                result = {
+                    "status": "submitted",
+                    "query": query
+                }
+                Path("C:/DeskEcho/action_result.json").write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding='utf-8')
+                trigger_file.unlink()
+                return
+
+            if action == "capture_window":
+                from PyQt6.QtWidgets import QApplication
+                QApplication.processEvents()
+                pix = self.grab()
+                pix.save(out_img)
+                ans_text = self.answer_browser.toPlainText()
+                result = {
+                    "status": "success",
+                    "answer_snippet": ans_text[:200],
+                    "is_speaking": getattr(self, "is_speaking", False),
+                    "image_saved": out_img
+                }
+                Path("C:/DeskEcho/action_result.json").write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding='utf-8')
+                trigger_file.unlink()
+                return
+
             if action == "test_non_intrusive_update":
                 # 切换到切片库
                 self._switch_nav(1)
