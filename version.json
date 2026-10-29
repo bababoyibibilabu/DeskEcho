@@ -1,14 +1,14 @@
 {
-  "version": "0.2.2",
+  "version": "0.2.3",
   "release_date": "2026-10-29",
-  "title": "DeskEcho v0.2.2 列表单行自适应省略号排版与无打断更新体验",
+  "title": "DeskEcho v0.2.3 或许没用切片列表纯粹极简排版与跨会话自启修复",
   "changelog": [
-    "重构‘或许没用’切片列表项白字议题部分为严格固定单行显示（ElidedLabel），末尾自适应添加省略号（...），右侧配合四象限卡片完整详情，界面极致规整紧凑",
-    "优化切片库双栏分割器布局比例（锁定左栏最小安全宽度 300px），彻底消除窄视口导致的文字挤压与横向裁切",
-    "移除首屏右上角冗余的‘刷新列表’按钮，改由新切片静默浮动药丸（新切片置顶查看）无感更新，杜绝打断操作员过往纪要查阅",
-    "支持自动更新检测与单文件 Windows EXE 官方发版同步升级"
+    "优化‘或许没用’切片列表交互排版：移除列表项内冗余的有用按钮与研判原因标签，全面对齐正式切片极简双行风格",
+    "保留详情面板专属【✨ 判定有用并恢复】与【💡 AI 研判理由】栏目，强化主次信息层级",
+    "完善打包规范，完整收录 ChromaDB 向量数据库及遥测子模块，彻底解决 Windows EXE 运行依赖",
+    "修复 Windows 物理控制台桌面（Session 1）开机与调度自启管道，实现前台无感无缝交付"
   ],
-  "download_url": "https://github.com/bababoyibibilabu/DeskEcho/releases/download/v0.2.2/DeskEcho.exe",
-  "zip_url": "https://github.com/bababoyibibilabu/DeskEcho/archive/refs/tags/v0.2.2.zip",
+  "download_url": "https://github.com/bababoyibibilabu/DeskEcho/releases/download/v0.2.3/DeskEcho.exe",
+  "zip_url": "https://github.com/bababoyibibilabu/DeskEcho/archive/refs/tags/v0.2.3.zip",
   "min_version": "0.1.0"
 }

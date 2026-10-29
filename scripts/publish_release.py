@@ -45,16 +45,16 @@ def main():
     repo = "DeskEcho"
 
     # 1. 检查或创建 Release
-    print(f"[*] 检查 GitHub Release {tag}...")
+    print(f"[*] 检查 GitHub Release {tag}...", flush=True)
     rel_url = f"https://api.github.com/repos/{owner}/{repo}/releases/tags/{tag}"
-    r = requests.get(rel_url, headers=headers)
+    r = requests.get(rel_url, headers=headers, timeout=30)
     
     release_id = None
     if r.status_code == 200:
         release_id = r.json().get("id")
-        print(f"[*] 找到已有 Release {tag} (ID: {release_id})")
+        print(f"[*] 找到已有 Release {tag} (ID: {release_id})", flush=True)
     else:
-        print(f"[*] 正在创建 GitHub Release {tag}...")
+        print(f"[*] 正在创建 GitHub Release {tag}...", flush=True)
         create_url = f"https://api.github.com/repos/{owner}/{repo}/releases"
         payload = {
             "tag_name": tag,
@@ -64,12 +64,12 @@ def main():
             "draft": False,
             "prerelease": False
         }
-        cr = requests.post(create_url, headers=headers, json=payload)
+        cr = requests.post(create_url, headers=headers, json=payload, timeout=30)
         if cr.status_code in (200, 201):
             release_id = cr.json().get("id")
-            print(f"[+] 成功创建 GitHub Release {tag} (ID: {release_id})")
+            print(f"[+] 成功创建 GitHub Release {tag} (ID: {release_id})", flush=True)
         else:
-            print(f"[ERROR] 创建 Release 失败: {cr.status_code} - {cr.text}")
+            print(f"[ERROR] 创建 Release 失败: {cr.status_code} - {cr.text}", flush=True)
             sys.exit(1)
 
     # 2. 上传 DeskEcho.exe 资产
@@ -77,25 +77,27 @@ def main():
     
     # 检查是否已存在同名资产
     assets_url = f"https://api.github.com/repos/{owner}/{repo}/releases/{release_id}/assets"
-    ar = requests.get(assets_url, headers=headers)
+    ar = requests.get(assets_url, headers=headers, timeout=30)
     if ar.status_code == 200:
         for asset in ar.json():
             if asset.get("name") == "DeskEcho.exe":
-                print(f"[*] 发现已有同名资产 {asset.get('name')} (ID: {asset.get('id')})，正在删除旧资产...")
+                print(f"[*] 发现已有同名资产 {asset.get('name')} (ID: {asset.get('id')})，正在删除旧资产...", flush=True)
                 del_url = f"https://api.github.com/repos/{owner}/{repo}/releases/assets/{asset.get('id')}"
-                requests.delete(del_url, headers=headers)
+                requests.delete(del_url, headers=headers, timeout=30)
+                import time
+                time.sleep(2)
 
-    print(f"[*] 正在上传 {dist_exe.name} ({dist_exe.stat().st_size / (1024*1024):.1f} MB) 至 GitHub Release...")
+    print(f"[*] 正在上传 {dist_exe.name} ({dist_exe.stat().st_size / (1024*1024):.1f} MB) 至 GitHub Release...", flush=True)
     with open(dist_exe, "rb") as f:
         up_headers = {
             "Authorization": f"Bearer {token}",
             "Content-Type": "application/octet-stream"
         }
-        ur = requests.post(upload_url, headers=up_headers, data=f)
+        ur = requests.post(upload_url, headers=up_headers, data=f, timeout=300)
         if ur.status_code in (200, 201):
-            print(f"[SUCCESS] 成功上传发布资产 DeskEcho.exe！下载链接: {ur.json().get('browser_download_url')}")
+            print(f"[SUCCESS] 成功上传发布资产 DeskEcho.exe！下载链接: {ur.json().get('browser_download_url')}", flush=True)
         else:
-            print(f"[ERROR] 上传发布资产失败: {ur.status_code} - {ur.text}")
+            print(f"[ERROR] 上传发布资产失败: {ur.status_code} - {ur.text}", flush=True)
             sys.exit(1)
 
 if __name__ == "__main__":

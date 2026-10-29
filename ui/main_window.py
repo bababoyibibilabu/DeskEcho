@@ -3044,11 +3044,10 @@ class MainWindow(QMainWindow):
                     rec = it.data(Qt.ItemDataRole.UserRole) if it else {}
                     items_info.append({
                         "row": i,
+                        "text": it.text() if it else "",
                         "time": rec.get("start_time"),
                         "reason": rec.get("trash_reason"),
                         "summary_snippet": rec.get("summary", "")[:90],
-                        "item_sizeHint": [it.sizeHint().width(), it.sizeHint().height()] if it else None,
-                        "widget_actual_size": [w.width(), w.height()] if w else None,
                     })
 
                 result = {
@@ -3179,20 +3178,15 @@ class MainWindow(QMainWindow):
             if not first_line:
                 first_line = "常规会议沟通讨论"
 
+            clean_topic = first_line[:32] + "..." if len(first_line) > 32 else first_line
             if self.current_mem_mode == "trash":
-                item = QListWidgetItem()
-                item.setSizeHint(QSize(280, 88))
+                item = QListWidgetItem(f"🗑️ {time_str}\n   {clean_topic}")
+                reason = rec.get("trash_reason", "次要碎片")
+                item.setToolTip(f"【次要切片】: {time_str}\n【AI 研判理由】: {reason}\n{first_line}")
                 item.setData(Qt.ItemDataRole.UserRole, rec)
                 self.mem_list.addItem(item)
-                widget = TrashSliceItemWidget(
-                    rec=rec,
-                    list_item=item,
-                    list_widget=self.mem_list,
-                    on_restore_callback=self._restore_slice_useful
-                )
-                self.mem_list.setItemWidget(item, widget)
             else:
-                item = QListWidgetItem(f"📅 {time_str}\n   {first_line[:28]}")
+                item = QListWidgetItem(f"📅 {time_str}\n   {clean_topic}")
                 item.setToolTip(f"{time_str}\n{first_line}")
                 item.setData(Qt.ItemDataRole.UserRole, rec)
                 self.mem_list.addItem(item)
@@ -3419,20 +3413,15 @@ class MainWindow(QMainWindow):
             summary = rec.get("summary", "")
             first_line = summary.split("\n")[0] if summary else "匹配切片"
 
+            clean_topic = first_line[:30] + "..." if len(first_line) > 30 else first_line
             if self.current_mem_mode == "trash":
-                item = QListWidgetItem()
-                item.setSizeHint(QSize(280, 88))
+                item = QListWidgetItem(f"🗑️ {time_str}\n   🔍 {clean_topic}")
+                reason = rec.get("trash_reason", "次要碎片")
+                item.setToolTip(f"【次要切片】: {time_str}\n【AI 研判理由】: {reason}\n{first_line}")
                 item.setData(Qt.ItemDataRole.UserRole, rec)
                 self.mem_list.addItem(item)
-                widget = TrashSliceItemWidget(
-                    rec=rec,
-                    list_item=item,
-                    list_widget=self.mem_list,
-                    on_restore_callback=self._restore_slice_useful
-                )
-                self.mem_list.setItemWidget(item, widget)
             else:
-                item = QListWidgetItem(f"📅 {time_str}\n   🔍 {first_line[:26]}")
+                item = QListWidgetItem(f"📅 {time_str}\n   🔍 {clean_topic}")
                 item.setData(Qt.ItemDataRole.UserRole, rec)
                 self.mem_list.addItem(item)
 
