@@ -14,91 +14,93 @@ COMPANY_INFO = {
 
 EMPLOYEES: List[Dict[str, Any]] = [
     {
-        "name": "陈佳彤",
-        "title": "行政人事与组织办公室负责人",
-        "status": "active",
-        "aliases": ["陈佳彤", "小陈", "佳彤", "陈经理", "行政人事"],
-        "duties": "负责团队行政人事、日常办公保障、组织协同与团队后勤支撑，新员工入职对接",
-        "tech_stack": "行政管理 / 人事组织 / 流程规范 / 日常协调",
-        "current_focus": "团队行政人事规范化推进、流程无缝衔接与办公保障"
-    },
-    {
         "name": "吕明秋",
-        "title": "算法与大模型应用专家",
+        "title": "董事长",
         "status": "active",
-        "aliases": ["吕明秋", "吕工", "老吕", "小吕"],
-        "duties": "负责大模型应用落地、课程脚本AI辅助生成、自适应评估与交互逻辑调优",
-        "tech_stack": "Python / 大模型工作流 / Prompt工程 / 算法工程",
-        "current_focus": "智能陪学系统核心交互与AI生成工作流构建"
+        "aliases": ["吕明秋", "吕总", "董事长", "老板", "明秋"],
+        "duties": "公司董事长与战略决策委员会负责人。统筹公司中长期战略规划、商业定位、重大投融资与业务决策，把关核心研发资源方向与品牌标识定位",
+        "tech_stack": "企业战略决策 / 商业发展 / 资本统筹 / 核心定位规划",
+        "current_focus": "公司中长期战略规划把关、品牌Logo定位与关键业务方向审核"
     },
     {
         "name": "杨年新",
         "title": "总经理 / 业务与资源统筹总负责人",
         "status": "active",
-        "aliases": ["杨总", "杨年新", "杨建新", "老杨", "发言人1", "发言人7"],
-        "duties": "公司整体业务推进与技术资源兜底，统筹多端产品交付、外部院校合作与商务资源",
-        "tech_stack": "战略运营 / 商业推进 / 综合调度 / 资源协调",
-        "current_focus": "推进“奋斗一百天”核心目标、东北师大/吉大合作项目与场地规划落地"
-    },
-    {
-        "name": "陈思豪",
-        "title": "系统后端与接口开发主管",
-        "status": "active",
-        "aliases": ["陈思豪", "陈哥", "思豪", "陈工"],
-        "duties": "负责服务端架构设计、API接口定义与高可用微服务搭建，主导前后端并行高效交付",
-        "tech_stack": "Python / 后端架构 / RESTful API / 数据库 / 微服务",
-        "current_focus": "先行出具API接口体系与数据处理流程梳理"
+        "aliases": ["杨总", "杨年新", "杨建新", "老杨", "发言人7", "发言人1"],
+        "duties": "公司总经理，全面把控业务推进进度与软硬件技术资源兜底，推进“奋斗一百天”攻坚战，统筹东北师大与吉大等外部合作及展会参展落地",
+        "tech_stack": "战略运营 / 商业推进 / 综合调度 / 资源协调 / 跨端协同",
+        "current_focus": "推进“奋斗一百天”核心攻坚目标、东北师大/吉大合作项目与场地落地"
     },
     {
         "name": "程远",
-        "title": "技术总监 / 架构与研发协调",
+        "title": "产品经理 (深耕教培行业 / 技术研发)",
         "status": "active",
-        "aliases": ["程远", "成远", "成哥", "程哥", "发言人3"],
-        "duties": "统筹技术研发全局协调、跨端架构设计、软硬件技术方案打通与开发节奏把控",
-        "tech_stack": "系统架构 / 技术协调 / 软硬协同 / 跨平台交付",
-        "current_focus": "整体技术方案架构协调、安卓端与机器人端协同落地"
+        "aliases": ["程远", "成远", "成哥", "程哥", "发言人3", "教培", "BKT", "掌握度"],
+        "duties": "深耕教培行业产品设计与全栈技术开发，负责K12互动学习闭环、自适应抽题评测体系、BKT知识追踪与掌握度画像算法、软硬件协同架构与功能定义",
+        "tech_stack": "教培产品规划 / 知识图谱 / 自适应学习(BKT) / 全栈研发 / 软硬件协同",
+        "current_focus": "K12自适应学习闭环设计、知识图谱推导、掌握度画像算法与多端功能落地"
+    },
+    {
+        "name": "陈思豪",
+        "title": "机器人后端开发",
+        "status": "active",
+        "aliases": ["陈思豪", "陈哥", "思豪", "陈工", "机器人后端", "后端接口"],
+        "duties": "负责机器人服务端与核心后端开发、RESTful API 规范制定、前后端并行交付数据管道搭建、多端数据同步与微服务开发",
+        "tech_stack": "机器人后端 / Python / API架构 / 数据管道 / 微服务",
+        "current_focus": "机器人后端接口体系规范化、数据管道打通与多端接口联调交付"
     },
     {
         "name": "荣硕",
-        "title": "硬件与嵌入式测试工程师",
+        "title": "机器人安卓开发 / 语音交互工程师",
         "status": "active",
-        "aliases": ["荣硕", "小荣", "荣工", "荣"],
-        "duties": "负责硬件白板/平板、麦克风拾音、天机900板卡调试、硬件交互与声音测试",
-        "tech_stack": "硬件调试 / 嵌入式开发 / 拾音设备 / 系统部署",
-        "current_focus": "天机900双麦克风调试与硬件白板测试环境搭建"
+        "aliases": ["荣硕", "小荣", "荣工", "荣", "语音交互", "打断", "麦克风", "拾音"],
+        "duties": "负责机器人端安卓应用开发与系统适配，主导高音量下语音唤醒与打断 (Barge-in)、回声消除 (AEC)、麦克风拾音链路调试与硬件板卡联调",
+        "tech_stack": "机器人安卓 / 语音交互 / 降噪与回声消除(AEC) / 拾音设备调试 / 硬件板卡",
+        "current_focus": "机器人音频链路测试、回声消除与高音量唤醒打断方案调优、板卡与白板硬件连接调试"
     },
     {
         "name": "张文嘉",
-        "title": "商业运营与合作拓展主管",
+        "title": "行政主管 / 题库与教研数据整理",
         "status": "active",
-        "aliases": ["张文嘉", "张文佳", "文嘉", "小张"],
-        "duties": "负责合作院校（东北师大、吉大等）项目落地推进、承办代表对接与商业合作拓展",
-        "tech_stack": "商务拓展 / 项目承办 / 商务运营 / 院校合作",
-        "current_focus": "东北师大校区部等关键合作项目跟进与承办落地"
+        "aliases": ["张文嘉", "张文佳", "文嘉", "小张", "题库", "错题", "映射表"],
+        "duties": "负责团队综合行政事务、校企合作日常对接与承办代表工作，主导K12题库精细化梳理、教材版本与知识点映射表构建、错题归因体系整理",
+        "tech_stack": "行政管理 / 题库整理 / 教研知识树 / 错题归类 / 院校合作对接",
+        "current_focus": "K12题库精细化梳理、各区域教材与知识点映射表构建、错题归因与行政保障"
+    },
+    {
+        "name": "郎琦",
+        "title": "安卓开发工程师 / 全栈与AI技术支持",
+        "status": "active",
+        "aliases": ["郎琦", "郎琪", "小郎", "安卓", "全栈", "AI技术", "数据表", "抓取"],
+        "duties": "负责安卓客户端核心应用开发、多表复杂数据库设计与持久化存储，同时提供全栈系统支持与AI模型调用脚本/数据抓取技术支持",
+        "tech_stack": "Android开发 / 全栈研发 / SQLite多表架构 / AI技术支持 / Python数据脚本",
+        "current_focus": "安卓端数据库架构实现 (多表关联与性能调优)、AI题目审核辅助与技术调用支撑"
     },
     {
         "name": "李洋",
         "title": "产品 UI / UE 视觉与交互专家",
         "status": "active",
-        "aliases": ["李洋", "李阳", "洋哥", "UI", "设计", "美编"],
-        "duties": "负责产品 UI / UE 视觉与全链路交互设计、页面定稿、视觉规范与动效打磨",
-        "tech_stack": "UI/UE 设计 / 视觉传达 / 动效交互 / 原型设计",
-        "current_focus": "学习平板与机器人端多端视觉定稿与交互规范输出"
+        "aliases": ["李洋", "李阳", "洋哥", "UI", "视觉", "界面", "设计", "美编"],
+        "duties": "负责产品全链路视觉与UI/UE交互设计，主导平板端与机器人端视觉规范、页面定稿、开屏学情录入交互、企业VI与品牌标识设计",
+        "tech_stack": "UI/UE设计 / 视觉传达 / 交互原型 / 动效设计 / 品牌VI",
+        "current_focus": "学习平板与机器人端多端视觉定稿、开屏形象体互动与企业VI标识设计打磨"
     },
     {
-        "name": "郎琦",
-        "title": "安卓端核心研发工程师",
+        "name": "陈佳彤",
+        "title": "行政人事与组织办公室负责人",
         "status": "active",
-        "aliases": ["郎琦", "郎琪", "小郎", "安卓郎", "安卓开发"],
-        "duties": "负责安卓端机器人/平板应用架构、数据库表结构设计与客户端交互功能落地",
-        "tech_stack": "Android / Kotlin / Java / SQLite / 客户端通信",
-        "current_focus": "安卓数据库设计与核心页面功能开发"
+        "aliases": ["陈佳彤", "小陈", "佳彤", "陈经理", "行政人事", "办公室", "考勤", "入职"],
+        "duties": "全面主持行政人事办公室日常运转，负责团队考勤与后勤保障、新员工入职对接、跨部门协同盯办、推进工作进度表与组织保障",
+        "tech_stack": "行政人事 / 组织协同 / 进度盯办 / 后勤保障 / 流程规范",
+        "current_focus": "团队行政人事规范化推进、新同事入职对接、跟进项目日常进度表与无缝业务链接"
     }
 ]
 
-def extract_action_summary(emp_name: str, aliases: List[str], slices: List[Dict[str, Any]]) -> List[Dict[str, str]]:
-    """从历史会议切片中提取该人员的关键决策、主导事项或发言结论"""
-    keywords = [emp_name] + aliases
+def extract_action_summary(emp_name: str, aliases: List[str], slices: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    从历史会议切片中智能提取该人员的关键决策、待办落实、主导发言与事实备忘
+    """
+    kw = [emp_name] + aliases
     actions = []
     for s in slices:
         summary_text = s.get("summary", "")
@@ -106,47 +108,94 @@ def extract_action_summary(emp_name: str, aliases: List[str], slices: List[Dict[
         start_time = s.get("start_time", "")
         date_str = start_time[:16] if len(start_time) >= 16 else start_time
 
-        topic = ""
-        conclusion = ""
+        sections: Dict[str, Any] = {"topic": "", "decisions": [], "actions": [], "facts": []}
+        current_sec = None
         for line in summary_text.split("\n"):
             line = line.strip()
-            if "【核心议题】" in line or "【议题】" in line or "1. 核心议题" in line:
-                topic = line.replace("【核心议题】", "").replace("【议题】", "").replace("1. 核心议题（Topic）：", "").strip()
-            if any(k in line for k in keywords):
-                conclusion = line.replace("【关键结论】", "").replace("【结论】", "").replace("2. 决策与结论（Key Decisions）：", "").replace("3. 待办事项（Action Items）：", "").strip()
+            if not line:
+                continue
+            if "1. 核心议题" in line or "【核心议题】" in line or "【议题】" in line:
+                current_sec = "topic"
+                topic_content = line.split("：", 1)[-1].split(":", 1)[-1].strip()
+                sections["topic"] = topic_content
+            elif "2. 决策与结论" in line or "【关键结论】" in line or "【结论】" in line:
+                current_sec = "decisions"
+            elif "3. 待办事项" in line or "【待办事项】" in line or "【待办】" in line:
+                current_sec = "actions"
+            elif "4. 事实备忘" in line or "【事实备忘】" in line:
+                current_sec = "facts"
+            else:
+                if current_sec and current_sec != "topic":
+                    sections[current_sec].append(line)
 
-        if not conclusion:
-            for sent in raw_text.split("。"):
+        relevant_actions = [a for a in sections["actions"] if any(k in a for k in kw)]
+        relevant_decisions = [d for d in sections["decisions"] if any(k in d for k in kw)]
+        relevant_facts = [f for f in sections["facts"] if any(k in f for k in kw)]
+
+        points = []
+        if relevant_actions:
+            for act in relevant_actions[:2]:
+                clean_act = act.lstrip("-*•123456789. ")
+                points.append(f"📌 待办落实：{clean_act}")
+        if relevant_decisions:
+            for dec in relevant_decisions[:2]:
+                clean_dec = dec.lstrip("-*•123456789. ")
+                points.append(f"✅ 关键决策：{clean_dec}")
+        if relevant_facts and not points:
+            for fact in relevant_facts[:2]:
+                clean_fact = fact.lstrip("-*•123456789. ")
+                points.append(f"📝 事实备忘：{clean_fact}")
+
+        spoken_quote = ""
+        if not points:
+            for sent in raw_text.split("\n"):
                 sent = sent.strip()
-                if any(k in sent for k in keywords) and len(sent) > 5:
-                    conclusion = sent
+                if any(k in sent for k in kw) and len(sent) > 8:
+                    spoken_quote = sent[:120]
                     break
+            if spoken_quote:
+                points.append(f"🎙️ 现场发言：{spoken_quote}")
 
+        if not points:
+            if sections["decisions"] and sections["decisions"][0] != "无":
+                first_dec = sections["decisions"][0].lstrip("-*•123456789. ")
+                points.append(f"✅ 决议协同：{first_dec}")
+            elif sections["topic"]:
+                points.append(f"🎯 重点研讨：{sections['topic'][:60]}")
+            else:
+                points.append("🤝 参与研讨并输出指导意见")
+
+        topic = sections["topic"]
         if not topic:
-            topic = summary_text.split("\n")[0][:25] if summary_text else "常规业务研讨"
-        if not conclusion:
-            conclusion = summary_text[:50] if summary_text else "参与会议决策并给出指导意见"
+            topic = s.get("id", "").split("_slice_")[0].replace("_", " ")
 
+        highlight = points[0] if points else "参与会议决策并跟进落实"
         actions.append({
+            "slice_id": s.get("id", ""),
             "time": date_str,
             "topic": topic,
-            "highlight": conclusion
+            "highlight": highlight,
+            "points": points
         })
     return actions
 
 def get_dynamic_employee_profile(store, emp: Dict[str, Any]) -> Dict[str, Any]:
     """动态获取员工画像，汇聚会议参与度与关键主导事项"""
     names = [emp["name"]] + emp.get("aliases", [])
-    slices = store.query_slices_by_entity_names(names, limit=6) if store else []
-    
+    slices = store.query_slices_by_entity_names(names, limit=8) if store else []
+
     actions = extract_action_summary(emp["name"], emp.get("aliases", []), slices)
-    
+
     if actions:
         latest_act = actions[0]
-        core_highlight = f"{latest_act['highlight']}"
+        pts = latest_act.get("points", [])
+        if pts:
+            core_highlight = f"【{latest_act.get('topic', '近期会议')}】{pts[0]}"
+        else:
+            core_highlight = f"【{latest_act.get('topic', '近期会议')}】{latest_act.get('highlight', '')}"
     else:
         core_highlight = emp.get("current_focus", emp.get("duties", ""))
-        
+
     return {
         "emp": emp,
         "meeting_count": len(slices),

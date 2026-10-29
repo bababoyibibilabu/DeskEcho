@@ -1178,24 +1178,44 @@ class ExpandableEmployeeCard(QFrame):
                 item_frame.setStyleSheet("""
                     QFrame {
                         background: rgba(255, 255, 255, 0.03);
-                        border: 1px solid rgba(255, 255, 255, 0.05);
+                        border: 1px solid rgba(255, 255, 255, 0.06);
+                        border-left: 2px solid #26B0E4;
                         border-radius: 6px;
-                        padding: 6px 8px;
+                        padding: 7px 9px;
                     }
                 """)
                 item_layout = QVBoxLayout(item_frame)
                 item_layout.setContentsMargins(8, 6, 8, 6)
-                item_layout.setSpacing(3)
+                item_layout.setSpacing(4)
 
-                header_lbl = QLabel(f"📅 {act.get('time', '近期')} · 【{act.get('topic', '常规议题')}】")
-                header_lbl.setStyleSheet("color: #94A3B8; font-size: 10.5px; font-weight: bold;")
-
-                desc_lbl = QLabel(f"💬 {act.get('highlight', '')}")
-                desc_lbl.setWordWrap(True)
-                desc_lbl.setStyleSheet("color: #E2E8F0; font-size: 11px; line-height: 1.35;")
-
+                topic_str = act.get('topic', '常规议题')
+                header_lbl = QLabel(f"📅 {act.get('time', '近期')} · 【{topic_str}】")
+                header_lbl.setWordWrap(True)
+                header_lbl.setStyleSheet("color: #38BDF8; font-size: 11px; font-weight: bold;")
                 item_layout.addWidget(header_lbl)
-                item_layout.addWidget(desc_lbl)
+
+                points = act.get("points", [])
+                if points:
+                    for pt in points:
+                        pt_lbl = QLabel(pt)
+                        pt_lbl.setWordWrap(True)
+                        if pt.startswith("✅"):
+                            pt_lbl.setStyleSheet("color: #86EFAC; font-size: 11px; line-height: 1.4; padding-left: 2px;")
+                        elif pt.startswith("📌"):
+                            pt_lbl.setStyleSheet("color: #BAE6FD; font-size: 11px; line-height: 1.4; padding-left: 2px;")
+                        elif pt.startswith("📝"):
+                            pt_lbl.setStyleSheet("color: #FDE047; font-size: 11px; line-height: 1.4; padding-left: 2px;")
+                        elif pt.startswith("🎙️"):
+                            pt_lbl.setStyleSheet("color: #CBD5E1; font-size: 10.5px; font-style: italic; line-height: 1.35; padding-left: 2px;")
+                        else:
+                            pt_lbl.setStyleSheet("color: #E2E8F0; font-size: 11px; line-height: 1.4; padding-left: 2px;")
+                        item_layout.addWidget(pt_lbl)
+                elif act.get("highlight"):
+                    desc_lbl = QLabel(f"💬 {act.get('highlight', '')}")
+                    desc_lbl.setWordWrap(True)
+                    desc_lbl.setStyleSheet("color: #E2E8F0; font-size: 11px; line-height: 1.35;")
+                    item_layout.addWidget(desc_lbl)
+
                 self.timeline_layout.addWidget(item_frame)
         else:
             no_act_lbl = QLabel("💡 暂无直接关联的历史会议切片。后续会议讨论中若提及或由其发言，系统将自动汇总沉淀于此。")
