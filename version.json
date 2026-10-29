@@ -1,15 +1,16 @@
 {
-  "version": "0.2.4",
+  "version": "0.2.5",
   "release_date": "2026-10-29",
-  "title": "DeskEcho v0.2.4 敏捷自进化指令模式与生产机自动热升级加固",
+  "title": "DeskEcho v0.2.5 全新双主题视觉重构与质感轻量化升级",
   "changelog": [
-    "新增敏捷自进化口语指令模式：按住对讲以“改进一下/提个需求”开头，直通工单入库与技术方案评估，不污染会议记忆库",
-    "配备专属架构师播报角色：采用沉稳干练的工程师音色（zh-CN-YunjianNeural）进行极简秒级确认响应",
-    "升级主界面专属工单视觉卡片：以极客琥珀金卡片呈现需求分类、诉求归纳与实施拆解路径",
-    "加固 Windows 生产机自动更新引擎：采用独立暂存区与进程退出解耦守护批处理，确保大包下载与热重启 100% 稳妥可靠",
-    "引入后台 Autonomous Loop 调度管道，实现需求捕获、真机验证到全自动发版更新的飞轮闭环"
+    "全新双主题支持：默认提供高清晰舒适的浅色主题 (Light)，并完美兼容深色主题 (Dark)，右上角太阳/月亮一键秒级切换",
+    "美好智能品牌花朵微标：侧边栏、窗口图标及系统托盘全套融入色卡玻璃拟态花朵微标变体",
+    "解答框微动效光效：输出生成与打字过程中触发 Border Beam 呼吸流光边框，回答就绪后优雅定格，输出完毕即刻停止",
+    "视觉层级深度减负：重构冗余嵌套边框，剔除多层套盒杂音，大幅提升长文本与会议切片阅读呼吸感",
+    "现代化统一高对比弹窗：采用定制 ModernDialog 彻底替代原生简陋灰底弹窗，切片恢复与删除操作层次分明、对比鲜明",
+    "极简程序状态栏：去除系统默认立体边框，采用主题自适应的高质感极简状态栏，拒绝过度设计与浮夸喧宾夺主"
   ],
-  "download_url": "https://github.com/bababoyibibilabu/DeskEcho/releases/download/v0.2.4/DeskEcho.exe",
-  "zip_url": "https://github.com/bababoyibibilabu/DeskEcho/archive/refs/tags/v0.2.4.zip",
+  "download_url": "https://github.com/bababoyibibilabu/DeskEcho/releases/download/v0.2.5/DeskEcho.exe",
+  "zip_url": "https://github.com/bababoyibibilabu/DeskEcho/archive/refs/tags/v0.2.5.zip",
   "min_version": "0.1.0"
 }

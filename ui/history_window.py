@@ -64,7 +64,7 @@ class HistoryWindow(QWidget):
         for rec in self.records:
             time_display = f"{rec.get('start_time', '')}"
             summary_snippet = (rec.get('summary') or '无摘要')[:30].replace("\n", " ")
-            item = QListWidgetItem(f"📅 {time_display}\n  {summary_snippet}...")
+            item = QListWidgetItem(f"{time_display}\n  {summary_snippet}...")
             self.list_widget.addItem(item)
         
         self.list_widget.setCurrentRow(0)
@@ -108,6 +108,6 @@ class HistoryWindow(QWidget):
                 "summary": r.get("content", ""),
                 "raw_text": ""
             })
-            self.list_widget.addItem(f"🔍 {meta.get('start_time', '')}\n  {r.get('content')[:35]}...")
+            self.list_widget.addItem(f"{meta.get('start_time', '')}\n  {r.get('content')[:35]}...")
         if self.records:
             self.list_widget.setCurrentRow(0)

@@ -136,15 +136,15 @@ def extract_action_summary(emp_name: str, aliases: List[str], slices: List[Dict[
         if relevant_actions:
             for act in relevant_actions[:2]:
                 clean_act = act.lstrip("-*•123456789. ")
-                points.append(f"📌 待办落实：{clean_act}")
+                points.append(f"【待办落实】{clean_act}")
         if relevant_decisions:
             for dec in relevant_decisions[:2]:
                 clean_dec = dec.lstrip("-*•123456789. ")
-                points.append(f"✅ 关键决策：{clean_dec}")
+                points.append(f"【关键决策】{clean_dec}")
         if relevant_facts and not points:
             for fact in relevant_facts[:2]:
                 clean_fact = fact.lstrip("-*•123456789. ")
-                points.append(f"📝 事实备忘：{clean_fact}")
+                points.append(f"【事实备忘】{clean_fact}")
 
         spoken_quote = ""
         if not points:
@@ -154,16 +154,16 @@ def extract_action_summary(emp_name: str, aliases: List[str], slices: List[Dict[
                     spoken_quote = sent[:120]
                     break
             if spoken_quote:
-                points.append(f"🎙️ 现场发言：{spoken_quote}")
+                points.append(f"【现场发言】{spoken_quote}")
 
         if not points:
             if sections["decisions"] and sections["decisions"][0] != "无":
                 first_dec = sections["decisions"][0].lstrip("-*•123456789. ")
-                points.append(f"✅ 决议协同：{first_dec}")
+                points.append(f"【决议协同】{first_dec}")
             elif sections["topic"]:
-                points.append(f"🎯 重点研讨：{sections['topic'][:60]}")
+                points.append(f"【重点研讨】{sections['topic'][:60]}")
             else:
-                points.append("🤝 参与研讨并输出指导意见")
+                points.append("参与研讨并输出指导意见")
 
         topic = sections["topic"]
         if not topic:

@@ -40,16 +40,16 @@ class HUDStreamBrowser(QTextBrowser):
     def _render(self, text: str, is_streaming: bool):
         escaped = html.escape(text.strip())
 
-        # 0. 重点渲染 > ❓ **语音提问**：
+        # 0. 重点渲染 > **语音提问**：
         def format_question(m):
             content = m.group(1).strip()
-            return f'<div style="background: rgba(38, 176, 228, 0.12); border-left: 3px solid #26B0E4; border-radius: 6px; padding: 6px 11px; margin: 4px 0 6px 0;"><div style="color: #26B0E4; font-weight: bold; font-size: 10px; margin-bottom: 2px;">❓ 识别提问</div><div style="color: #FFFFFF; font-size: 13px; font-weight: 600;">“{content}”</div></div>'
+            return f'<div style="background: rgba(38, 176, 228, 0.12); border-left: 3px solid #26B0E4; border-radius: 6px; padding: 6px 11px; margin: 4px 0 6px 0;"><div style="color: #26B0E4; font-weight: bold; font-size: 10px; margin-bottom: 2px;">识别提问</div><div style="color: #FFFFFF; font-size: 13px; font-weight: 600;">“{content}”</div></div>'
         escaped = re.sub(r'&gt;\s*❓?\s*\*\*语音提问\*\*[：:]\s*(.+?)(?=(?:\n\n|\n&lt;|\n#|$))', format_question, escaped, flags=re.DOTALL)
 
         # 重点渲染结论播报 (美好智能 VI: 靛青 #13459D -> 海青 #26B0E4 -> 鹦鹉绿 #8AC657)
         def format_spoken(m):
             content = m.group(1).strip()
-            return f'<div style="background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 rgba(19, 69, 157, 0.28), stop:0.55 rgba(38, 176, 228, 0.16), stop:1 rgba(138, 198, 87, 0.12)); border-left: 3px solid #26B0E4; border-radius: 6px; padding: 8px 12px; margin: 6px 0 8px 0;"><div style="color: #26B0E4; font-weight: bold; font-size: 10px; letter-spacing: 0.5px; margin-bottom: 2px;">🎙️ 结论播报 (TTS 极简朗读)</div><div style="color: #FFFFFF; font-size: 13px; font-weight: 600; line-height: 1.45;">{content}</div></div>'
+            return f'<div style="background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 rgba(19, 69, 157, 0.28), stop:0.55 rgba(38, 176, 228, 0.16), stop:1 rgba(138, 198, 87, 0.12)); border-left: 3px solid #26B0E4; border-radius: 6px; padding: 8px 12px; margin: 6px 0 8px 0;"><div style="color: #26B0E4; font-weight: bold; font-size: 10px; letter-spacing: 0.5px; margin-bottom: 2px;">结论播报 (TTS 极简朗读)</div><div style="color: #FFFFFF; font-size: 13px; font-weight: 600; line-height: 1.45;">{content}</div></div>'
         escaped = re.sub(r'&gt;\s*🎙️?\s*\*\*结论播报\*\*[：:]\s*(.+?)(?=(?:\n\n|\n&lt;|\n#|$))', format_spoken, escaped, flags=re.DOTALL)
 
         escaped = re.sub(r'###\s*(.+?)(?=\n|$)', r'<div style="color: #F8FAFC; font-size: 13px; font-weight: bold; margin: 10px 0 4px 0; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 3px;">\1</div>', escaped)
@@ -289,8 +289,9 @@ class HUDWindow(QWidget):
         input_layout.setContentsMargins(8, 4, 8, 4)
         input_layout.setSpacing(6)
 
-        icon_hint = QLabel("⚡")
-        icon_hint.setStyleSheet("font-size: 13px; color: #26B0E4;")
+        from ui.components.icons import get_symbol_pixmap
+        icon_hint = QLabel()
+        icon_hint.setPixmap(get_symbol_pixmap("search", color="#26B0E4", size=14))
         input_layout.addWidget(icon_hint)
 
         self.input_edit = QLineEdit()
@@ -346,14 +347,14 @@ class HUDWindow(QWidget):
             if hasattr(self, "stop_btn"):
                 self.stop_btn.hide()
             self.status_dot.setStyleSheet("color: #64748B; font-size: 13px;")
-            self.status_text.setText("🔇 播报已打断")
+            self.status_text.setText("播报已打断")
             return True
         return False
 
     def show_interrupted_status(self):
         """点按右 Alt 打断播报后的状态反馈，保留解答卡片内容供阅读"""
         self.status_dot.setStyleSheet("color: #94A3B8; font-size: 13px;")
-        self.status_text.setText("🔇 播报已打断 (按 Esc 关闭)")
+        self.status_text.setText("播报已打断 (按 Esc 关闭)")
         if hasattr(self, "stop_btn"):
             self.stop_btn.hide()
 
@@ -382,9 +383,8 @@ class HUDWindow(QWidget):
         self.stage_progress.set_step(1)
         self.content_browser.setHtml(
             "<div style='color: #26B0E4; padding-top: 40px; text-align: center; font-size: 14px;'>"
-            "<span style='font-size: 26px;'>🎙</span><br><br>"
-            "<b>正在倾听您的提问...</b><br><br>"
-            "<span style='color: #94A3B8; font-size: 12px;'>说出您的问题，松开按键即刻检索历史会议</span>"
+            "<div style='font-size: 14px; font-weight: bold;'>正在倾听您的提问...</div><br>"
+            "<span style='color: #94A3B8; font-size: 12px;'>请说话，松开按键即刻检索历史会议</span>"
             "</div>"
         )
         self.show()
@@ -399,8 +399,8 @@ class HUDWindow(QWidget):
 
         self.content_browser.setHtml(
             "<div style='padding-top: 36px; text-align: center;'>"
-            "<div style='font-size: 17px; color: #26B0E4; font-weight: bold;'>⏳ 稍等，正在检索...</div>"
-            "<div style='margin-top: 14px; color: #94A3B8; font-size: 12px;'>🎧 正在将提问转化为文字并对齐记忆切片...</div>"
+            "<div style='font-size: 17px; color: #26B0E4; font-weight: bold;'>稍等，正在检索...</div>"
+            "<div style='margin-top: 14px; color: #94A3B8; font-size: 12px;'>正在将提问转化为文字并对齐记忆切片...</div>"
             "</div>"
         )
         self.show()
@@ -434,7 +434,7 @@ class HUDWindow(QWidget):
         self.raise_()
 
         if audio_path and os.path.exists(audio_path):
-            self.status_text.setText("🔊 播报中 (按右 Alt 打断)")
+            self.status_text.setText("结论播报中 (按右 Alt 打断)")
             if hasattr(self, "stop_btn"):
                 self.stop_btn.show()
             self.player.setSource(QUrl.fromLocalFile(os.path.abspath(audio_path)))

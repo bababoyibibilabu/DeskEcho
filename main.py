@@ -247,6 +247,8 @@ class DeskEchoApp:
             return
 
         self.signals.stage_progress.emit(2, "已听清提问", f"识别提问：<b>“{query_text}”</b><br><br>🔍 正在检索向量知识库与时间轴切片...")
+        if hasattr(self.main_window, 'ans_card') and hasattr(self.main_window.ans_card, 'start_beam'):
+            self.main_window.ans_card.start_beam()
         time.sleep(0.2)
 
         def on_rag_progress(title: str, detail: str):
@@ -278,6 +280,8 @@ class DeskEchoApp:
 
         def _worker():
             self.signals.stage_progress.emit(2, "正在检索", f"问题：<b>“{query_text}”</b><br><br>🔍 正在检索向量知识库与时间轴...")
+            if hasattr(self.main_window, 'ans_card') and hasattr(self.main_window.ans_card, 'start_beam'):
+                self.main_window.ans_card.start_beam()
             
             def on_rag_progress(title: str, detail: str):
                 self.signals.stage_progress.emit(3, title, detail)
@@ -323,6 +327,8 @@ class DeskEchoApp:
             formatted_answer = answer_markdown
 
         self.main_window.display_answer(formatted_answer, audio_path, is_followup=is_followup, focal_topic=focal_topic, response_mode=response_mode)
+        if hasattr(self.main_window, 'ans_card') and hasattr(self.main_window.ans_card, 'stop_beam'):
+            self.main_window.ans_card.stop_beam()
 
         # 3. 若无 TTS 音频播放，立即恢复背景会议录制；若有播放，由 MainWindow.tts_playback_finished 在播完后恢复
         if not audio_path or not os.path.exists(audio_path):

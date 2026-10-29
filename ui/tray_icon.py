@@ -3,6 +3,7 @@ from PyQt6.QtGui import QIcon, QPixmap, QPainter, QColor, QBrush, QPen
 from PyQt6.QtCore import Qt, pyqtSignal, QObject
 
 from version import APP_VERSION
+from ui.components.icons import get_flower_logo_pixmap
 
 class TrayManager(QObject):
     toggle_record_signal = pyqtSignal(bool)
@@ -26,24 +27,26 @@ class TrayManager(QObject):
         self.tray_icon.show()
 
     def _create_icon(self, is_active: bool) -> QIcon:
-        """动态绘制托盘图标"""
+        """动态绘制托盘图标 (美好智能 Flower Logo 变体)"""
         pixmap = QPixmap(32, 32)
         pixmap.fill(Qt.GlobalColor.transparent)
         
         painter = QPainter(pixmap)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         
-        # 美好智能 VI 品牌色：海青 #26B0E4 活跃，灰调静止
-        bg_color = QColor(38, 176, 228) if is_active else QColor(100, 116, 139)
-        painter.setBrush(QBrush(bg_color))
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.drawEllipse(2, 2, 28, 28)
+        # 绘制 Flower Logo
+        logo = get_flower_logo_pixmap(28)
+        painter.drawPixmap(2, 2, logo)
 
-        # 内部回响声波图形
-        painter.setPen(QPen(QColor(255, 255, 255), 2, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
-        painter.drawLine(16, 8, 16, 24)
-        painter.drawLine(11, 12, 11, 20)
-        painter.drawLine(21, 12, 21, 20)
+        if not is_active:
+            # 暂停时右下角加小暗灰角标
+            painter.setBrush(QBrush(QColor(100, 116, 139)))
+            painter.setPen(QPen(QColor(15, 23, 42), 1.5))
+            painter.drawEllipse(18, 18, 12, 12)
+            painter.setBrush(QBrush(QColor(255, 255, 255)))
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.drawRect(21, 21, 2, 6)
+            painter.drawRect(25, 21, 2, 6)
         
         painter.end()
         return QIcon(pixmap)
@@ -75,36 +78,46 @@ class TrayManager(QObject):
             }
         """)
         
-        main_action = menu.addAction("🖥 打开控制台主界面")
+        from ui.components.icons import get_symbol_icon
+
+        main_action = menu.addAction("打开控制台主界面")
+        main_action.setIcon(get_symbol_icon("bolt", color="#26B0E4", size=14))
         main_action.triggered.connect(self.show_main_signal.emit)
 
-        update_action = menu.addAction(f"🚀 软件发版与更新 (v{APP_VERSION})")
+        update_action = menu.addAction(f"软件发版与更新 (v{APP_VERSION})")
+        update_action.setIcon(get_symbol_icon("rocket_launch", color="#38BDF8", size=14))
         update_action.triggered.connect(self.open_update_signal.emit)
 
         menu.addSeparator()
 
-        self.toggle_action = menu.addAction("⏸ 暂停会议录制")
+        self.toggle_action = menu.addAction("暂停会议录制")
+        self.toggle_action.setIcon(get_symbol_icon("mic", color="#10B981", size=14))
         self.toggle_action.triggered.connect(self._toggle_recording)
 
         menu.addSeparator()
 
-        demo_action = menu.addAction("💡 写入示例会议记录 (演示用)")
+        demo_action = menu.addAction("写入示例会议记录 (演示用)")
+        demo_action.setIcon(get_symbol_icon("article", color="#8AC657", size=14))
         demo_action.triggered.connect(self.inject_demo_signal.emit)
 
         menu.addSeparator()
 
-        quit_action = menu.addAction("❌ 退出 DeskEcho")
+        quit_action = menu.addAction("退出 DeskEcho")
+        quit_action.setIcon(get_symbol_icon("delete_forever", color="#EF4444", size=14))
         quit_action.triggered.connect(self.quit_signal.emit)
 
         self.tray_icon.setContextMenu(menu)
 
     def set_record_state(self, should_record: bool):
+        from ui.components.icons import get_symbol_icon
         self.is_recording = should_record
         if self.is_recording:
-            self.toggle_action.setText("⏸ 暂停会议录制")
+            self.toggle_action.setText("暂停会议录制")
+            self.toggle_action.setIcon(get_symbol_icon("mic", color="#10B981", size=14))
             self.tray_icon.setIcon(self.icon_active)
         else:
-            self.toggle_action.setText("▶ 恢复会议录制")
+            self.toggle_action.setText("恢复会议录制")
+            self.toggle_action.setIcon(get_symbol_icon("mic", color="#F59E0B", size=14))
             self.tray_icon.setIcon(self.icon_paused)
 
     def _toggle_recording(self):

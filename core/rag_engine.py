@@ -31,7 +31,7 @@ QA_SYSTEM_PROMPT = """你是一个常驻企业桌面会议记忆助理 DeskEcho�
    ▶ 轨道 A：【会议有记录】（参考片段中确实讨论了该议题）：
      - 严格基于内部会议记录与组织档案回答，绝不捏造；
      - 输出结构：
-       > 🎙️ **结论播报**：[用1~2句极简、口语化的自然句子直接给出结论]
+       > **结论播报**：[用1~2句极简、口语化的自然句子直接给出结论]
        
        ### 详细说明与溯源依据
        [在此展开详细的背景、具体会议时间点（如 2026-10-28 14:00）、发言人、各切片佐证与逻辑推导]
@@ -39,9 +39,9 @@ QA_SYSTEM_PROMPT = """你是一个常驻企业桌面会议记忆助理 DeskEcho�
    ▶ 轨道 B：【会议无记录 / 外部通用问题】（参考片段中完全未涉及用户所问主题，如询问全网常识、外部知名公司、日常科技知识、通用概念等）：
      - 自动触发全网通用知识拓展，切勿生硬拒绝，而是礼貌说明会议无记录并给出客观科普；
      - 输出结构：
-       > 🎙️ **结论播报**：会议暂无记录。全网常识显示：[用1句话直接给出通用常识核心要点]
+       > **结论播报**：会议暂无记录。全网常识显示：[用1句话直接给出通用常识核心要点]
 
-       > 🌐 **全网通用知识解答**：过往内部会议中未检索到相关讨论，以下内容基于通用 AI 知识推导，非企业内部决策依据。
+       > **全网通用知识解答**：过往内部会议中未检索到相关讨论，以下内容基于通用 AI 知识推导，非企业内部决策依据。
 
        ### 详细说明与科普
        [在此条理清晰地展开 2~3 个维度的通用科普介绍，使用 Markdown 排版，重点加粗]
@@ -68,9 +68,9 @@ GENERAL_FALLBACK_SYSTEM_PROMPT = """你是一个常驻企业桌面会议记忆�
 2. 【严格输出格式规范】：
    必须严格按照以下格式输出：
 
-> 🎙️ **结论播报**：会议暂无记录。[紧接着用1句话概括全网通识核心答案]
+> **结论播报**：会议暂无记录。[紧接着用1句话概括全网通识核心答案]
 
-> 🌐 **全网通用知识解答**：过往内部会议中未检索到相关讨论，以下内容基于通用 AI 知识推导，非企业内部决策依据。
+> **全网通用知识解答**：过往内部会议中未检索到相关讨论，以下内容基于通用 AI 知识推导，非企业内部决策依据。
 
 ### 详细说明与科普
 [在此条理清晰地展开 2~3 个维度的详细介绍，使用 Markdown 排版，重点加粗]
@@ -120,7 +120,7 @@ class RAGEngine:
         # 0. 敏捷自进化指令拦截 (如以 "改进一下/提个需求" 开头，不污染会议知识库，直通工单入库)
         if self.instruction_handler.is_instruction(query):
             if on_progress:
-                on_progress("评估改进指令", "🚀 检测到软件改进指令，架构师角色正在拆解方案并立项...")
+                on_progress("评估改进指令", "检测到软件改进指令，架构师角色正在拆解方案并立项...")
             return self.instruction_handler.handle_instruction(query)
 
         # 1. 获取有效前序历史
@@ -130,9 +130,9 @@ class RAGEngine:
         # 2. 口语语义改写与多轮意图规范化
         if on_progress:
             if has_history:
-                on_progress("上下文意图解析", f"🧠 正在结合前序 {len(history)} 轮对话消解指代与重塑检索句...")
+                on_progress("上下文意图解析", f"正在结合前序 {len(history)} 轮对话消解指代与重塑检索句...")
             else:
-                on_progress("意图语义解析", "🧠 正在解析口语意图，去除口癖并对齐企业组织架构实体...")
+                on_progress("意图语义解析", "正在解析口语意图，去除口癖并对齐企业组织架构实体...")
 
         rewrite_result = self.rewriter.rewrite_and_normalize(query, history=history)
         search_query = rewrite_result["search_query"]
@@ -147,7 +147,7 @@ class RAGEngine:
         entity_hint = f"（定位实体：{target_entity}）" if target_entity != "无" else ""
         topic_hint = f" [话题: {focal_topic}]" if focal_topic else ""
         if on_progress:
-            on_progress("检索会议记忆", f"🔍 正在检索【{search_query[:25]}】{entity_hint}{topic_hint}...")
+            on_progress("检索会议记忆", f"正在检索【{search_query[:25]}】{entity_hint}{topic_hint}...")
 
         # 3. 多策略切片检索
         context_parts = []
@@ -204,7 +204,7 @@ class RAGEngine:
 
         if not context_parts:
             if on_progress:
-                on_progress("全网通识拓展", "🌐 会议库未命中该议题，已自动切换至全网通用知识解答...")
+                on_progress("全网通识拓展", "会议库未命中该议题，已自动切换至全网通用知识解答...")
             
             answer, spoken_text = self._generate_general_fallback(query, dialogue_context=dialogue_context)
             turn = ConversationTurn(
@@ -228,7 +228,7 @@ class RAGEngine:
 
         matched_count = len(seen_ids)
         if on_progress:
-            on_progress("提炼溯源结论", f"📚 已定位到 {matched_count} 处相关会议记录，正在由 DeepSeek 生成解答...")
+            on_progress("提炼溯源结论", f"已定位到 {matched_count} 处相关会议记录，正在由 DeepSeek 生成解答...")
 
         context_str = "\n\n--------------------\n\n".join(context_parts)
 
@@ -274,11 +274,11 @@ class RAGEngine:
 
         if not answer:
             first_doc = context_parts[0] if context_parts else ""
-            answer = f"> 🎙️ **结论播报**：已为您匹配到相关会议片段，请查看屏幕卡片。\n\n### 详细说明与溯源依据\n{first_doc[:300]}..."
+            answer = f"> **结论播报**：已为您匹配到相关会议片段，请查看屏幕卡片。\n\n### 详细说明与溯源依据\n{first_doc[:300]}..."
             spoken_text = "已为您匹配到相关会议片段，请查看屏幕卡片。"
 
         # 判定最终返回模式：MEETING 还是 GENERAL
-        if "> 🌐 **全网通用知识解答**" in answer or "会议暂无记录" in spoken_text:
+        if "> **全网通用知识解答**" in answer or "会议暂无记录" in spoken_text:
             response_mode = "GENERAL"
         else:
             response_mode = "MEETING"
@@ -310,7 +310,7 @@ class RAGEngine:
         """当内部会议库 0 匹配时，直接触发大模型全网通用知识解答"""
         if not self.client:
             default_txt = "过往会议记录中暂未找到相关信息。"
-            ans = f"> 🎙️ **结论播报**：{default_txt}\n\n> 🌐 **全网通用知识解答**：过往内部会议中未检索到相关讨论，当前未配置大模型密钥，无法推导演绎。\n\n### 详细说明\n知识库未命中该议题。"
+            ans = f"> **结论播报**：{default_txt}\n\n> **全网通用知识解答**：过往内部会议中未检索到相关讨论，当前未配置大模型密钥，无法推导演绎。\n\n### 详细说明\n知识库未命中该议题。"
             return ans, default_txt
 
         try:
@@ -333,7 +333,7 @@ class RAGEngine:
         except Exception as e:
             print(f"[RAGEngine] 全网通识推导异常: {e}")
             default_txt = "会议暂无记录，外部大模型推导异常。"
-            ans = f"> 🎙️ **结论播报**：{default_txt}\n\n> 🌐 **全网通用知识解答**：过往内部会议未命中此话题，通用接口访问受阻。"
+            ans = f"> **结论播报**：{default_txt}\n\n> **全网通用知识解答**：过往内部会议未命中此话题，通用接口访问受阻。"
             return ans, default_txt
 
     def _extract_spoken_text(self, markdown_answer: str) -> str:

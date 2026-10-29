@@ -92,7 +92,7 @@ class QueryRewriter:
                     a = getattr(turn, "spoken_summary", "") or getattr(turn, "detailed_markdown", "")[:120]
                     topic = getattr(turn, "focal_topic", "")
                     topic_str = f" [核心主题: {topic}]" if topic else ""
-                    history_lines.append(f"- 轮次 {idx}{topic_str}：提问“{q}” ➔ 结论要点“{a}”")
+                    history_lines.append(f"- 轮次 {idx}{topic_str}：提问“{q}” -> 结论要点“{a}”")
                 history_context_str = "\n".join(history_lines)
 
                 prompt_user = (

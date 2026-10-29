@@ -24,6 +24,15 @@ from core.knowledge_engine import MeetingStore, assess_slice_utility
 from core.entity_dict import EMPLOYEES, COMPANY_INFO, get_dynamic_employee_profile
 from core.updater import AutoUpdateWorker, UpdateChecker
 from ui.audio_visualizer import AudioWaveVisualizer
+from ui.theme_manager import ThemeManager, ThemeType
+from ui.components.icons import get_symbol_icon, get_symbol_pixmap, get_flower_logo_icon, get_flower_logo_pixmap
+from ui.components.modern_dialog import ModernDialog
+from ui.components.border_beam import BorderBeamContainer
+from ui.styles import (
+    get_cmd_card_style, get_ans_card_style, get_answer_browser_style,
+    get_top_version_style, get_theme_btn_style, get_intercom_banner_style,
+    get_mem_list_style, get_mem_detail_style
+)
 
 class ModernBreathingSwitch(QPushButton):
     """
@@ -80,44 +89,53 @@ class ModernBreathingSwitch(QPushButton):
         rect = self.rect()
         w, h = rect.width(), rect.height()
 
+        tm = ThemeManager.get_instance()
+        is_light = tm.is_light()
+        colors = tm.get_colors()
+
         # 胶囊底座
         if self.is_active:
-            painter.setBrush(QBrush(QColor(16, 185, 129, 30)))
-            painter.setPen(QPen(QColor(138, 198, 87, 180), 1.5))
+            if is_light:
+                painter.setBrush(QBrush(QColor(22, 163, 74, 18)))
+                painter.setPen(QPen(QColor(22, 163, 74, 160), 1.2))
+            else:
+                painter.setBrush(QBrush(QColor(16, 185, 129, 30)))
+                painter.setPen(QPen(QColor(138, 198, 87, 180), 1.2))
         else:
-            painter.setBrush(QBrush(QColor(245, 158, 11, 25)))
+            painter.setBrush(QBrush(QColor(245, 158, 11, 20)))
             painter.setPen(QPen(QColor(245, 158, 11, 120), 1.2))
 
-        painter.drawRoundedRect(1, 1, w - 2, h - 2, 10, 10)
+        painter.drawRoundedRect(1, 1, w - 2, h - 2, 8, 8)
 
-        # 呼吸光晕与中心核 (美好智能 鹦鹉绿 #8AC657 动态律动)
+        # 状态指示圆点
         dot_x = 16
         dot_y = h // 2
         core_r = 4.0
 
         if self.is_active:
-            halo_color = QColor(138, 198, 87, int(self.glow_alpha * 0.5))
+            active_color = QColor(colors["brand_success"])
+            halo_color = QColor(active_color.red(), active_color.green(), active_color.blue(), int(self.glow_alpha * 0.45))
             painter.setBrush(QBrush(halo_color))
             painter.setPen(Qt.PenStyle.NoPen)
             painter.drawEllipse(int(dot_x - self.glow_radius), int(dot_y - self.glow_radius),
                                 int(self.glow_radius * 2), int(self.glow_radius * 2))
 
-            painter.setBrush(QBrush(QColor(138, 198, 87)))
+            painter.setBrush(QBrush(active_color))
             painter.drawEllipse(int(dot_x - core_r), int(dot_y - core_r), int(core_r * 2), int(core_r * 2))
         else:
             painter.setBrush(QBrush(QColor(245, 158, 11)))
             painter.setPen(Qt.PenStyle.NoPen)
             painter.drawEllipse(int(dot_x - core_r), int(dot_y - core_r), int(core_r * 2), int(core_r * 2))
 
-        # 文字说明 (精炼字数，适配侧栏宽度，确保开启与暂停均完整优雅展示)
+        # 文字说明 (自适应双主题对比度)
         painter.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
         text_rect = rect.adjusted(30, 0, -6, 0)
         if self.is_active:
-            painter.setPen(QColor(241, 245, 249))
-            painter.drawText(text_rect, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, "🎙️ 实时倾听中 [已开启]")
+            painter.setPen(QColor(colors["text_primary"]))
+            painter.drawText(text_rect, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, "实时倾听中 [已开启]")
         else:
-            painter.setPen(QColor(251, 191, 36))
-            painter.drawText(text_rect, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, "⏸️ 倾听已暂停 [点击恢复]")
+            painter.setPen(QColor(217, 119, 6 if is_light else 251, 191, 36))
+            painter.drawText(text_rect, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, "倾听已暂停 [点击恢复]")
 
 
 class StreamTextDisplay(QTextBrowser):
@@ -134,18 +152,33 @@ class StreamTextDisplay(QTextBrowser):
         self._timer.timeout.connect(self._stream_step)
 
     def clear_history(self):
-        """清空历史追问卡片，恢复默认导引页"""
+        """清空历史追问卡片，恢复默认导引页 (高对比度纯净排版，无 Emoji)"""
         self._timer.stop()
         self._history_turns.clear()
         self._full_text = ""
         self._current_index = 0
-        self.setHtml(
-            "<div style='color: #475569; text-align: center; padding-top: 100px; line-height: 1.8;'>"
-            "💡 在上方输入问题回车，或长按 <b>右 Alt</b> 启动语音对讲 (免按 Fn，空格键右侧直达)<br>"
-            "系统将自动完成 <b>Query Rewriting 意图蒸馏</b> 与 <b>Hybrid RAG 混合检索</b><br>"
-            "并以<b>音视分离</b>策略给出结论播报与精准上下文溯源"
-            "</div>"
-        )
+        is_light = ThemeManager.get_instance().is_light()
+
+        title_color = "#0F172A" if is_light else "#F8FAFC"
+        key_bg = "#E2E8F0" if is_light else "rgba(38, 176, 228, 0.15)"
+        key_color = "#0284C7" if is_light else "#38BDF8"
+        key_border = "#CBD5E1" if is_light else "rgba(38, 176, 228, 0.4)"
+        body_color = "#334155" if is_light else "#94A3B8"
+        sub_color = "#64748B" if is_light else "#64748B"
+
+        self.setHtml(f"""
+            <div style="text-align: center; padding-top: 85px; line-height: 2.2; font-family: -apple-system, 'Segoe UI', 'Microsoft YaHei', sans-serif;">
+                <div style="font-size: 15px; font-weight: 700; color: {title_color}; margin-bottom: 6px;">
+                    在上方检索框输入问题，或长按 <span style="background-color: {key_bg}; color: {key_color}; padding: 2px 8px; border-radius: 4px; font-size: 13px; font-weight: bold; border: 1px solid {key_border};">右 Alt</span> 随时语音对讲
+                </div>
+                <div style="font-size: 13px; color: {body_color}; margin-bottom: 4px;">
+                    系统自动完成 <b>Query Rewriting 意图蒸馏</b> 与 <b>Hybrid RAG 混合检索</b>
+                </div>
+                <div style="font-size: 12px; color: {sub_color};">
+                    以<b>音视分离</b>策略给出极简结论播报与毫秒级会议上下文溯源
+                </div>
+            </div>
+        """)
 
     def load_history_session(self, turns: list):
         """一次性加载整场历史会话的所有问答卡片"""
@@ -163,8 +196,8 @@ class StreamTextDisplay(QTextBrowser):
             markdown_body = t.get("detailed_markdown", "").strip()
             is_follow = (i > 0)
             q_label = "连续追问" if is_follow else "语音提问"
-            if user_q and not markdown_body.startswith("> ❓"):
-                full_card_text = f"> ❓ **{q_label}**：{user_q}\n\n{markdown_body}"
+            if user_q and not markdown_body.startswith("> **"):
+                full_card_text = f"> **{q_label}**：{user_q}\n\n{markdown_body}"
             else:
                 full_card_text = markdown_body
             card_html = self._format_turn_html(full_card_text, is_streaming=False)
@@ -212,7 +245,9 @@ class StreamTextDisplay(QTextBrowser):
                 parts.append(self._get_divider_html())
             parts.append(self._format_turn_html(active_text, is_streaming=is_streaming))
 
-        html_body = f"""<div style="line-height: 1.6; color: #E2E8F0; font-size: 12.5px; font-family: 'Segoe UI', -apple-system, sans-serif;">{''.join(parts)}</div>"""
+        is_light = ThemeManager.get_instance().is_light()
+        body_color = "#0F172A" if is_light else "#E2E8F0"
+        html_body = f"""<div style="line-height: 1.6; color: {body_color}; font-size: 12.5px; font-family: -apple-system, 'Segoe UI', sans-serif;">{''.join(parts)}</div>"""
         self.setHtml(html_body)
         
         # 滚轮自动吸底跟随打字流
@@ -221,89 +256,135 @@ class StreamTextDisplay(QTextBrowser):
             sb.setValue(sb.maximum())
 
     def _get_divider_html(self) -> str:
+        is_light = ThemeManager.get_instance().is_light()
+        if is_light:
+            return """
+            <div style="margin: 18px 0 14px 0; border-top: 1px dashed rgba(2, 132, 199, 0.25); text-align: center;">
+                <span style="background-color: #F8FAFC; padding: 2px 12px; color: #16A34A; font-size: 10px; font-weight: bold; border-radius: 4px; border: 1px solid rgba(22, 163, 74, 0.3);">
+                    连续追问上下文 · 上下文延续中
+                </span>
+            </div>
+            """
         return """
         <div style="margin: 18px 0 14px 0; border-top: 1px dashed rgba(38, 176, 228, 0.28); text-align: center;">
             <span style="background-color: #0A0C10; padding: 2px 12px; color: #8AC657; font-size: 10px; font-weight: bold; border-radius: 4px; border: 1px solid rgba(138, 198, 87, 0.3);">
-                ⏱️ 连续追问上下文 · 上下文延续中
+                连续追问上下文 · 上下文延续中
             </span>
         </div>
         """
 
     def _format_turn_html(self, text: str, is_streaming: bool) -> str:
+        # 清除任何历史残留或外部携带的静态 Emoji
+        text = re.sub(r'[\U0001F000-\U0001FAFF\u2600-\u26FF\u2700-\u27BF]', '', text)
         escaped = html.escape(text.strip())
+        is_light = ThemeManager.get_instance().is_light()
 
-        # 0. 重点渲染 > ❓ **连续追问**：或 > ❓ **语音提问**：或 **文字提问**
+        # 0. 重点渲染 > **连续追问**：或 > **语音提问**：或 **文字提问** (无 Emoji)
         def format_question(m):
             q_type = m.group(1).strip()
             content = m.group(2).strip()
+            text_c = "#0F172A" if is_light else "#FFFFFF"
             if "追问" in q_type:
+                bg = "rgba(22, 163, 74, 0.08)" if is_light else "rgba(138, 198, 87, 0.12)"
+                border_c = "#16A34A" if is_light else "#8AC657"
                 return (
-                    f'<div style="background: rgba(138, 198, 87, 0.12); border-left: 3px solid #8AC657; border-radius: 6px; padding: 7px 12px; margin: 4px 0 8px 0;">'
-                    f'<div style="color: #8AC657; font-weight: bold; font-size: 10px; margin-bottom: 2px;">⚡ 连续追问 (已继承上下文)</div>'
-                    f'<div style="color: #FFFFFF; font-size: 13px; font-weight: 600;">“{content}”</div></div>'
+                    f'<div style="background: {bg}; border-left: 3px solid {border_c}; border-radius: 6px; padding: 7px 12px; margin: 4px 0 8px 0;">'
+                    f'<div style="color: {border_c}; font-weight: bold; font-size: 10.5px; margin-bottom: 2px;">连续追问 (已继承上下文)</div>'
+                    f'<div style="color: {text_c}; font-size: 13px; font-weight: 600;">“{content}”</div></div>'
                 )
             else:
+                bg = "rgba(2, 132, 199, 0.08)" if is_light else "rgba(38, 176, 228, 0.12)"
+                border_c = "#0284C7" if is_light else "#26B0E4"
                 return (
-                    f'<div style="background: rgba(38, 176, 228, 0.12); border-left: 3px solid #26B0E4; border-radius: 6px; padding: 7px 12px; margin: 4px 0 8px 0;">'
-                    f'<div style="color: #26B0E4; font-weight: bold; font-size: 10px; margin-bottom: 2px;">❓ 识别提问</div>'
-                    f'<div style="color: #FFFFFF; font-size: 13px; font-weight: 600;">“{content}”</div></div>'
+                    f'<div style="background: {bg}; border-left: 3px solid {border_c}; border-radius: 6px; padding: 7px 12px; margin: 4px 0 8px 0;">'
+                    f'<div style="color: {border_c}; font-weight: bold; font-size: 10.5px; margin-bottom: 2px;">识别提问</div>'
+                    f'<div style="color: {text_c}; font-size: 13px; font-weight: 600;">“{content}”</div></div>'
                 )
         escaped = re.sub(r'&gt;\s*❓?\s*\*\*(语音提问|连续追问|文字提问)\*\*[：:]\s*(.+?)(?=(?:\n\n|\n&lt;|\n#|$))', format_question, escaped, flags=re.DOTALL)
 
-        # 0.4 重点渲染 > 🚀 **敏捷自进化工单**：
+        # 0.4 重点渲染 > **敏捷自进化工单**：
         def format_instruction_pill(m):
             info = m.group(1).strip()
+            bg = "rgba(245, 158, 11, 0.12)" if is_light else "rgba(245, 158, 11, 0.18)"
+            title_c = "#D97706" if is_light else "#FBBF24"
+            desc_c = "#334155" if is_light else "#94A3B8"
             return (
-                f'<div style="background: rgba(245, 158, 11, 0.18); border: 1px solid rgba(245, 158, 11, 0.45); border-radius: 6px; padding: 6px 12px; margin: 4px 0 8px 0;">'
-                f'<span style="color: #FBBF24; font-weight: bold; font-size: 11px;">🚀 敏捷自进化工单已立项</span>'
-                f'<span style="color: #94A3B8; font-size: 11px; margin-left: 8px;">{info}</span></div>'
+                f'<div style="background: {bg}; border: 1px solid rgba(245, 158, 11, 0.45); border-radius: 6px; padding: 6px 12px; margin: 4px 0 8px 0;">'
+                f'<span style="color: {title_c}; font-weight: bold; font-size: 11px;">敏捷自进化工单已立项</span>'
+                f'<span style="color: {desc_c}; font-size: 11px; margin-left: 8px;">{info}</span></div>'
             )
         escaped = re.sub(r'&gt;\s*🚀?\s*\*\*敏捷自进化工单\*\*[：:]\s*(.+?)(?=(?:\n\n|\n&lt;|\n#|$))', format_instruction_pill, escaped, flags=re.DOTALL)
 
-        # 0.5 重点渲染 > 🌐 **全网通用知识解答**：
+        # 0.5 重点渲染 > **全网通用知识解答**：
         def format_general_badge(m):
             content = m.group(1).strip()
+            if is_light:
+                return (
+                    f'<div style="background: rgba(147, 51, 234, 0.08); border-left: 3px solid #9333EA; border-radius: 6px; padding: 8px 12px; margin: 6px 0 10px 0;">'
+                    f'<div style="color: #9333EA; font-weight: bold; font-size: 10.5px; margin-bottom: 3px; letter-spacing: 0.5px;">'
+                    f'全网通用知识解答 (非企业内部会议决策依据)</div>'
+                    f'<div style="color: #0F172A; font-size: 12px; line-height: 1.5;">{content}</div></div>'
+                )
             return (
                 f'<div style="background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 rgba(139, 92, 246, 0.22), stop:1 rgba(168, 85, 247, 0.12)); '
                 f'border-left: 3px solid #8B5CF6; border-radius: 6px; padding: 8px 12px; margin: 6px 0 10px 0;">'
                 f'<div style="color: #C084FC; font-weight: bold; font-size: 10.5px; margin-bottom: 3px; letter-spacing: 0.5px;">'
-                f'🌐 全网通用知识解答 (非企业内部会议决策依据)</div>'
+                f'全网通用知识解答 (非企业内部会议决策依据)</div>'
                 f'<div style="color: #E2E8F0; font-size: 12px; line-height: 1.5;">{content}</div></div>'
             )
         escaped = re.sub(r'&gt;\s*🌐?\s*\*\*全网通用知识解答\*\*[：:]\s*(.+?)(?=(?:\n\n|\n&lt;|\n#|$))', format_general_badge, escaped, flags=re.DOTALL)
 
-        # 1. 重点渲染 > 🎙️ **结论播报**：或 > 🎙️ **架构师响应**：
+        # 1. 重点渲染 > **结论播报**：或 > **架构师响应**：
         def format_spoken(m):
             tag = m.group(1).strip()
             content = m.group(2).strip()
+            text_c = "#0F172A" if is_light else "#FFFFFF"
             if "架构师" in tag:
+                bg = "rgba(245, 158, 11, 0.12)" if is_light else "rgba(245, 158, 11, 0.28)"
+                border_c = "#D97706" if is_light else "#F59E0B"
+                title_c = "#D97706" if is_light else "#FBBF24"
                 return (
-                    f'<div style="background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 rgba(245, 158, 11, 0.28), stop:1 rgba(217, 119, 6, 0.12)); '
-                    f'border-left: 3px solid #F59E0B; border-radius: 6px; padding: 8px 14px; margin: 6px 0 10px 0;">'
-                    f'<div style="color: #FBBF24; font-weight: bold; font-size: 10px; letter-spacing: 0.5px; margin-bottom: 3px;">🎙️ 架构师响应 (已录入自进化队列)</div>'
-                    f'<div style="color: #FFFFFF; font-size: 13px; font-weight: 600; line-height: 1.45;">{content}</div></div>'
+                    f'<div style="background: {bg}; border-left: 3px solid {border_c}; border-radius: 6px; padding: 8px 14px; margin: 6px 0 10px 0;">'
+                    f'<div style="color: {title_c}; font-weight: bold; font-size: 10.5px; letter-spacing: 0.5px; margin-bottom: 3px;">架构师响应 (已录入自进化队列)</div>'
+                    f'<div style="color: {text_c}; font-size: 13px; font-weight: 600; line-height: 1.45;">{content}</div></div>'
+                )
+            if is_light:
+                return (
+                    f'<div style="background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 rgba(2, 132, 199, 0.08), stop:1 rgba(22, 163, 74, 0.05)); '
+                    f'border-left: 3px solid #0284C7; border-radius: 6px; padding: 8px 14px; margin: 6px 0 10px 0;">'
+                    f'<div style="color: #0284C7; font-weight: bold; font-size: 10.5px; letter-spacing: 0.5px; margin-bottom: 3px;">结论播报 (TTS 极简朗读)</div>'
+                    f'<div style="color: #0F172A; font-size: 13px; font-weight: 600; line-height: 1.45;">{content}</div></div>'
                 )
             return (
                 f'<div style="background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 rgba(19, 69, 157, 0.28), stop:0.55 rgba(38, 176, 228, 0.16), stop:1 rgba(138, 198, 87, 0.12)); '
                 f'border-left: 3px solid #26B0E4; border-radius: 6px; padding: 8px 14px; margin: 6px 0 10px 0;">'
-                f'<div style="color: #26B0E4; font-weight: bold; font-size: 10px; letter-spacing: 0.5px; margin-bottom: 3px;">🎙️ 结论播报 (TTS 极简朗读)</div>'
+                f'<div style="color: #26B0E4; font-weight: bold; font-size: 10.5px; letter-spacing: 0.5px; margin-bottom: 3px;">结论播报 (TTS 极简朗读)</div>'
                 f'<div style="color: #FFFFFF; font-size: 13px; font-weight: 600; line-height: 1.45;">{content}</div></div>'
             )
         escaped = re.sub(r'&gt;\s*🎙️?\s*\*\*(结论播报|架构师响应)\*\*[：:]\s*(.+?)(?=(?:\n\n|\n&lt;|\n#|$))', format_spoken, escaped, flags=re.DOTALL)
 
-        # 1.5 渲染 > 💡 **自动流转**：提示卡
+        # 1.5 渲染 > **自动流转**：提示卡
         def format_tip(m):
             content = m.group(1).strip()
-            return f'<div style="background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 6px; padding: 6px 12px; margin: 8px 0; color: #94A3B8; font-size: 11px;">💡 <b>自动流转说明</b>：{content}</div>'
+            bg = "rgba(0, 0, 0, 0.03)" if is_light else "rgba(255, 255, 255, 0.04)"
+            border = "#E2E8F0" if is_light else "rgba(255, 255, 255, 0.08)"
+            tip_c = "#475569" if is_light else "#94A3B8"
+            return f'<div style="background: {bg}; border: 1px solid {border}; border-radius: 6px; padding: 6px 12px; margin: 8px 0; color: {tip_c}; font-size: 11px;"><b>自动流转说明</b>：{content}</div>'
         escaped = re.sub(r'&gt;\s*💡?\s*\*\*(?:自动流转|提示)\*\*[：:]\s*(.+?)(?=(?:\n\n|\n&lt;|\n#|$))', format_tip, escaped, flags=re.DOTALL)
 
         # 2. Markdown 强调与标题转换
-        escaped = re.sub(r'###\s*(.+?)(?=\n|$)', r'<div style="color: #F8FAFC; font-size: 13.5px; font-weight: bold; margin: 12px 0 4px 0; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 3px;">\1</div>', escaped)
-        escaped = re.sub(r'##\s*(.+?)(?=\n|$)', r'<div style="color: #FFFFFF; font-size: 14.5px; font-weight: bold; margin: 14px 0 6px 0;">\1</div>', escaped)
-        escaped = re.sub(r'\*\*(.+?)\*\*', r'<b style="color: #FBBF24;">\1</b>', escaped)
-        escaped = re.sub(r'`([^`]+)`', r'<code style="background-color: rgba(255,255,255,0.08); color: #26B0E4; padding: 2px 4px; border-radius: 4px; font-family: Cascadia Code, Consolas;">\1</code>', escaped)
+        if is_light:
+            escaped = re.sub(r'###\s*(.+?)(?=\n|$)', r'<div style="color: #0F172A; font-size: 13.5px; font-weight: bold; margin: 12px 0 4px 0; border-bottom: 1px solid #E2E8F0; padding-bottom: 3px;">\1</div>', escaped)
+            escaped = re.sub(r'##\s*(.+?)(?=\n|$)', r'<div style="color: #0F172A; font-size: 14.5px; font-weight: bold; margin: 14px 0 6px 0;">\1</div>', escaped)
+            escaped = re.sub(r'\*\*(.+?)\*\*', r'<b style="color: #D97706;">\1</b>', escaped)
+            escaped = re.sub(r'`([^`]+)`', r'<code style="background-color: #F1F5F9; color: #0284C7; padding: 2px 4px; border-radius: 4px; font-family: Cascadia Code, Consolas;">\1</code>', escaped)
+        else:
+            escaped = re.sub(r'###\s*(.+?)(?=\n|$)', r'<div style="color: #F8FAFC; font-size: 13.5px; font-weight: bold; margin: 12px 0 4px 0; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 3px;">\1</div>', escaped)
+            escaped = re.sub(r'##\s*(.+?)(?=\n|$)', r'<div style="color: #FFFFFF; font-size: 14.5px; font-weight: bold; margin: 14px 0 6px 0;">\1</div>', escaped)
+            escaped = re.sub(r'\*\*(.+?)\*\*', r'<b style="color: #FBBF24;">\1</b>', escaped)
+            escaped = re.sub(r'`([^`]+)`', r'<code style="background-color: rgba(255,255,255,0.08); color: #26B0E4; padding: 2px 4px; border-radius: 4px; font-family: Cascadia Code, Consolas;">\1</code>', escaped)
         
-        # 3. 严格清洗空行与换行 (彻底杜绝多余空白)
+        # 3. 严格清洗空行与换行
         escaped = re.sub(r'\n{3,}', '\n\n', escaped)
         escaped = escaped.strip()
         escaped = escaped.replace("\n", "<br>")
@@ -312,18 +393,13 @@ class StreamTextDisplay(QTextBrowser):
         while escaped.startswith("<br>"):
             escaped = escaped[4:].strip()
 
-        cursor = " <span style='color: #26B0E4; font-weight: bold; font-size: 13px;'>▌</span>" if is_streaming else ""
+        cursor = f" <span style='color: {'#0284C7' if is_light else '#26B0E4'}; font-weight: bold; font-size: 13px;'>▌</span>" if is_streaming else ""
         return f"<div>{escaped}{cursor}</div>"
 
 
 class IntercomBanner(QFrame):
     """
-    知识溯源解答区域顶部的全局语音对讲与检索动效长条
-    - 未唤醒 (Idle)：暗透磨砂胶囊，提示按住【右 Alt】对讲或文本检索
-    - 收音中 (Listening)：红青极光边框 + 实时动态跳动声波 + “正在倾听语音提问...”
-    - 检索中 (Processing)：海青科技光晕 + 阶段文字更新 (“稍等，正在检索... / 识别提问 / 混合检索”)
-    - 播报中 (Speaking)：翡翠绿呼吸光晕 + 播报声波 + [🔇 打断播报] 按钮
-    - 打断状态 (Interrupted)：柔灰提示 “🔇 播报已打断”
+    知识溯源解答区域顶部的全局语音对讲与检索动效长条 (双主题无缝适配，矢量微标，无 Emoji)
     """
     interrupted_clicked = pyqtSignal()
 
@@ -344,20 +420,11 @@ class IntercomBanner(QFrame):
         layout.setSpacing(10)
 
         # 状态徽章 (Pill Badge)
-        self.badge_lbl = QLabel("🎙️ 右Alt 对讲")
-        self.badge_lbl.setStyleSheet("""
-            background-color: rgba(255, 255, 255, 0.06);
-            color: #94A3B8;
-            font-size: 11px;
-            font-weight: bold;
-            padding: 4px 10px;
-            border-radius: 6px;
-        """)
+        self.badge_lbl = QLabel("右Alt 对讲")
         layout.addWidget(self.badge_lbl)
 
-        # 核心提示文案
+        # 核心提示文案 (高对比度深色文本)
         self.status_lbl = QLabel("长按【右 Alt】语音对讲提问 (松开检索) · 或在上方输入框检索")
-        self.status_lbl.setStyleSheet("color: #64748B; font-size: 12px; font-weight: 500;")
         self.status_lbl.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         layout.addWidget(self.status_lbl, 1)
 
@@ -368,24 +435,8 @@ class IntercomBanner(QFrame):
         layout.addWidget(self.wave_vis)
 
         # 播报打断按钮 (默认隐藏)
-        self.stop_btn = QPushButton("🔇 打断播报")
+        self.stop_btn = QPushButton("打断播报")
         self.stop_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.stop_btn.setStyleSheet("""
-            QPushButton {
-                background: rgba(239, 68, 68, 0.15);
-                border: 1px solid rgba(239, 68, 68, 0.4);
-                color: #FCA5A5;
-                border-radius: 6px;
-                padding: 4px 10px;
-                font-size: 11px;
-                font-weight: 600;
-            }
-            QPushButton:hover {
-                background: rgba(239, 68, 68, 0.28);
-                color: #FFFFFF;
-                border-color: #EF4444;
-            }
-        """)
         self.stop_btn.clicked.connect(self.interrupted_clicked.emit)
         self.stop_btn.hide()
         layout.addWidget(self.stop_btn)
@@ -393,206 +444,371 @@ class IntercomBanner(QFrame):
     def set_idle(self):
         self._reset_timer.stop()
         self.stop_btn.hide()
-        self.setStyleSheet("""
-            IntercomBanner {
-                background: rgba(15, 23, 42, 0.45);
-                border: 1px solid rgba(255, 255, 255, 0.07);
-                border-radius: 8px;
-            }
-        """)
-        self.badge_lbl.setText("🎙️ 右Alt 对讲")
-        self.badge_lbl.setStyleSheet("""
-            background-color: rgba(255, 255, 255, 0.05);
-            color: #64748B;
-            font-size: 11px;
-            font-weight: bold;
-            padding: 3px 8px;
-            border-radius: 5px;
-        """)
-        self.status_lbl.setText("长按【右 Alt】随时语音对讲提问 (松开检索) · 免按 Fn / 支持空格或右 Alt 即刻打断播报")
-        self.status_lbl.setStyleSheet("color: #64748B; font-size: 11.5px;")
+        is_light = ThemeManager.get_instance().is_light()
+        if is_light:
+            self.setStyleSheet("""
+                IntercomBanner {
+                    background-color: #F8FAFC;
+                    border: 1px solid #E2E8F0;
+                    border-radius: 8px;
+                }
+            """)
+            self.badge_lbl.setText("右Alt 对讲")
+            self.badge_lbl.setStyleSheet("""
+                background-color: rgba(2, 132, 199, 0.08);
+                color: #0284C7;
+                font-size: 11px;
+                font-weight: 700;
+                padding: 4px 10px;
+                border-radius: 5px;
+                border: 1px solid rgba(2, 132, 199, 0.25);
+            """)
+            self.status_lbl.setText("长按【右 Alt】随时语音对讲提问 (松开检索) · 免按 Fn / 支持空格或右 Alt 即刻打断播报")
+            self.status_lbl.setStyleSheet("color: #334155; font-size: 11.5px; font-weight: 500;")
+        else:
+            self.setStyleSheet("""
+                IntercomBanner {
+                    background: rgba(15, 23, 42, 0.65);
+                    border: 1px solid rgba(255, 255, 255, 0.08);
+                    border-radius: 8px;
+                }
+            """)
+            self.badge_lbl.setText("右Alt 对讲")
+            self.badge_lbl.setStyleSheet("""
+                background-color: rgba(38, 176, 228, 0.15);
+                color: #38BDF8;
+                font-size: 11px;
+                font-weight: bold;
+                padding: 4px 10px;
+                border-radius: 5px;
+                border: 1px solid rgba(38, 176, 228, 0.35);
+            """)
+            self.status_lbl.setText("长按【右 Alt】随时语音对讲提问 (松开检索) · 免按 Fn / 支持空格或右 Alt 即刻打断播报")
+            self.status_lbl.setStyleSheet("color: #94A3B8; font-size: 11.5px;")
         self.wave_vis.set_active(False)
 
     def set_listening(self):
         self._reset_timer.stop()
         self.stop_btn.hide()
-        self.setStyleSheet("""
-            IntercomBanner {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 rgba(239, 68, 68, 0.18), stop:1 rgba(38, 176, 228, 0.12));
-                border: 1.5px solid rgba(239, 68, 68, 0.6);
-                border-radius: 8px;
-            }
-        """)
-        self.badge_lbl.setText("🔴 正在收音")
-        self.badge_lbl.setStyleSheet("""
-            background-color: rgba(239, 68, 68, 0.25);
-            color: #FCA5A5;
-            font-size: 11px;
-            font-weight: bold;
-            padding: 3px 8px;
-            border-radius: 5px;
-        """)
-        self.status_lbl.setText("正在倾听您的提问... 请说话，松开【右 Alt】即刻检索历史会议")
-        self.status_lbl.setStyleSheet("color: #FFFFFF; font-size: 12px; font-weight: bold;")
+        is_light = ThemeManager.get_instance().is_light()
+        if is_light:
+            self.setStyleSheet("""
+                IntercomBanner {
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 rgba(239, 68, 68, 0.08), stop:1 rgba(2, 132, 199, 0.05));
+                    border: 1.5px solid #EF4444;
+                    border-radius: 8px;
+                }
+            """)
+            self.badge_lbl.setText("正在收音")
+            self.badge_lbl.setStyleSheet("""
+                background-color: rgba(239, 68, 68, 0.15);
+                color: #DC2626;
+                font-size: 11px;
+                font-weight: bold;
+                padding: 4px 10px;
+                border-radius: 5px;
+                border: 1px solid #EF4444;
+            """)
+            self.status_lbl.setText("正在倾听您的提问... 请说话，松开【右 Alt】即刻检索历史会议")
+            self.status_lbl.setStyleSheet("color: #0F172A; font-size: 12px; font-weight: 700;")
+        else:
+            self.setStyleSheet("""
+                IntercomBanner {
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 rgba(239, 68, 68, 0.22), stop:1 rgba(38, 176, 228, 0.14));
+                    border: 1.5px solid rgba(239, 68, 68, 0.7);
+                    border-radius: 8px;
+                }
+            """)
+            self.badge_lbl.setText("正在收音")
+            self.badge_lbl.setStyleSheet("""
+                background-color: rgba(239, 68, 68, 0.25);
+                color: #FCA5A5;
+                font-size: 11px;
+                font-weight: bold;
+                padding: 4px 10px;
+                border-radius: 5px;
+            """)
+            self.status_lbl.setText("正在倾听您的提问... 请说话，松开【右 Alt】即刻检索历史会议")
+            self.status_lbl.setStyleSheet("color: #FFFFFF; font-size: 12px; font-weight: bold;")
         self.wave_vis.set_mode("listening")
         self.wave_vis.set_active(True)
 
     def set_ack(self):
         self._reset_timer.stop()
         self.stop_btn.hide()
-        self.setStyleSheet("""
-            IntercomBanner {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 rgba(19, 69, 157, 0.25), stop:1 rgba(38, 176, 228, 0.15));
-                border: 1.2px solid #26B0E4;
-                border-radius: 8px;
-            }
-        """)
-        self.badge_lbl.setText("⏳ 即时响应")
-        self.badge_lbl.setStyleSheet("""
-            background-color: rgba(38, 176, 228, 0.22);
-            color: #26B0E4;
-            font-size: 11px;
-            font-weight: bold;
-            padding: 3px 8px;
-            border-radius: 5px;
-        """)
-        self.status_lbl.setText("稍等，正在检索... 正在将语音对齐向量知识库")
-        self.status_lbl.setStyleSheet("color: #81D4FA; font-size: 12px; font-weight: 600;")
+        is_light = ThemeManager.get_instance().is_light()
+        if is_light:
+            self.setStyleSheet("""
+                IntercomBanner {
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 rgba(2, 132, 199, 0.08), stop:1 rgba(22, 163, 74, 0.05));
+                    border: 1.5px solid #0284C7;
+                    border-radius: 8px;
+                }
+            """)
+            self.badge_lbl.setText("即时响应")
+            self.badge_lbl.setStyleSheet("""
+                background-color: rgba(2, 132, 199, 0.15);
+                color: #0284C7;
+                font-size: 11px;
+                font-weight: bold;
+                padding: 4px 10px;
+                border-radius: 5px;
+                border: 1px solid #0284C7;
+            """)
+            self.status_lbl.setText("稍等，正在检索... 正在将语音对齐向量知识库")
+            self.status_lbl.setStyleSheet("color: #0F172A; font-size: 12px; font-weight: 600;")
+        else:
+            self.setStyleSheet("""
+                IntercomBanner {
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 rgba(19, 69, 157, 0.28), stop:1 rgba(38, 176, 228, 0.18));
+                    border: 1.2px solid #26B0E4;
+                    border-radius: 8px;
+                }
+            """)
+            self.badge_lbl.setText("即时响应")
+            self.badge_lbl.setStyleSheet("""
+                background-color: rgba(38, 176, 228, 0.22);
+                color: #26B0E4;
+                font-size: 11px;
+                font-weight: bold;
+                padding: 4px 10px;
+                border-radius: 5px;
+            """)
+            self.status_lbl.setText("稍等，正在检索... 正在将语音对齐向量知识库")
+            self.status_lbl.setStyleSheet("color: #81D4FA; font-size: 12px; font-weight: 600;")
         self.wave_vis.set_mode("default")
         self.wave_vis.set_active(True)
 
     def set_stage(self, step: int, title: str, detail: str):
         self._reset_timer.stop()
         self.stop_btn.hide()
+        is_light = ThemeManager.get_instance().is_light()
         clean_detail = re.sub(r'<[^>]+>', '', detail).replace('\n', ' ')
-        self.badge_lbl.setText(f"⚡ 步骤 {step}/3")
-        self.badge_lbl.setStyleSheet("""
-            background-color: rgba(38, 176, 228, 0.2);
-            color: #26B0E4;
-            font-size: 11px;
-            font-weight: bold;
-            padding: 3px 8px;
-            border-radius: 5px;
-        """)
-        self.status_lbl.setText(f"{title} · {clean_detail}")
-        self.status_lbl.setStyleSheet("color: #E2E8F0; font-size: 12px;")
+        self.badge_lbl.setText(f"步骤 {step}/3")
+        if is_light:
+            self.badge_lbl.setStyleSheet("""
+                background-color: rgba(2, 132, 199, 0.12);
+                color: #0284C7;
+                font-size: 11px;
+                font-weight: bold;
+                padding: 4px 10px;
+                border-radius: 5px;
+                border: 1px solid #0284C7;
+            """)
+            self.status_lbl.setText(f"{title} · {clean_detail}")
+            self.status_lbl.setStyleSheet("color: #0F172A; font-size: 12px; font-weight: 500;")
+        else:
+            self.badge_lbl.setStyleSheet("""
+                background-color: rgba(38, 176, 228, 0.2);
+                color: #26B0E4;
+                font-size: 11px;
+                font-weight: bold;
+                padding: 4px 10px;
+                border-radius: 5px;
+            """)
+            self.status_lbl.setText(f"{title} · {clean_detail}")
+            self.status_lbl.setStyleSheet("color: #E2E8F0; font-size: 12px;")
         self.wave_vis.set_mode("default")
         self.wave_vis.set_active(True)
 
     def set_speaking(self):
         self._reset_timer.stop()
         self.stop_btn.show()
-        self.setStyleSheet("""
-            IntercomBanner {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 rgba(16, 185, 129, 0.15), stop:1 rgba(138, 198, 87, 0.10));
-                border: 1.2px solid #8AC657;
-                border-radius: 8px;
-            }
-        """)
-        self.badge_lbl.setText("🔊 结论播报")
-        self.badge_lbl.setStyleSheet("""
-            background-color: rgba(138, 198, 87, 0.22);
-            color: #8AC657;
-            font-size: 11px;
-            font-weight: bold;
-            padding: 3px 8px;
-            border-radius: 5px;
-        """)
-        self.status_lbl.setText("🎙️ 正在语音播报结论... (按右 Alt、按空格或点击右侧可随时打断)")
-        self.status_lbl.setStyleSheet("color: #A5D6A7; font-size: 12px; font-weight: 500;")
+        is_light = ThemeManager.get_instance().is_light()
+        if is_light:
+            self.setStyleSheet("""
+                IntercomBanner {
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 rgba(22, 163, 74, 0.08), stop:1 rgba(2, 132, 199, 0.05));
+                    border: 1.5px solid #16A34A;
+                    border-radius: 8px;
+                }
+            """)
+            self.badge_lbl.setText("结论播报")
+            self.badge_lbl.setStyleSheet("""
+                background-color: rgba(22, 163, 74, 0.15);
+                color: #16A34A;
+                font-size: 11px;
+                font-weight: bold;
+                padding: 4px 10px;
+                border-radius: 5px;
+                border: 1px solid #16A34A;
+            """)
+            self.status_lbl.setText("正在语音播报结论... (按右 Alt、按空格或点击右侧可随时打断)")
+            self.status_lbl.setStyleSheet("color: #0F172A; font-size: 12px; font-weight: 600;")
+            self.stop_btn.setIcon(get_symbol_icon("volume_off", color="#DC2626", size=13))
+            self.stop_btn.setStyleSheet("""
+                QPushButton {
+                    background: rgba(239, 68, 68, 0.10);
+                    border: 1px solid #EF4444;
+                    color: #DC2626;
+                    border-radius: 6px;
+                    padding: 4px 10px;
+                    font-size: 11px;
+                    font-weight: 600;
+                }
+                QPushButton:hover {
+                    background: #EF4444;
+                    color: #FFFFFF;
+                }
+            """)
+        else:
+            self.setStyleSheet("""
+                IntercomBanner {
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 rgba(16, 185, 129, 0.18), stop:1 rgba(138, 198, 87, 0.12));
+                    border: 1.2px solid #8AC657;
+                    border-radius: 8px;
+                }
+            """)
+            self.badge_lbl.setText("结论播报")
+            self.badge_lbl.setStyleSheet("""
+                background-color: rgba(138, 198, 87, 0.22);
+                color: #8AC657;
+                font-size: 11px;
+                font-weight: bold;
+                padding: 4px 10px;
+                border-radius: 5px;
+            """)
+            self.status_lbl.setText("正在语音播报结论... (按右 Alt、按空格或点击右侧可随时打断)")
+            self.status_lbl.setStyleSheet("color: #A5D6A7; font-size: 12px; font-weight: 500;")
+            self.stop_btn.setIcon(get_symbol_icon("volume_off", color="#FCA5A5", size=13))
+            self.stop_btn.setStyleSheet("""
+                QPushButton {
+                    background: rgba(239, 68, 68, 0.15);
+                    border: 1px solid rgba(239, 68, 68, 0.4);
+                    color: #FCA5A5;
+                    border-radius: 6px;
+                    padding: 4px 10px;
+                    font-size: 11px;
+                    font-weight: 600;
+                }
+                QPushButton:hover {
+                    background: rgba(239, 68, 68, 0.28);
+                    color: #FFFFFF;
+                    border-color: #EF4444;
+                }
+            """)
         self.wave_vis.set_mode("speaking")
         self.wave_vis.set_active(True)
 
     def set_completed(self, focal_topic: str = "", is_followup: bool = False, response_mode: str = "MEETING"):
         self.stop_btn.hide()
         self.wave_vis.set_active(False)
-        if response_mode == "INSTRUCTION":
-            self.badge_lbl.setText("🚀 敏捷自进化工单")
-            self.badge_lbl.setStyleSheet("""
-                background-color: rgba(245, 158, 11, 0.22);
-                color: #FBBF24;
-                font-size: 11px;
-                font-weight: bold;
-                padding: 3px 8px;
-                border-radius: 5px;
+        is_light = ThemeManager.get_instance().is_light()
+
+        if is_light:
+            self.setStyleSheet("""
+                IntercomBanner {
+                    background: #F8FAFC;
+                    border: 1px solid #E2E8F0;
+                    border-radius: 8px;
+                }
             """)
-            self.status_lbl.setText("改进需求已立项归档 · 架构师角色已响应，后台智能体即将自动执行更新")
-            self.status_lbl.setStyleSheet("color: #FDE68A; font-size: 11.5px;")
-        elif response_mode == "GENERAL":
-            self.badge_lbl.setText("🌐 全网通用常识")
-            self.badge_lbl.setStyleSheet("""
-                background-color: rgba(139, 92, 246, 0.22);
-                color: #C084FC;
-                font-size: 11px;
-                font-weight: bold;
-                padding: 3px 8px;
-                border-radius: 5px;
-            """)
-            self.status_lbl.setText("未检索到内部会议记录 · 已自动降级为全网通用大模型知识解答")
-            self.status_lbl.setStyleSheet("color: #D8B4FE; font-size: 11.5px;")
-        else:
-            self.badge_lbl.setText("⚡ 连续就绪" if is_followup else "✅ 会议精准溯源")
-            self.badge_lbl.setStyleSheet("""
-                background-color: rgba(38, 176, 228, 0.15);
-                color: #81D4FA;
-                font-size: 11px;
-                font-weight: bold;
-                padding: 3px 8px;
-                border-radius: 5px;
-            """)
-            if focal_topic:
-                self.status_lbl.setText(f"回答已就绪 · 当前焦点「{focal_topic}」，长按【右 Alt】可针对该话题直接追问")
+            if response_mode == "INSTRUCTION":
+                self.badge_lbl.setText("敏捷自进化工单")
+                self.badge_lbl.setStyleSheet("background-color: rgba(245, 158, 11, 0.15); color: #D97706; font-size: 11px; font-weight: bold; padding: 4px 10px; border-radius: 5px; border: 1px solid #F59E0B;")
+                self.status_lbl.setText("改进需求已立项归档 · 架构师角色已响应，后台智能体即将自动执行更新")
+                self.status_lbl.setStyleSheet("color: #92400E; font-size: 11.5px; font-weight: 500;")
+            elif response_mode == "GENERAL":
+                self.badge_lbl.setText("全网通用常识")
+                self.badge_lbl.setStyleSheet("background-color: rgba(147, 51, 234, 0.12); color: #9333EA; font-size: 11px; font-weight: bold; padding: 4px 10px; border-radius: 5px; border: 1px solid #9333EA;")
+                self.status_lbl.setText("未检索到内部会议记录 · 已自动降级为全网通用大模型知识解答")
+                self.status_lbl.setStyleSheet("color: #6B21A8; font-size: 11.5px; font-weight: 500;")
             else:
-                self.status_lbl.setText("回答已就绪，已定位历史会议切片上下文")
-            self.status_lbl.setStyleSheet("color: #94A3B8; font-size: 11.5px;")
+                self.badge_lbl.setText("连续就绪" if is_followup else "会议精准溯源")
+                self.badge_lbl.setStyleSheet("background-color: rgba(2, 132, 199, 0.10); color: #0284C7; font-size: 11px; font-weight: bold; padding: 4px 10px; border-radius: 5px; border: 1px solid #0284C7;")
+                if focal_topic:
+                    self.status_lbl.setText(f"回答已就绪 · 当前焦点「{focal_topic}」，长按【右 Alt】可针对该话题直接追问")
+                else:
+                    self.status_lbl.setText("回答已就绪，已定位历史会议切片上下文")
+                self.status_lbl.setStyleSheet("color: #334155; font-size: 11.5px; font-weight: 500;")
+        else:
+            self.setStyleSheet("""
+                IntercomBanner {
+                    background: rgba(15, 23, 42, 0.65);
+                    border: 1px solid rgba(255, 255, 255, 0.08);
+                    border-radius: 8px;
+                }
+            """)
+            if response_mode == "INSTRUCTION":
+                self.badge_lbl.setText("敏捷自进化工单")
+                self.badge_lbl.setStyleSheet("background-color: rgba(245, 158, 11, 0.22); color: #FBBF24; font-size: 11px; font-weight: bold; padding: 4px 10px; border-radius: 5px;")
+                self.status_lbl.setText("改进需求已立项归档 · 架构师角色已响应，后台智能体即将自动执行更新")
+                self.status_lbl.setStyleSheet("color: #FDE68A; font-size: 11.5px;")
+            elif response_mode == "GENERAL":
+                self.badge_lbl.setText("全网通用常识")
+                self.badge_lbl.setStyleSheet("background-color: rgba(139, 92, 246, 0.22); color: #C084FC; font-size: 11px; font-weight: bold; padding: 4px 10px; border-radius: 5px;")
+                self.status_lbl.setText("未检索到内部会议记录 · 已自动降级为全网通用大模型知识解答")
+                self.status_lbl.setStyleSheet("color: #D8B4FE; font-size: 11.5px;")
+            else:
+                self.badge_lbl.setText("连续就绪" if is_followup else "会议精准溯源")
+                self.badge_lbl.setStyleSheet("background-color: rgba(38, 176, 228, 0.15); color: #81D4FA; font-size: 11px; font-weight: bold; padding: 4px 10px; border-radius: 5px;")
+                if focal_topic:
+                    self.status_lbl.setText(f"回答已就绪 · 当前焦点「{focal_topic}」，长按【右 Alt】可针对该话题直接追问")
+                else:
+                    self.status_lbl.setText("回答已就绪，已定位历史会议切片上下文")
+                self.status_lbl.setStyleSheet("color: #94A3B8; font-size: 11.5px;")
         self._reset_timer.start(8000)
 
     def set_interrupted(self):
         self.stop_btn.hide()
         self.wave_vis.set_active(False)
-        self.setStyleSheet("""
-            IntercomBanner {
-                background: rgba(30, 41, 59, 0.5);
-                border: 1px solid rgba(148, 163, 184, 0.2);
-                border-radius: 8px;
-            }
-        """)
-        self.badge_lbl.setText("🔇 播报已打断")
-        self.badge_lbl.setStyleSheet("""
-            background-color: rgba(148, 163, 184, 0.15);
-            color: #94A3B8;
-            font-size: 11px;
-            font-weight: bold;
-            padding: 3px 8px;
-            border-radius: 5px;
-        """)
-        self.status_lbl.setText("语音播报已静音打断，完整解答与时间轴记录保留在下方")
-        self.status_lbl.setStyleSheet("color: #94A3B8; font-size: 11.5px;")
+        is_light = ThemeManager.get_instance().is_light()
+        if is_light:
+            self.setStyleSheet("""
+                IntercomBanner {
+                    background: #F8FAFC;
+                    border: 1px solid #E2E8F0;
+                    border-radius: 8px;
+                }
+            """)
+            self.badge_lbl.setText("播报已打断")
+            self.badge_lbl.setStyleSheet("background-color: #E2E8F0; color: #475569; font-size: 11px; font-weight: bold; padding: 4px 10px; border-radius: 5px;")
+            self.status_lbl.setText("语音播报已静音打断，完整解答与时间轴记录保留在下方")
+            self.status_lbl.setStyleSheet("color: #475569; font-size: 11.5px;")
+        else:
+            self.setStyleSheet("""
+                IntercomBanner {
+                    background: rgba(30, 41, 59, 0.5);
+                    border: 1px solid rgba(148, 163, 184, 0.2);
+                    border-radius: 8px;
+                }
+            """)
+            self.badge_lbl.setText("播报已打断")
+            self.badge_lbl.setStyleSheet("background-color: rgba(148, 163, 184, 0.15); color: #94A3B8; font-size: 11px; font-weight: bold; padding: 4px 10px; border-radius: 5px;")
+            self.status_lbl.setText("语音播报已静音打断，完整解答与时间轴记录保留在下方")
+            self.status_lbl.setStyleSheet("color: #94A3B8; font-size: 11.5px;")
         self._reset_timer.start(5000)
 
     def set_no_speech(self, hint: str = ""):
         self._reset_timer.stop()
         self.stop_btn.hide()
         self.wave_vis.set_active(False)
-        self.setStyleSheet("""
-            IntercomBanner {
-                background: rgba(30, 41, 59, 0.45);
-                border: 1px solid rgba(148, 163, 184, 0.25);
-                border-radius: 8px;
-            }
-        """)
-        self.badge_lbl.setText("🎙️ 未听到说话")
-        self.badge_lbl.setStyleSheet("""
-            background-color: rgba(255, 255, 255, 0.08);
-            color: #CBD5E1;
-            font-size: 11px;
-            font-weight: bold;
-            padding: 3px 8px;
-            border-radius: 5px;
-        """)
+        is_light = ThemeManager.get_instance().is_light()
         msg = hint or "未听到提问声音，请按住【右 Alt】说话，松开即刻检索"
-        self.status_lbl.setText(msg)
-        self.status_lbl.setStyleSheet("color: #94A3B8; font-size: 11.5px;")
+        if is_light:
+            self.setStyleSheet("""
+                IntercomBanner {
+                    background: #F8FAFC;
+                    border: 1px solid #E2E8F0;
+                    border-radius: 8px;
+                }
+            """)
+            self.badge_lbl.setText("未听到说话")
+            self.badge_lbl.setStyleSheet("background-color: #E2E8F0; color: #475569; font-size: 11px; font-weight: bold; padding: 4px 10px; border-radius: 5px;")
+            self.status_lbl.setText(msg)
+            self.status_lbl.setStyleSheet("color: #475569; font-size: 11.5px;")
+        else:
+            self.setStyleSheet("""
+                IntercomBanner {
+                    background: rgba(30, 41, 59, 0.45);
+                    border: 1px solid rgba(148, 163, 184, 0.25);
+                    border-radius: 8px;
+                }
+            """)
+            self.badge_lbl.setText("未听到说话")
+            self.badge_lbl.setStyleSheet("background-color: rgba(255, 255, 255, 0.08); color: #CBD5E1; font-size: 11px; font-weight: bold; padding: 4px 10px; border-radius: 5px;")
+            self.status_lbl.setText(msg)
+            self.status_lbl.setStyleSheet("color: #94A3B8; font-size: 11.5px;")
         self._reset_timer.start(3500)
 
 
@@ -625,60 +841,30 @@ class CollapsibleSessionMenu(QWidget):
         # 1. 顶行常驻条 (可点击展开/收起，右侧为小 + 按钮)
         self.header_frame = QFrame()
         self.header_frame.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.header_frame.setStyleSheet("""
-            QFrame {
-                background-color: rgba(255, 255, 255, 0.03);
-                border: 1px solid rgba(255, 255, 255, 0.06);
-                border-radius: 8px;
-            }
-            QFrame:hover {
-                background-color: rgba(255, 255, 255, 0.06);
-                border-color: rgba(38, 176, 228, 0.35);
-            }
-        """)
         h_layout = QHBoxLayout(self.header_frame)
         h_layout.setContentsMargins(10, 8, 8, 8)
         h_layout.setSpacing(6)
 
-        self.icon_lbl = QLabel("📜")
-        self.icon_lbl.setStyleSheet("font-size: 13px; background: transparent; border: none;")
+        self.icon_lbl = QLabel()
+        self.icon_lbl.setStyleSheet("background: transparent; border: none;")
         h_layout.addWidget(self.icon_lbl)
 
         self.title_lbl = QLabel("会话历史")
-        self.title_lbl.setStyleSheet("color: #E2E8F0; font-size: 12px; font-weight: 600; background: transparent; border: none;")
         h_layout.addWidget(self.title_lbl)
 
         self.count_badge = QLabel("0")
-        self.count_badge.setStyleSheet("color: #94A3B8; font-size: 10px; background: rgba(255, 255, 255, 0.06); padding: 1px 5px; border-radius: 4px; border: none;")
         h_layout.addWidget(self.count_badge)
 
         self.arrow_lbl = QLabel("▸")
-        self.arrow_lbl.setStyleSheet("color: #64748B; font-size: 11px; font-weight: bold; background: transparent; border: none;")
         h_layout.addWidget(self.arrow_lbl)
 
         h_layout.addStretch()
 
         # 开启新会话小 + 按钮 (带气泡提示 "新会话")
-        self.new_btn = QPushButton("+")
+        self.new_btn = QPushButton()
         self.new_btn.setFixedSize(22, 22)
         self.new_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.new_btn.setToolTip("新会话")
-        self.new_btn.setStyleSheet("""
-            QPushButton {
-                background: rgba(38, 176, 228, 0.15);
-                border: 1px solid rgba(38, 176, 228, 0.35);
-                color: #38BDF8;
-                border-radius: 5px;
-                font-size: 14px;
-                font-weight: bold;
-                padding: 0;
-            }
-            QPushButton:hover {
-                background: rgba(38, 176, 228, 0.35);
-                border-color: #26B0E4;
-                color: #FFFFFF;
-            }
-        """)
         self.new_btn.clicked.connect(self._on_new_btn_clicked)
         h_layout.addWidget(self.new_btn)
 
@@ -692,22 +878,9 @@ class CollapsibleSessionMenu(QWidget):
         body_layout.setContentsMargins(4, 2, 4, 2)
         body_layout.setSpacing(4)
 
-        # 搜索框 (紧凑型)
+        # 搜索框 (紧凑型，无 Emoji)
         self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("🔍 快速筛选话题...")
-        self.search_input.setStyleSheet("""
-            QLineEdit {
-                background-color: #0A0D15;
-                border: 1px solid rgba(255, 255, 255, 0.08);
-                border-radius: 6px;
-                padding: 4px 8px;
-                font-size: 11px;
-                color: #FFFFFF;
-            }
-            QLineEdit:focus {
-                border-color: #26B0E4;
-            }
-        """)
+        self.search_input.setPlaceholderText("快速筛选话题...")
         self.search_input.textChanged.connect(self._filter_sessions)
         body_layout.addWidget(self.search_input)
 
@@ -716,40 +889,157 @@ class CollapsibleSessionMenu(QWidget):
         self.list_widget.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.list_widget.setVerticalScrollMode(QListWidget.ScrollMode.ScrollPerPixel)
         self.list_widget.setMaximumHeight(260)
-        self.list_widget.setStyleSheet("""
-            QListWidget {
-                background-color: #0C0F17;
-                border: 1px solid rgba(255, 255, 255, 0.06);
-                border-radius: 8px;
-                padding: 4px;
-                outline: none;
-            }
-            QListWidget::item {
-                background-color: #121624;
-                border: 1px solid rgba(255, 255, 255, 0.04);
-                border-radius: 6px;
-                padding: 6px 8px;
-                margin-bottom: 4px;
-                color: #CBD5E1;
-                font-size: 11px;
-            }
-            QListWidget::item:hover {
-                background-color: #162032;
-                border-color: rgba(38, 176, 228, 0.4);
-                color: #FFFFFF;
-            }
-            QListWidget::item:selected {
-                background-color: #132742;
-                border-color: #26B0E4;
-                color: #38BDF8;
-            }
-        """)
         self.list_widget.itemClicked.connect(self._on_item_clicked)
         self.list_widget.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.list_widget.customContextMenuRequested.connect(self._show_context_menu)
         body_layout.addWidget(self.list_widget)
 
         main_layout.addWidget(self.body_container)
+        self.apply_theme()
+
+    def apply_theme(self):
+        is_light = ThemeManager.get_instance().is_light()
+        if is_light:
+            self.header_frame.setStyleSheet("""
+                QFrame {
+                    background-color: #FFFFFF;
+                    border: 1px solid #E2E8F0;
+                    border-radius: 8px;
+                }
+                QFrame:hover {
+                    background-color: #F8FAFC;
+                    border-color: #0284C7;
+                }
+            """)
+            self.icon_lbl.setPixmap(get_symbol_pixmap("history", color="#0284C7", size=15))
+            self.title_lbl.setStyleSheet("color: #0F172A; font-size: 12px; font-weight: 600; background: transparent; border: none;")
+            self.count_badge.setStyleSheet("color: #64748B; font-size: 10px; background: #F1F5F9; padding: 1px 5px; border-radius: 4px; border: none;")
+            self.arrow_lbl.setStyleSheet("color: #94A3B8; font-size: 11px; font-weight: bold; background: transparent; border: none;")
+            self.new_btn.setIcon(get_symbol_icon("add", color="#0284C7", size=13))
+            self.new_btn.setStyleSheet("""
+                QPushButton {
+                    background: rgba(2, 132, 199, 0.08);
+                    border: 1px solid rgba(2, 132, 199, 0.3);
+                    border-radius: 5px;
+                    padding: 0;
+                }
+                QPushButton:hover {
+                    background: rgba(2, 132, 199, 0.18);
+                    border-color: #0284C7;
+                }
+            """)
+            self.search_input.setStyleSheet("""
+                QLineEdit {
+                    background-color: #FFFFFF;
+                    border: 1px solid #CBD5E1;
+                    border-radius: 6px;
+                    padding: 4px 8px;
+                    font-size: 11px;
+                    color: #0F172A;
+                }
+                QLineEdit:focus {
+                    border-color: #0284C7;
+                }
+            """)
+            self.list_widget.setStyleSheet("""
+                QListWidget {
+                    background-color: #FFFFFF;
+                    border: 1px solid #E2E8F0;
+                    border-radius: 8px;
+                    padding: 4px;
+                    outline: none;
+                }
+                QListWidget::item {
+                    background-color: #F8FAFC;
+                    border: 1px solid #E2E8F0;
+                    border-radius: 6px;
+                    padding: 6px 8px;
+                    margin-bottom: 4px;
+                    color: #1E293B;
+                    font-size: 11px;
+                }
+                QListWidget::item:hover {
+                    background-color: #F1F5F9;
+                    border-color: #0284C7;
+                    color: #0F172A;
+                }
+                QListWidget::item:selected {
+                    background-color: rgba(2, 132, 199, 0.10);
+                    border-color: #0284C7;
+                    color: #0284C7;
+                    font-weight: 600;
+                }
+            """)
+        else:
+            self.header_frame.setStyleSheet("""
+                QFrame {
+                    background-color: rgba(255, 255, 255, 0.03);
+                    border: 1px solid rgba(255, 255, 255, 0.06);
+                    border-radius: 8px;
+                }
+                QFrame:hover {
+                    background-color: rgba(255, 255, 255, 0.06);
+                    border-color: rgba(38, 176, 228, 0.35);
+                }
+            """)
+            self.icon_lbl.setPixmap(get_symbol_pixmap("history", color="#26B0E4", size=15))
+            self.title_lbl.setStyleSheet("color: #E2E8F0; font-size: 12px; font-weight: 600; background: transparent; border: none;")
+            self.count_badge.setStyleSheet("color: #94A3B8; font-size: 10px; background: rgba(255, 255, 255, 0.06); padding: 1px 5px; border-radius: 4px; border: none;")
+            self.arrow_lbl.setStyleSheet("color: #64748B; font-size: 11px; font-weight: bold; background: transparent; border: none;")
+            self.new_btn.setIcon(get_symbol_icon("add", color="#38BDF8", size=13))
+            self.new_btn.setStyleSheet("""
+                QPushButton {
+                    background: rgba(38, 176, 228, 0.15);
+                    border: 1px solid rgba(38, 176, 228, 0.35);
+                    border-radius: 5px;
+                    padding: 0;
+                }
+                QPushButton:hover {
+                    background: rgba(38, 176, 228, 0.35);
+                    border-color: #26B0E4;
+                }
+            """)
+            self.search_input.setStyleSheet("""
+                QLineEdit {
+                    background-color: #0A0D15;
+                    border: 1px solid rgba(255, 255, 255, 0.08);
+                    border-radius: 6px;
+                    padding: 4px 8px;
+                    font-size: 11px;
+                    color: #FFFFFF;
+                }
+                QLineEdit:focus {
+                    border-color: #26B0E4;
+                }
+            """)
+            self.list_widget.setStyleSheet("""
+                QListWidget {
+                    background-color: #0C0F17;
+                    border: 1px solid rgba(255, 255, 255, 0.06);
+                    border-radius: 8px;
+                    padding: 4px;
+                    outline: none;
+                }
+                QListWidget::item {
+                    background-color: #121624;
+                    border: 1px solid rgba(255, 255, 255, 0.04);
+                    border-radius: 6px;
+                    padding: 6px 8px;
+                    margin-bottom: 4px;
+                    color: #CBD5E1;
+                    font-size: 11px;
+                }
+                QListWidget::item:hover {
+                    background-color: #162032;
+                    border-color: rgba(38, 176, 228, 0.4);
+                    color: #FFFFFF;
+                }
+                QListWidget::item:selected {
+                    background-color: #132742;
+                    border-color: #26B0E4;
+                    color: #38BDF8;
+                }
+            """)
 
     def _on_header_clicked(self, event):
         child = self.header_frame.childAt(event.pos())
@@ -836,7 +1126,7 @@ class CollapsibleSessionMenu(QWidget):
 
             item = QListWidgetItem()
             item.setData(Qt.ItemDataRole.UserRole, sid)
-            item_text = f"💬 {title}\n    ⏱️ {group_tag} · {turn_count} 轮"
+            item_text = f"{title}\n    {group_tag} · {turn_count} 轮"
             item.setText(item_text)
             self.list_widget.addItem(item)
             if sid == self._active_session_id:
@@ -856,30 +1146,55 @@ class CollapsibleSessionMenu(QWidget):
         if not sid:
             return
 
+        is_light = ThemeManager.get_instance().is_light()
         menu = QMenu(self)
-        menu.setStyleSheet("""
-            QMenu {
-                background-color: #121724;
-                border: 1px solid rgba(255, 255, 255, 0.1);
-                color: #E2E8F0;
-                font-size: 11px;
-                padding: 4px;
-            }
-            QMenu::item:selected {
-                background-color: #EF4444;
-                color: #FFFFFF;
-                border-radius: 4px;
-            }
-        """)
-        del_action = menu.addAction("🗑️ 删除此会话")
+        if is_light:
+            menu.setStyleSheet("""
+                QMenu {
+                    background-color: #FFFFFF;
+                    border: 1px solid #CBD5E1;
+                    color: #0F172A;
+                    font-size: 11px;
+                    padding: 4px;
+                }
+                QMenu::item:selected {
+                    background-color: #DC2626;
+                    color: #FFFFFF;
+                    border-radius: 4px;
+                }
+            """)
+        else:
+            menu.setStyleSheet("""
+                QMenu {
+                    background-color: #121724;
+                    border: 1px solid rgba(255, 255, 255, 0.1);
+                    color: #E2E8F0;
+                    font-size: 11px;
+                    padding: 4px;
+                }
+                QMenu::item:selected {
+                    background-color: #EF4444;
+                    color: #FFFFFF;
+                    border-radius: 4px;
+                }
+            """)
+        del_action = menu.addAction("删除此会话")
+        del_action.setIcon(get_symbol_icon("delete_forever", color="#DC2626" if is_light else "#EF4444", size=14))
         action = menu.exec(self.list_widget.mapToGlobal(pos))
         if action == del_action:
-            try:
-                self.store.delete_session(sid)
-                self.session_deleted.emit(sid)
-                self.refresh_sessions()
-            except Exception as e:
-                print(f"[CollapsibleSessionMenu] 删除会话失败: {e}")
+            if ModernDialog.confirm_danger(
+                self,
+                title="删除会话记录",
+                message="确定删除此场历史会话记录吗？",
+                detail="删除后该会话的问答上下文记录将被清空，但不会影响知识库底层的会议切片资产。",
+                confirm_text="删除会话"
+            ):
+                try:
+                    self.store.delete_session(sid)
+                    self.session_deleted.emit(sid)
+                    self.refresh_sessions()
+                except Exception as e:
+                    print(f"[CollapsibleSessionMenu] 删除会话失败: {e}")
 
 # 兼容别名
 SessionDrawer = CollapsibleSessionMenu
@@ -915,31 +1230,39 @@ class NavButton(QPushButton):
         rect = self.rect()
         w, h = rect.width(), rect.height()
 
-        # 背景与圆角 (美好智能 VI: 靛青底座 #13459D + 海青指示条 #26B0E4)
+        tm = ThemeManager.get_instance()
+        is_light = tm.is_light()
+        colors = tm.get_colors()
+
+        # 背景与圆角 (美好智能 VI 规范)
         if self.is_active:
-            painter.setBrush(QBrush(QColor(19, 69, 157, 48))) # 靛青底座 #13459D
-            painter.setPen(QPen(QColor(38, 176, 228, 130), 1.0)) # 海青边框 #26B0E4
+            if is_light:
+                painter.setBrush(QBrush(QColor(2, 132, 199, 20)))
+                painter.setPen(QPen(QColor(2, 132, 199, 140), 1.0))
+            else:
+                painter.setBrush(QBrush(QColor(19, 69, 157, 48)))
+                painter.setPen(QPen(QColor(38, 176, 228, 130), 1.0))
             painter.drawRoundedRect(4, 2, w - 8, h - 4, 8, 8)
 
-            # 左侧微光指示小条 (海青 #26B0E4)
-            painter.setBrush(QBrush(QColor(38, 176, 228)))
+            # 左侧微光指示小条
+            painter.setBrush(QBrush(QColor(colors["brand_accent"])))
             painter.setPen(Qt.PenStyle.NoPen)
             painter.drawRoundedRect(7, 9, 3, h - 18, 1.5, 1.5)
         else:
             painter.setPen(Qt.PenStyle.NoPen)
             painter.setBrush(Qt.BrushStyle.NoBrush)
 
-        # 图标与主文本
-        painter.setFont(QFont("Segoe UI Emoji", 11))
-        painter.setPen(QColor(255, 255, 255) if self.is_active else QColor(148, 163, 184))
-        painter.drawText(16, 0, 24, h, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, self.icon_str)
+        # 绘制 Google Material Symbols 矢量图标 (彻底替代系统 Emoji)
+        icon_c = colors["brand_accent"] if self.is_active else colors["text_muted"]
+        icon_pix = get_symbol_pixmap(self.icon_str, color=icon_c, size=18)
+        painter.drawPixmap(16, (h - 18) // 2, icon_pix)
 
-        painter.setFont(QFont("Segoe UI", 10, QFont.Weight.Medium if not self.is_active else QFont.Weight.DemiBold))
-        text_color = QColor(255, 255, 255) if self.is_active else QColor(203, 213, 225)
+        painter.setFont(QFont("Segoe UI", 10, QFont.Weight.DemiBold if self.is_active else QFont.Weight.Medium))
+        text_color = QColor(colors["text_primary"] if self.is_active else colors["text_secondary"])
         painter.setPen(text_color)
         painter.drawText(44, 0, w - 90, h, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, self.label_str)
 
-        # 右侧微型 Badge (美好智能 鹦鹉绿 #8AC657)
+        # 右侧微型 Badge
         if self.badge_str:
             badge_font = QFont("Segoe UI", 8, QFont.Weight.Bold)
             painter.setFont(badge_font)
@@ -947,12 +1270,17 @@ class NavButton(QPushButton):
             badge_rect_x = w - badge_w - 12
             badge_rect_y = (h - 18) // 2
 
-            bg_badge = QColor(19, 69, 157, 85) if self.is_active else QColor(255, 255, 255, 16)
+            if is_light:
+                bg_badge = QColor(2, 132, 199, 25) if self.is_active else QColor(15, 23, 42, 12)
+                text_badge = QColor(2, 132, 199) if self.is_active else QColor(100, 116, 139)
+            else:
+                bg_badge = QColor(19, 69, 157, 85) if self.is_active else QColor(255, 255, 255, 16)
+                text_badge = QColor(138, 198, 87) if self.is_active else QColor(148, 163, 184)
+
             painter.setBrush(QBrush(bg_badge))
             painter.setPen(Qt.PenStyle.NoPen)
             painter.drawRoundedRect(badge_rect_x, badge_rect_y, badge_w, 18, 9, 9)
 
-            text_badge = QColor(138, 198, 87) if self.is_active else QColor(148, 163, 184)
             painter.setPen(text_badge)
             painter.drawText(badge_rect_x, badge_rect_y, badge_w, 18, Qt.AlignmentFlag.AlignCenter, self.badge_str)
 
@@ -976,7 +1304,6 @@ class ExpandableEmployeeCard(QFrame):
 
         self.setObjectName("emp_card")
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._apply_style(hover=False)
 
         # 主纵向布局
         self.main_layout = QVBoxLayout(self)
@@ -1005,9 +1332,9 @@ class ExpandableEmployeeCard(QFrame):
         info_box = QVBoxLayout()
         info_box.setSpacing(1)
         self.name_lbl = QLabel(emp["name"])
-        self.name_lbl.setStyleSheet("font-size: 14px; font-weight: bold; color: #FFFFFF;")
+        self.name_lbl.setStyleSheet("font-size: 14px; font-weight: bold;")
         self.title_lbl = QLabel(emp["title"])
-        self.title_lbl.setStyleSheet("font-size: 11px; color: #94A3B8;")
+        self.title_lbl.setStyleSheet("font-size: 11px;")
         info_box.addWidget(self.name_lbl)
         info_box.addWidget(self.title_lbl)
         header_layout.addLayout(info_box)
@@ -1021,18 +1348,18 @@ class ExpandableEmployeeCard(QFrame):
 
         # 离职状态徽章
         if self.is_departed:
-            self.status_badge = QLabel("📁 已离职 · 档案留存")
+            self.status_badge = QLabel("已离职 · 档案留存")
             self.status_badge.setStyleSheet("color: #94A3B8; font-size: 9.5px; background: rgba(148, 163, 184, 0.12); border: 1px solid rgba(148, 163, 184, 0.25); padding: 2px 6px; border-radius: 4px; font-weight: 600;")
             right_box.addWidget(self.status_badge, alignment=Qt.AlignmentFlag.AlignRight)
 
         # 关联会议计数徽章
-        self.meeting_badge = QLabel("🎙️ 关联 0 场会议")
-        self.meeting_badge.setStyleSheet("color: #64748B; font-size: 10px; background: rgba(255,255,255,0.04); padding: 2px 7px; border-radius: 4px; font-weight: 500;")
+        self.meeting_badge = QLabel("关联 0 场会议")
+        self.meeting_badge.setStyleSheet("color: #64748B; font-size: 10px; background: rgba(0,0,0,0.04); padding: 2px 7px; border-radius: 4px; font-weight: 500;")
         right_box.addWidget(self.meeting_badge, alignment=Qt.AlignmentFlag.AlignRight)
 
         # 展开/收起指示器
         self.toggle_lbl = QLabel("▾ 展开履历")
-        self.toggle_lbl.setStyleSheet("color: #26B0E4; font-size: 10.5px; font-weight: 600; padding-right: 2px;")
+        self.toggle_lbl.setStyleSheet("font-size: 10.5px; font-weight: 600; padding-right: 2px;")
         right_box.addWidget(self.toggle_lbl, alignment=Qt.AlignmentFlag.AlignRight)
 
         header_layout.addLayout(right_box)
@@ -1042,14 +1369,14 @@ class ExpandableEmployeeCard(QFrame):
         aliases = emp.get("aliases", [])
         if aliases:
             aliases_str = " / ".join(aliases[:4])
-            alias_badge = QLabel(f"🗣️ 称谓/误读纠错: {aliases_str}")
-            alias_badge.setStyleSheet("color: #64748B; font-size: 10px; background: rgba(255,255,255,0.02); padding: 2px 6px; border-radius: 4px;")
+            alias_badge = QLabel(f"称谓纠错: {aliases_str}")
+            alias_badge.setStyleSheet("color: #64748B; font-size: 10px; background: rgba(0,0,0,0.02); padding: 2px 6px; border-radius: 4px;")
             self.main_layout.addWidget(alias_badge)
 
         # 3. 基础职责描述
-        self.duties_lbl = QLabel(f"📌 {emp.get('duties', '')}")
+        self.duties_lbl = QLabel(emp.get('duties', ''))
         self.duties_lbl.setWordWrap(True)
-        self.duties_lbl.setStyleSheet("color: #CBD5E1; font-size: 11.5px; line-height: 1.4;")
+        self.duties_lbl.setStyleSheet("font-size: 11.5px; line-height: 1.4;")
         self.main_layout.addWidget(self.duties_lbl)
 
         # 4. 核心动态高亮胶囊 (动态从会议切片库提取)
@@ -1058,17 +1385,17 @@ class ExpandableEmployeeCard(QFrame):
         hl_layout.setContentsMargins(8, 6, 8, 6)
         hl_layout.setSpacing(3)
 
-        self.hl_title_lbl = QLabel("🔥 最近主导与会议动态")
-        self.hl_title_lbl.setStyleSheet("color: #26B0E4; font-size: 10.5px; font-weight: bold;")
+        self.hl_title_lbl = QLabel("最近主导与会议动态")
+        self.hl_title_lbl.setStyleSheet("font-size: 10.5px; font-weight: bold;")
         self.hl_content_lbl = QLabel("正在同步会议记忆中台...")
         self.hl_content_lbl.setWordWrap(True)
-        self.hl_content_lbl.setStyleSheet("color: #E2E8F0; font-size: 11px; line-height: 1.35;")
+        self.hl_content_lbl.setStyleSheet("font-size: 11px; line-height: 1.35;")
         hl_layout.addWidget(self.hl_title_lbl)
         hl_layout.addWidget(self.hl_content_lbl)
         self.main_layout.addWidget(self.highlight_box)
 
         # 5. 技术栈与专业方向
-        self.tech_lbl = QLabel(f"⚡ 业务方向/技术栈: {emp.get('tech_stack', '通用业务')}")
+        self.tech_lbl = QLabel(f"业务方向/技术栈: {emp.get('tech_stack', '通用业务')}")
         self.tech_lbl.setStyleSheet("color: #64748B; font-size: 10.5px;")
         self.main_layout.addWidget(self.tech_lbl)
 
@@ -1082,12 +1409,12 @@ class ExpandableEmployeeCard(QFrame):
         # 分割线
         divider = QFrame()
         divider.setFrameShape(QFrame.Shape.HLine)
-        divider.setStyleSheet("background-color: rgba(255, 255, 255, 0.08); max-height: 1px;")
+        divider.setStyleSheet("background-color: rgba(148, 163, 184, 0.15); max-height: 1px;")
         self.detail_layout.addWidget(divider)
 
         # 详细档案小标题
-        footprint_title = QLabel("📋 动态会议足迹与履历档案 (实时沉淀自中台记忆)")
-        footprint_title.setStyleSheet("color: #8AC657; font-size: 11px; font-weight: bold;")
+        footprint_title = QLabel("动态会议足迹与履历档案 (实时沉淀自中台记忆)")
+        footprint_title.setStyleSheet("font-size: 11px; font-weight: bold;")
         self.detail_layout.addWidget(footprint_title)
 
         # 动态切片时间轴列表容器
@@ -1097,25 +1424,44 @@ class ExpandableEmployeeCard(QFrame):
         self.timeline_layout.setSpacing(6)
         self.detail_layout.addWidget(self.timeline_widget)
 
-        # 快捷检索按钮
-        self.query_btn = QPushButton(f"🔍 检索关于 {emp['name']} 的全部会议决议与发言")
+        # 快捷检索按钮 (Material Symbol 矢量图标，无 Emoji)
+        is_light = ThemeManager.get_instance().is_light()
+        self.query_btn = QPushButton(f"检索关于 {emp['name']} 的全部会议决议与发言")
+        self.query_btn.setIcon(get_symbol_icon("search", color="#0284C7" if is_light else "#38BDF8", size=13))
         self.query_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.query_btn.setStyleSheet("""
-            QPushButton {
-                background: rgba(38, 176, 228, 0.12);
-                color: #38BDF8;
-                border: 1px solid rgba(38, 176, 228, 0.35);
-                border-radius: 6px;
-                padding: 7px 12px;
-                font-size: 11px;
-                font-weight: 600;
-            }
-            QPushButton:hover {
-                background: rgba(38, 176, 228, 0.25);
-                color: #FFFFFF;
-                border-color: #26B0E4;
-            }
-        """)
+        if is_light:
+            self.query_btn.setStyleSheet("""
+                QPushButton {
+                    background: rgba(2, 132, 199, 0.08);
+                    color: #0284C7;
+                    border: 1px solid rgba(2, 132, 199, 0.3);
+                    border-radius: 6px;
+                    padding: 7px 12px;
+                    font-size: 11px;
+                    font-weight: 600;
+                }
+                QPushButton:hover {
+                    background: rgba(2, 132, 199, 0.18);
+                    color: #0369A1;
+                }
+            """)
+        else:
+            self.query_btn.setStyleSheet("""
+                QPushButton {
+                    background: rgba(38, 176, 228, 0.12);
+                    color: #38BDF8;
+                    border: 1px solid rgba(38, 176, 228, 0.35);
+                    border-radius: 6px;
+                    padding: 7px 12px;
+                    font-size: 11px;
+                    font-weight: 600;
+                }
+                QPushButton:hover {
+                    background: rgba(38, 176, 228, 0.25);
+                    color: #FFFFFF;
+                    border-color: #26B0E4;
+                }
+            """)
         self.query_btn.clicked.connect(self._on_search_clicked)
         self.detail_layout.addWidget(self.query_btn)
 
@@ -1123,58 +1469,58 @@ class ExpandableEmployeeCard(QFrame):
 
         # 初始化刷新动态档案
         self.refresh_profile()
+        self._apply_style(hover=False)
 
     def _apply_style(self, hover: bool = False):
-        if self.is_departed:
-            if self.is_expanded:
-                self.setStyleSheet("""
-                    QFrame#emp_card {
-                        background-color: #121522;
-                        border: 1px solid rgba(148, 163, 184, 0.45);
+        is_light = ThemeManager.get_instance().is_light()
+        if is_light:
+            if self.is_departed:
+                border_c = "#CBD5E1" if hover else "#E2E8F0"
+                self.setStyleSheet(f"""
+                    QFrame#emp_card {{
+                        background-color: #F8FAFC;
+                        border: 1px dashed {border_c};
                         border-radius: 10px;
-                    }
-                """)
-            elif hover:
-                self.setStyleSheet("""
-                    QFrame#emp_card {
-                        background-color: #121624;
-                        border: 1px dashed rgba(148, 163, 184, 0.35);
-                        border-radius: 10px;
-                    }
+                    }}
                 """)
             else:
-                self.setStyleSheet("""
-                    QFrame#emp_card {
-                        background-color: #0E1119;
-                        border: 1px dashed rgba(255, 255, 255, 0.09);
+                border_c = "#0284C7" if (self.is_expanded or hover) else "#E2E8F0"
+                bg_c = "#F8FAFC" if hover else "#FFFFFF"
+                self.setStyleSheet(f"""
+                    QFrame#emp_card {{
+                        background-color: {bg_c};
+                        border: 1px solid {border_c};
                         border-radius: 10px;
-                    }
+                    }}
                 """)
+            self.name_lbl.setStyleSheet("font-size: 14px; font-weight: bold; color: #0F172A;")
+            self.title_lbl.setStyleSheet("font-size: 11px; color: #475569;")
+            self.duties_lbl.setStyleSheet("color: #334155; font-size: 11.5px; line-height: 1.4;")
+            self.toggle_lbl.setStyleSheet("color: #0284C7; font-size: 10.5px; font-weight: 600; padding-right: 2px;")
         else:
-            if self.is_expanded:
-                self.setStyleSheet("""
-                    QFrame#emp_card {
-                        background-color: #141724;
-                        border: 1px solid rgba(38, 176, 228, 0.55);
+            if self.is_departed:
+                border_c = "rgba(148, 163, 184, 0.45)" if self.is_expanded else ("rgba(148, 163, 184, 0.35)" if hover else "rgba(255, 255, 255, 0.09)")
+                self.setStyleSheet(f"""
+                    QFrame#emp_card {{
+                        background-color: #121522;
+                        border: 1px dashed {border_c};
                         border-radius: 10px;
-                    }
-                """)
-            elif hover:
-                self.setStyleSheet("""
-                    QFrame#emp_card {
-                        background-color: #151928;
-                        border: 1px solid rgba(38, 176, 228, 0.4);
-                        border-radius: 10px;
-                    }
+                    }}
                 """)
             else:
-                self.setStyleSheet("""
-                    QFrame#emp_card {
-                        background-color: #12151F;
-                        border: 1px solid rgba(255, 255, 255, 0.08);
+                border_c = "rgba(38, 176, 228, 0.55)" if self.is_expanded else ("rgba(38, 176, 228, 0.4)" if hover else "rgba(255, 255, 255, 0.08)")
+                bg_c = "#141724" if self.is_expanded else ("#151928" if hover else "#12151F")
+                self.setStyleSheet(f"""
+                    QFrame#emp_card {{
+                        background-color: {bg_c};
+                        border: 1px solid {border_c};
                         border-radius: 10px;
-                    }
+                    }}
                 """)
+            self.name_lbl.setStyleSheet("font-size: 14px; font-weight: bold; color: #FFFFFF;")
+            self.title_lbl.setStyleSheet("font-size: 11px; color: #94A3B8;")
+            self.duties_lbl.setStyleSheet("color: #CBD5E1; font-size: 11.5px; line-height: 1.4;")
+            self.toggle_lbl.setStyleSheet("color: #26B0E4; font-size: 10.5px; font-weight: 600; padding-right: 2px;")
 
     def enterEvent(self, event):
         if not self.is_expanded:
@@ -1206,65 +1552,68 @@ class ExpandableEmployeeCard(QFrame):
 
     def refresh_profile(self):
         """从 store 动态反查该成员的最新会议切片并重新计算画像"""
+        is_light = ThemeManager.get_instance().is_light()
         profile = get_dynamic_employee_profile(self.store, self.emp)
         m_count = profile.get("meeting_count", 0)
 
-        # 1. 更新关联会议计数 Badge
+        # 1. 更新关联会议计数 Badge (无 Emoji)
         if m_count > 0:
-            prefix = "🎙️ 历史关联" if self.is_departed else "🎙️ 关联"
+            prefix = "历史关联" if self.is_departed else "关联"
             self.meeting_badge.setText(f"{prefix} {m_count} 场会议")
-            badge_color = "#94A3B8" if self.is_departed else "#26B0E4"
-            badge_bg = "rgba(148,163,184,0.12)" if self.is_departed else "rgba(38,176,228,0.12)"
-            badge_bd = "rgba(148,163,184,0.25)" if self.is_departed else "rgba(38,176,228,0.25)"
+            badge_color = "#64748B" if self.is_departed else ("#0284C7" if is_light else "#26B0E4")
+            badge_bg = "rgba(100,116,139,0.10)" if self.is_departed else ("rgba(2,132,199,0.10)" if is_light else "rgba(38,176,228,0.12)")
+            badge_bd = "rgba(100,116,139,0.25)" if self.is_departed else ("rgba(2,132,199,0.25)" if is_light else "rgba(38,176,228,0.25)")
             self.meeting_badge.setStyleSheet(
                 f"color: {badge_color}; font-size: 10px; background: {badge_bg}; "
                 f"border: 1px solid {badge_bd}; padding: 2px 7px; border-radius: 4px; font-weight: 600;"
             )
         else:
-            self.meeting_badge.setText("🎙️ 暂无关联会议")
+            self.meeting_badge.setText("暂无关联会议")
             self.meeting_badge.setStyleSheet(
-                "color: #64748B; font-size: 10px; background: rgba(255,255,255,0.04); "
-                "border: 1px solid rgba(255,255,255,0.05); padding: 2px 7px; border-radius: 4px;"
+                "color: #94A3B8; font-size: 10px; background: rgba(0,0,0,0.03); "
+                "border: 1px solid rgba(0,0,0,0.05); padding: 2px 7px; border-radius: 4px;"
             )
 
-        # 2. 更新最新主导与动态高亮胶囊
+        # 2. 更新最新主导与动态高亮胶囊 (无 Emoji)
         core_hl = profile.get("core_highlight", "")
+        core_hl = re.sub(r'[\U0001F000-\U0001FAFF\u2600-\u26FF\u2700-\u27BF]', '', core_hl)
         if self.is_departed:
-            self.hl_title_lbl.setText("📜 历史主导与交接决策" if m_count > 0 else "📋 离职交接与历史档案留存")
-            self.hl_title_lbl.setStyleSheet("color: #94A3B8; font-size: 10.5px; font-weight: bold;")
+            self.hl_title_lbl.setText("历史主导与交接决策" if m_count > 0 else "离职交接与历史档案留存")
+            self.hl_title_lbl.setStyleSheet("color: #64748B; font-size: 10.5px; font-weight: bold;")
             self.highlight_box.setStyleSheet("""
                 QFrame {
-                    background: rgba(148, 163, 184, 0.07);
+                    background: rgba(100, 116, 139, 0.08);
                     border-left: 3px solid #64748B;
                     border-radius: 4px;
                     padding: 6px 10px;
                 }
             """)
         elif m_count > 0:
-            self.hl_title_lbl.setText("🔥 最近主导与会议决策")
-            self.hl_title_lbl.setStyleSheet("color: #26B0E4; font-size: 10.5px; font-weight: bold;")
-            self.highlight_box.setStyleSheet("""
-                QFrame {
-                    background: rgba(38, 176, 228, 0.07);
-                    border-left: 3px solid #26B0E4;
+            self.hl_title_lbl.setText("最近主导与会议决策")
+            self.hl_title_lbl.setStyleSheet(f"color: {'#0284C7' if is_light else '#26B0E4'}; font-size: 10.5px; font-weight: bold;")
+            self.highlight_box.setStyleSheet(f"""
+                QFrame {{
+                    background: {'rgba(2, 132, 199, 0.08)' if is_light else 'rgba(38, 176, 228, 0.07)'};
+                    border-left: 3px solid {'#0284C7' if is_light else '#26B0E4'};
                     border-radius: 4px;
                     padding: 6px 10px;
-                }
+                }}
             """)
         else:
-            self.hl_title_lbl.setText("🎯 现阶段核心职责与关注")
-            self.hl_title_lbl.setStyleSheet("color: #8AC657; font-size: 10.5px; font-weight: bold;")
-            self.highlight_box.setStyleSheet("""
-                QFrame {
-                    background: rgba(138, 198, 87, 0.07);
-                    border-left: 3px solid #8AC657;
+            self.hl_title_lbl.setText("现阶段核心职责与关注")
+            self.hl_title_lbl.setStyleSheet(f"color: {'#16A34A' if is_light else '#8AC657'}; font-size: 10.5px; font-weight: bold;")
+            self.highlight_box.setStyleSheet(f"""
+                QFrame {{
+                    background: {'rgba(22, 163, 74, 0.08)' if is_light else 'rgba(138, 198, 87, 0.07)'};
+                    border-left: 3px solid {'#16A34A' if is_light else '#8AC657'};
                     border-radius: 4px;
                     padding: 6px 10px;
-                }
+                }}
             """)
         self.hl_content_lbl.setText(core_hl)
+        self.hl_content_lbl.setStyleSheet(f"color: {'#1E293B' if is_light else '#E2E8F0'}; font-size: 11px; line-height: 1.35;")
 
-        # 3. 清理并重新填充详细时间轴切片
+        # 3. 清理并重新填充详细时间轴切片 (无 Emoji)
         while self.timeline_layout.count() > 0:
             child = self.timeline_layout.takeAt(0)
             if child.widget():
@@ -1274,52 +1623,60 @@ class ExpandableEmployeeCard(QFrame):
         if actions:
             for act in actions:
                 item_frame = QFrame()
-                item_frame.setStyleSheet("""
-                    QFrame {
-                        background: rgba(255, 255, 255, 0.03);
-                        border: 1px solid rgba(255, 255, 255, 0.06);
-                        border-left: 2px solid #26B0E4;
-                        border-radius: 6px;
-                        padding: 7px 9px;
-                    }
-                """)
+                if is_light:
+                    item_frame.setStyleSheet("""
+                        QFrame {
+                            background: #F8FAFC;
+                            border: 1px solid #E2E8F0;
+                            border-left: 2.5px solid #0284C7;
+                            border-radius: 6px;
+                            padding: 7px 9px;
+                        }
+                    """)
+                else:
+                    item_frame.setStyleSheet("""
+                        QFrame {
+                            background: rgba(255, 255, 255, 0.03);
+                            border: 1px solid rgba(255, 255, 255, 0.06);
+                            border-left: 2px solid #26B0E4;
+                            border-radius: 6px;
+                            padding: 7px 9px;
+                        }
+                    """)
                 item_layout = QVBoxLayout(item_frame)
                 item_layout.setContentsMargins(8, 6, 8, 6)
                 item_layout.setSpacing(4)
 
                 topic_str = act.get('topic', '常规议题')
-                header_lbl = QLabel(f"📅 {act.get('time', '近期')} · 【{topic_str}】")
+                header_lbl = QLabel(f"{act.get('time', '近期')} · 【{topic_str}】")
                 header_lbl.setWordWrap(True)
-                header_lbl.setStyleSheet("color: #38BDF8; font-size: 11px; font-weight: bold;")
+                header_lbl.setStyleSheet(f"color: {'#0284C7' if is_light else '#38BDF8'}; font-size: 11px; font-weight: bold;")
                 item_layout.addWidget(header_lbl)
 
                 points = act.get("points", [])
                 if points:
                     for pt in points:
-                        pt_lbl = QLabel(pt)
+                        clean_pt = pt
+                        for emo in ["✅", "📌", "📝", "🎙️", "💬"]:
+                            clean_pt = clean_pt.replace(emo, "").strip()
+                        pt_lbl = QLabel(f"• {clean_pt}")
                         pt_lbl.setWordWrap(True)
-                        if pt.startswith("✅"):
-                            pt_lbl.setStyleSheet("color: #86EFAC; font-size: 11px; line-height: 1.4; padding-left: 2px;")
-                        elif pt.startswith("📌"):
-                            pt_lbl.setStyleSheet("color: #BAE6FD; font-size: 11px; line-height: 1.4; padding-left: 2px;")
-                        elif pt.startswith("📝"):
-                            pt_lbl.setStyleSheet("color: #FDE047; font-size: 11px; line-height: 1.4; padding-left: 2px;")
-                        elif pt.startswith("🎙️"):
-                            pt_lbl.setStyleSheet("color: #CBD5E1; font-size: 10.5px; font-style: italic; line-height: 1.35; padding-left: 2px;")
-                        else:
-                            pt_lbl.setStyleSheet("color: #E2E8F0; font-size: 11px; line-height: 1.4; padding-left: 2px;")
+                        pt_lbl.setStyleSheet(f"color: {'#334155' if is_light else '#CBD5E1'}; font-size: 11px; line-height: 1.4; padding-left: 2px;")
                         item_layout.addWidget(pt_lbl)
                 elif act.get("highlight"):
-                    desc_lbl = QLabel(f"💬 {act.get('highlight', '')}")
+                    clean_hl = act.get('highlight', '')
+                    for emo in ["✅", "📌", "📝", "🎙️", "💬"]:
+                        clean_hl = clean_hl.replace(emo, "").strip()
+                    desc_lbl = QLabel(clean_hl)
                     desc_lbl.setWordWrap(True)
-                    desc_lbl.setStyleSheet("color: #E2E8F0; font-size: 11px; line-height: 1.35;")
+                    desc_lbl.setStyleSheet(f"color: {'#334155' if is_light else '#E2E8F0'}; font-size: 11px; line-height: 1.35;")
                     item_layout.addWidget(desc_lbl)
 
                 self.timeline_layout.addWidget(item_frame)
         else:
-            no_act_lbl = QLabel("💡 暂无直接关联的历史会议切片。后续会议讨论中若提及或由其发言，系统将自动汇总沉淀于此。")
+            no_act_lbl = QLabel("暂无直接关联的历史会议切片。后续会议讨论中若提及或由其发言，系统将自动汇总沉淀于此。")
             no_act_lbl.setWordWrap(True)
-            no_act_lbl.setStyleSheet("color: #64748B; font-size: 10.5px; font-style: italic; padding: 4px;")
+            no_act_lbl.setStyleSheet("color: #94A3B8; font-size: 10.5px; font-style: italic; padding: 4px;")
             self.timeline_layout.addWidget(no_act_lbl)
 
 
@@ -1360,9 +1717,9 @@ class ElidedLabel(QLabel):
 class TrashSliceItemWidget(QWidget):
     """
     或许没用切片列表单项组件
-    第 1 行：🗑️ 时间戳 + 右侧【✨ 有用】恢复按钮
+    第 1 行：时间戳 + 右侧【恢复】按钮
     第 2 行：AI 研判理由红底标签 (单行展示)
-    第 3 行：💬 议题提炼文本 (固定单行白字，末尾自动 ...，右侧有完整详情)
+    第 3 行：议题提炼文本 (固定单行白字，末尾自动 ...，右侧有完整详情)
     """
     def __init__(self, rec: dict, list_item: QListWidgetItem, list_widget: QListWidget, on_restore_callback, parent=None):
         super().__init__(parent)
@@ -1387,47 +1744,65 @@ class TrashSliceItemWidget(QWidget):
         # 第 1 行：时间戳 + 恢复按钮
         row1 = QHBoxLayout()
         row1.setSpacing(6)
-        lbl_time = QLabel(f"🗑️ {time_str}")
-        lbl_time.setStyleSheet("color: #F87171; font-size: 11px; font-weight: bold;")
+        lbl_time = QLabel(time_str)
+        lbl_time.setStyleSheet("color: #EF4444; font-size: 11px; font-weight: bold;")
         lbl_time.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         row1.addWidget(lbl_time, 1)
 
-        self.btn_useful = QPushButton("✨ 有用")
+        is_light = ThemeManager.get_instance().is_light()
+        self.btn_useful = QPushButton("恢复")
+        self.btn_useful.setIcon(get_symbol_icon("check_circle", color="#0284C7" if is_light else "#38BDF8", size=11))
         self.btn_useful.setToolTip("将此切片判定为有用并恢复为正式会议资产 (消除误判)")
         self.btn_useful.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_useful.setFixedSize(56, 22)
-        self.btn_useful.setStyleSheet("""
-            QPushButton {
-                background: rgba(38, 176, 228, 0.16);
-                color: #26B0E4;
-                border: 1px solid rgba(38, 176, 228, 0.45);
-                border-radius: 4px;
-                font-size: 11px;
-                font-weight: bold;
-                padding: 0;
-            }
-            QPushButton:hover {
-                background: #26B0E4;
-                color: #FFFFFF;
-                border: 1px solid #26B0E4;
-            }
-        """)
+        self.btn_useful.setFixedSize(58, 22)
+        if is_light:
+            self.btn_useful.setStyleSheet("""
+                QPushButton {
+                    background: rgba(2, 132, 199, 0.08);
+                    color: #0284C7;
+                    border: 1px solid rgba(2, 132, 199, 0.35);
+                    border-radius: 4px;
+                    font-size: 11px;
+                    font-weight: bold;
+                    padding: 0 4px;
+                }
+                QPushButton:hover {
+                    background: #0284C7;
+                    color: #FFFFFF;
+                }
+            """)
+        else:
+            self.btn_useful.setStyleSheet("""
+                QPushButton {
+                    background: rgba(38, 176, 228, 0.16);
+                    color: #26B0E4;
+                    border: 1px solid rgba(38, 176, 228, 0.45);
+                    border-radius: 4px;
+                    font-size: 11px;
+                    font-weight: bold;
+                    padding: 0 4px;
+                }
+                QPushButton:hover {
+                    background: #26B0E4;
+                    color: #FFFFFF;
+                }
+            """)
         self.btn_useful.clicked.connect(self._handle_restore)
         row1.addWidget(self.btn_useful, 0)
         root_layout.addLayout(row1)
 
         # 第 2 行：AI 研判理由 (红底胶囊单行展示)
         reason_frame = QFrame()
-        reason_frame.setStyleSheet("background: rgba(239, 68, 68, 0.12); border-radius: 3px;")
+        reason_frame.setStyleSheet("background: rgba(239, 68, 68, 0.10); border-radius: 3px;")
         r_layout = QHBoxLayout(reason_frame)
         r_layout.setContentsMargins(5, 1, 5, 1)
-        lbl_reason = ElidedLabel(f"⚠️ 研判原因：{reason}", color="#FCA5A5", font_size=10, font_weight=500)
+        lbl_reason = ElidedLabel(f"研判原因：{reason}", color="#DC2626" if is_light else "#FCA5A5", font_size=10, font_weight=500)
         lbl_reason.setFixedHeight(16)
         r_layout.addWidget(lbl_reason)
         root_layout.addWidget(reason_frame)
 
         # 第 3 行：切片提炼白字部分 (严格固定单行，末尾自动 ...)
-        self.lbl_title = ElidedLabel(f"💬 {first_line}", color="#E2E8F0", font_size=11, font_weight=400)
+        self.lbl_title = ElidedLabel(first_line, color="#1E293B" if is_light else "#E2E8F0", font_size=11, font_weight=400)
         self.lbl_title.setFixedHeight(18)
         root_layout.addWidget(self.lbl_title)
 
@@ -1463,6 +1838,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.store = meeting_store
         self.setWindowTitle("DeskEcho 桌面回响 · 企业常驻会议记忆空间")
+        self.setWindowIcon(get_flower_logo_icon(64))
         self.resize(1120, 740)
         self.setMinimumSize(960, 620)
 
@@ -1473,123 +1849,13 @@ class MainWindow(QMainWindow):
         self.player.playbackStateChanged.connect(self._on_playback_state_changed)
 
         self._init_ui()
+        self._apply_current_theme()
+        ThemeManager.get_instance().theme_changed.connect(self._apply_current_theme)
         self._setup_timer()
         self.refresh_records()
         self.clear_answer_session()
 
     def _init_ui(self):
-        # Alma 风格全局深邃 Obsidian 调色盘与极致流线型滚动条
-        self.setStyleSheet("""
-            QMainWindow {
-                background-color: #0A0C10;
-            }
-            QWidget {
-                color: #E2E8F0;
-                font-family: 'Segoe UI Variable Text', 'Segoe UI', 'PingFang SC', 'Microsoft YaHei UI', sans-serif;
-            }
-            QFrame#card {
-                background-color: #11141D;
-                border: 1px solid rgba(255, 255, 255, 0.07);
-                border-radius: 12px;
-            }
-            QFrame#sidebar {
-                background-color: #07090D;
-                border-right: 1px solid rgba(255, 255, 255, 0.06);
-            }
-            /* 分割线全面隐形消隐，彻底消除白条 */
-            QSplitter {
-                background: transparent;
-                border: none;
-            }
-            QSplitter::handle {
-                background-color: transparent;
-            }
-            QSplitter::handle:horizontal {
-                width: 6px;
-                background-color: transparent;
-            }
-            QSplitter::handle:horizontal:hover {
-                background-color: rgba(99, 102, 241, 0.4);
-            }
-            QSplitter::handle:vertical {
-                height: 6px;
-                background-color: transparent;
-            }
-            QSplitter::handle:vertical:hover {
-                background-color: rgba(38, 176, 228, 0.4);
-            }
-
-            /* 美好智能 VI 品牌风格极简现代化垂直滚动条 */
-            QScrollBar:vertical {
-                border: none;
-                background: transparent;
-                width: 6px;
-                margin: 0px;
-            }
-            QScrollBar::handle:vertical {
-                background: rgba(255, 255, 255, 0.16);
-                border-radius: 3px;
-                min-height: 28px;
-            }
-            QScrollBar::handle:vertical:hover {
-                background: rgba(38, 176, 228, 0.8);
-            }
-            QScrollBar::handle:vertical:pressed {
-                background: #13459D;
-            }
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-                border: none;
-                background: transparent;
-                height: 0px;
-                width: 0px;
-            }
-            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
-                border: none;
-                background: transparent;
-            }
-
-            /* 美好智能 VI 品牌风格极简现代化水平滚动条 */
-            QScrollBar:horizontal {
-                border: none;
-                background: transparent;
-                height: 6px;
-                margin: 0px;
-            }
-            QScrollBar::handle:horizontal {
-                background: rgba(255, 255, 255, 0.16);
-                border-radius: 3px;
-                min-width: 28px;
-            }
-            QScrollBar::handle:horizontal:hover {
-                background: rgba(38, 176, 228, 0.8);
-            }
-            QScrollBar::handle:horizontal:pressed {
-                background: #13459D;
-            }
-            QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
-                border: none;
-                background: transparent;
-                height: 0px;
-                width: 0px;
-            }
-            QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {
-                border: none;
-                background: transparent;
-            }
-            QScrollBar::corner {
-                background: transparent;
-            }
-
-            /* 滚动视图全局透明背景适配 */
-            QScrollArea {
-                border: none;
-                background: transparent;
-            }
-            QScrollArea > QWidget > QWidget {
-                background: transparent;
-            }
-        """)
-
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         main_h_layout = QHBoxLayout(central_widget)
@@ -1619,6 +1885,9 @@ class MainWindow(QMainWindow):
         content_layout.addWidget(self.stack, 1)
         main_h_layout.addWidget(content_container, 1)
 
+        # 底部简约状态栏 (不使用系统默认灰底框，简洁优雅，无过度动效)
+        self._build_clean_status_bar()
+
     # ---------------- 侧边栏构建 ----------------
     def _build_sidebar(self, parent_layout: QHBoxLayout):
         sidebar = QFrame()
@@ -1629,8 +1898,9 @@ class MainWindow(QMainWindow):
         side_layout.setSpacing(8)
 
         # 品牌 Workspace 标识卡
-        brand_card = QFrame()
-        brand_card.setStyleSheet("""
+        self.brand_card = QFrame()
+        self.brand_card.setObjectName("brand_card")
+        self.brand_card.setStyleSheet("""
             QFrame {
                 background-color: rgba(255, 255, 255, 0.03);
                 border: 1px solid rgba(255, 255, 255, 0.06);
@@ -1638,46 +1908,41 @@ class MainWindow(QMainWindow):
                 padding: 4px;
             }
         """)
-        brand_layout = QHBoxLayout(brand_card)
+        brand_layout = QHBoxLayout(self.brand_card)
         brand_layout.setContentsMargins(10, 8, 10, 8)
         brand_layout.setSpacing(10)
 
-        # 美好智能 VI 品牌 Logo Pill (靛青 #13459D -> 海青 #26B0E4 -> 鹦鹉绿 #8AC657 渐变)
-        logo_icon = QLabel("美")
-        logo_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        logo_icon.setFixedSize(30, 30)
-        logo_icon.setStyleSheet("""
-            background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #13459D, stop:0.5 #26B0E4, stop:1 #8AC657);
-            color: #FFFFFF;
-            font-size: 15px;
-            font-weight: 900;
-            border-radius: 7px;
-        """)
+        # 美好智能品牌 Flower Logo (色卡花朵衍生变体)
+        self.logo_icon = QLabel()
+        self.logo_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.logo_icon.setFixedSize(32, 32)
+        self.logo_icon.setPixmap(get_flower_logo_pixmap(30))
+        self.logo_icon.setStyleSheet("background: transparent; border: none;")
 
         brand_text_box = QVBoxLayout()
         brand_text_box.setSpacing(1)
-        title_lbl = QLabel("美好智能")
-        title_lbl.setStyleSheet("font-size: 13.5px; font-weight: 800; color: #FFFFFF; letter-spacing: 0.5px;")
-        sub_lbl = QLabel("BEAUTIFUL · DeskEcho")
-        sub_lbl.setStyleSheet("font-size: 10px; font-weight: 600; color: #26B0E4; letter-spacing: 0.5px;")
-        brand_text_box.addWidget(title_lbl)
-        brand_text_box.addWidget(sub_lbl)
+        self.brand_title_lbl = QLabel("美好智能")
+        self.brand_title_lbl.setStyleSheet("font-size: 13.5px; font-weight: 800; color: #FFFFFF; letter-spacing: 0.5px;")
+        self.brand_sub_lbl = QLabel("BEAUTIFUL · DeskEcho")
+        self.brand_sub_lbl.setStyleSheet("font-size: 10px; font-weight: 600; color: #26B0E4; letter-spacing: 0.5px;")
+        brand_text_box.addWidget(self.brand_title_lbl)
+        brand_text_box.addWidget(self.brand_sub_lbl)
 
-        brand_layout.addWidget(logo_icon)
+        brand_layout.addWidget(self.logo_icon)
         brand_layout.addLayout(brand_text_box)
         brand_layout.addStretch()
 
-        side_layout.addWidget(brand_card)
+        side_layout.addWidget(self.brand_card)
         side_layout.addSpacing(12)
 
         # 导航分类标题
-        nav_label = QLabel("WORKSPACE")
-        nav_label.setStyleSheet("font-size: 10px; font-weight: bold; color: #64748B; letter-spacing: 0.8px; padding-left: 6px;")
-        side_layout.addWidget(nav_label)
+        self.brand_nav_label = QLabel("WORKSPACE")
+        self.brand_nav_label.setStyleSheet("font-size: 10px; font-weight: bold; color: #64748B; letter-spacing: 0.8px; padding-left: 6px;")
+        side_layout.addWidget(self.brand_nav_label)
 
         # 1. 对讲与检索常驻主菜单项
         self.nav_btns = []
-        self.btn_ask = NavButton("⚡", "对讲与检索", "右Alt")
+        self.btn_ask = NavButton("bolt", "对讲与检索", "右Alt")
         self.btn_ask.clicked.connect(lambda: self._switch_nav(0))
         self.btn_ask.set_active(True)
         self.nav_btns.append(self.btn_ask)
@@ -1715,12 +1980,12 @@ class MainWindow(QMainWindow):
         bottom_footer_layout.setContentsMargins(4, 4, 4, 0)
         bottom_footer_layout.setSpacing(6)
 
-        hotkey_tag = QLabel(f"长按 [{Config.get_intercom_display_key()}] 语音对讲")
-        hotkey_tag.setStyleSheet("color: #64748B; font-size: 10.5px;")
-        bottom_footer_layout.addWidget(hotkey_tag, 1)
+        self.hotkey_tag = QLabel(f"长按 [{Config.get_intercom_display_key()}] 语音对讲")
+        self.hotkey_tag.setStyleSheet("color: #64748B; font-size: 10.5px;")
+        bottom_footer_layout.addWidget(self.hotkey_tag, 1)
 
-        # 右下角小齿轮按钮 (设置项入口)
-        self.btn_gear = QPushButton("⚙")
+        # 右下角小齿轮按钮 (设置项入口，矢量图标)
+        self.btn_gear = QPushButton()
         self.btn_gear.setToolTip("设置中心 (企业通讯录 / 会议切片档案 / 引擎状态)")
         self.btn_gear.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_gear.setFixedSize(26, 26)
@@ -1733,31 +1998,53 @@ class MainWindow(QMainWindow):
         parent_layout.addWidget(sidebar)
 
     def _update_gear_button_style(self, active: bool = False):
-        if active:
-            self.btn_gear.setStyleSheet("""
-                QPushButton {
-                    background-color: rgba(38, 176, 228, 0.25);
-                    color: #38BDF8;
-                    border: 1px solid #26B0E4;
-                    border-radius: 6px;
-                    font-size: 13px;
-                }
-            """)
+        is_light = ThemeManager.get_instance().is_light()
+        if is_light:
+            if active:
+                self.btn_gear.setIcon(get_symbol_icon("settings", color="#0284C7", size=15))
+                self.btn_gear.setStyleSheet("""
+                    QPushButton {
+                        background-color: rgba(2, 132, 199, 0.12);
+                        border: 1px solid #0284C7;
+                        border-radius: 6px;
+                    }
+                """)
+            else:
+                self.btn_gear.setIcon(get_symbol_icon("settings", color="#64748B", size=15))
+                self.btn_gear.setStyleSheet("""
+                    QPushButton {
+                        background-color: #FFFFFF;
+                        border: 1px solid #E2E8F0;
+                        border-radius: 6px;
+                    }
+                    QPushButton:hover {
+                        background-color: #F1F5F9;
+                        border-color: #0284C7;
+                    }
+                """)
         else:
-            self.btn_gear.setStyleSheet("""
-                QPushButton {
-                    background-color: rgba(255, 255, 255, 0.04);
-                    color: #94A3B8;
-                    border: 1px solid rgba(255, 255, 255, 0.08);
-                    border-radius: 6px;
-                    font-size: 13px;
-                }
-                QPushButton:hover {
-                    background-color: rgba(38, 176, 228, 0.18);
-                    border-color: #26B0E4;
-                    color: #38BDF8;
-                }
-            """)
+            if active:
+                self.btn_gear.setIcon(get_symbol_icon("settings", color="#38BDF8", size=15))
+                self.btn_gear.setStyleSheet("""
+                    QPushButton {
+                        background-color: rgba(38, 176, 228, 0.25);
+                        border: 1px solid #26B0E4;
+                        border-radius: 6px;
+                    }
+                """)
+            else:
+                self.btn_gear.setIcon(get_symbol_icon("settings", color="#94A3B8", size=15))
+                self.btn_gear.setStyleSheet("""
+                    QPushButton {
+                        background-color: rgba(255, 255, 255, 0.04);
+                        border: 1px solid rgba(255, 255, 255, 0.08);
+                        border-radius: 6px;
+                    }
+                    QPushButton:hover {
+                        background-color: rgba(38, 176, 228, 0.18);
+                        border-color: #26B0E4;
+                    }
+                """)
 
     def _toggle_settings_view(self):
         """点击右下角小齿轮，切换到设置中心（默认展示企业通讯录）或切回对讲"""
@@ -1798,41 +2085,76 @@ class MainWindow(QMainWindow):
     def _update_settings_sub_tab_styles(self, active_index: int):
         if not hasattr(self, 'sub_btn_roster'):
             return
+        is_light = ThemeManager.get_instance().is_light()
         idx_map = {
-            2: self.sub_btn_roster,
-            1: self.sub_btn_memory,
-            3: self.sub_btn_engine,
-            4: self.sub_btn_update
+            2: (self.sub_btn_roster, "group"),
+            1: (self.sub_btn_memory, "article"),
+            3: (self.sub_btn_engine, "tune"),
+            4: (self.sub_btn_update, "rocket_launch")
         }
-        for idx, btn in idx_map.items():
+        for idx, (btn, icon_name) in idx_map.items():
             if idx == active_index:
-                btn.setStyleSheet("""
-                    QPushButton {
-                        background-color: rgba(38, 176, 228, 0.22);
-                        color: #FFFFFF;
-                        border: 1px solid #26B0E4;
-                        border-radius: 6px;
-                        padding: 5px 12px;
-                        font-size: 11px;
-                        font-weight: bold;
-                    }
-                """)
+                if is_light:
+                    btn.setIcon(get_symbol_icon(icon_name, color="#0284C7", size=13))
+                    btn.setStyleSheet("""
+                        QPushButton {
+                            background-color: rgba(2, 132, 199, 0.12);
+                            color: #0284C7;
+                            border: 1px solid #0284C7;
+                            border-radius: 6px;
+                            padding: 5px 12px;
+                            font-size: 11px;
+                            font-weight: bold;
+                        }
+                    """)
+                else:
+                    btn.setIcon(get_symbol_icon(icon_name, color="#38BDF8", size=13))
+                    btn.setStyleSheet("""
+                        QPushButton {
+                            background-color: rgba(38, 176, 228, 0.22);
+                            color: #FFFFFF;
+                            border: 1px solid #26B0E4;
+                            border-radius: 6px;
+                            padding: 5px 12px;
+                            font-size: 11px;
+                            font-weight: bold;
+                        }
+                    """)
             else:
-                btn.setStyleSheet("""
-                    QPushButton {
-                        background-color: rgba(255, 255, 255, 0.04);
-                        color: #94A3B8;
-                        border: 1px solid rgba(255, 255, 255, 0.08);
-                        border-radius: 6px;
-                        padding: 5px 12px;
-                        font-size: 11px;
-                    }
-                    QPushButton:hover {
-                        background-color: rgba(255, 255, 255, 0.08);
-                        color: #E2E8F0;
-                        border-color: rgba(255, 255, 255, 0.16);
-                    }
-                """)
+                if is_light:
+                    btn.setIcon(get_symbol_icon(icon_name, color="#475569", size=13))
+                    btn.setStyleSheet("""
+                        QPushButton {
+                            background-color: #FFFFFF;
+                            color: #475569;
+                            border: 1px solid #CBD5E1;
+                            border-radius: 6px;
+                            padding: 5px 12px;
+                            font-size: 11px;
+                        }
+                        QPushButton:hover {
+                            background-color: #F1F5F9;
+                            color: #0F172A;
+                            border-color: #94A3B8;
+                        }
+                    """)
+                else:
+                    btn.setIcon(get_symbol_icon(icon_name, color="#94A3B8", size=13))
+                    btn.setStyleSheet("""
+                        QPushButton {
+                            background-color: rgba(255, 255, 255, 0.04);
+                            color: #94A3B8;
+                            border: 1px solid rgba(255, 255, 255, 0.08);
+                            border-radius: 6px;
+                            padding: 5px 12px;
+                            font-size: 11px;
+                        }
+                        QPushButton:hover {
+                            background-color: rgba(255, 255, 255, 0.08);
+                            color: #E2E8F0;
+                            border-color: rgba(255, 255, 255, 0.16);
+                        }
+                    """)
 
     # ---------------- 顶部栏构建 ----------------
     def _build_top_bar(self, parent_layout: QVBoxLayout):
@@ -1851,32 +2173,55 @@ class MainWindow(QMainWindow):
         tab_layout.setContentsMargins(0, 0, 0, 0)
         tab_layout.setSpacing(6)
 
-        self.sub_btn_roster = QPushButton(f"👥 企业通讯录 ({len(EMPLOYEES)}人)")
-        self.sub_btn_memory = QPushButton("🧠 会议记忆库")
-        self.sub_btn_engine = QPushButton("⚙️ 系统引擎状态")
-        self.sub_btn_update = QPushButton("🚀 软件更新")
-        self.sub_btn_back = QPushButton("← 返回对讲与检索")
+        is_light = ThemeManager.get_instance().is_light()
+        self.sub_btn_roster = QPushButton(f"企业通讯录 ({len(EMPLOYEES)}人)")
+        self.sub_btn_roster.setIcon(get_symbol_icon("group", color="#0284C7" if is_light else "#38BDF8", size=14))
+        self.sub_btn_memory = QPushButton("会议记忆库")
+        self.sub_btn_memory.setIcon(get_symbol_icon("article", color="#0284C7" if is_light else "#38BDF8", size=14))
+        self.sub_btn_engine = QPushButton("系统引擎状态")
+        self.sub_btn_engine.setIcon(get_symbol_icon("tune", color="#0284C7" if is_light else "#38BDF8", size=14))
+        self.sub_btn_update = QPushButton("软件更新")
+        self.sub_btn_update.setIcon(get_symbol_icon("rocket_launch", color="#0284C7" if is_light else "#38BDF8", size=14))
+        self.sub_btn_back = QPushButton("返回对讲与检索")
 
         for btn in (self.sub_btn_roster, self.sub_btn_memory, self.sub_btn_engine, self.sub_btn_update):
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
 
         self.sub_btn_back.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.sub_btn_back.setStyleSheet("""
-            QPushButton {
-                background: rgba(38, 176, 228, 0.15);
-                color: #38BDF8;
-                border: 1px solid rgba(38, 176, 228, 0.4);
-                border-radius: 6px;
-                padding: 5px 12px;
-                font-size: 11px;
-                font-weight: 600;
-            }
-            QPushButton:hover {
-                background: rgba(38, 176, 228, 0.3);
-                color: #FFFFFF;
-                border-color: #26B0E4;
-            }
-        """)
+        if is_light:
+            self.sub_btn_back.setStyleSheet("""
+                QPushButton {
+                    background: rgba(2, 132, 199, 0.08);
+                    color: #0284C7;
+                    border: 1px solid rgba(2, 132, 199, 0.3);
+                    border-radius: 6px;
+                    padding: 5px 12px;
+                    font-size: 11px;
+                    font-weight: 600;
+                }
+                QPushButton:hover {
+                    background: rgba(2, 132, 199, 0.16);
+                    color: #0369A1;
+                    border-color: #0284C7;
+                }
+            """)
+        else:
+            self.sub_btn_back.setStyleSheet("""
+                QPushButton {
+                    background: rgba(38, 176, 228, 0.15);
+                    color: #38BDF8;
+                    border: 1px solid rgba(38, 176, 228, 0.4);
+                    border-radius: 6px;
+                    padding: 5px 12px;
+                    font-size: 11px;
+                    font-weight: 600;
+                }
+                QPushButton:hover {
+                    background: rgba(38, 176, 228, 0.3);
+                    color: #FFFFFF;
+                    border-color: #26B0E4;
+                }
+            """)
 
         self.sub_btn_roster.clicked.connect(lambda: self._switch_nav(2))
         self.sub_btn_memory.clicked.connect(lambda: self._switch_nav(1))
@@ -1894,26 +2239,19 @@ class MainWindow(QMainWindow):
         top_bar.addWidget(self.settings_tab_bar)
         top_bar.addStretch()
 
+        # 主题切换按钮 (月亮/太阳小图标，置于版本号左侧一点点)
+        self.theme_btn = QPushButton()
+        self.theme_btn.setFixedSize(30, 28)
+        self.theme_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.theme_btn.clicked.connect(self._on_toggle_theme)
+        top_bar.addWidget(self.theme_btn)
+        top_bar.addSpacing(4)
+
         # 常驻版本与更新入口 (任何页面均可点击查看发版详情)
-        self.top_version_btn = QPushButton(f"🚀 v{APP_VERSION}")
+        self.top_version_btn = QPushButton(f"v{APP_VERSION}")
+        self.top_version_btn.setIcon(get_symbol_icon("rocket_launch", color="#0284C7" if is_light else "#38BDF8", size=13))
         self.top_version_btn.setToolTip(f"当前版本 v{APP_VERSION} · 点击打开软件更新与发版管理中心")
         self.top_version_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.top_version_btn.setStyleSheet("""
-            QPushButton {
-                background-color: rgba(38, 176, 228, 0.12);
-                color: #38BDF8;
-                border: 1px solid rgba(38, 176, 228, 0.35);
-                border-radius: 6px;
-                padding: 6px 12px;
-                font-size: 11px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: rgba(38, 176, 228, 0.25);
-                color: #FFFFFF;
-                border-color: #26B0E4;
-            }
-        """)
         self.top_version_btn.clicked.connect(lambda: self._switch_nav(4))
         top_bar.addWidget(self.top_version_btn)
 
@@ -1926,35 +2264,22 @@ class MainWindow(QMainWindow):
         page_layout.setContentsMargins(0, 0, 0, 0)
         page_layout.setSpacing(14)
 
+        is_light = ThemeManager.get_instance().is_light()
+
         # 美好智能 Command 风格检索栏
-        cmd_card = QFrame()
-        cmd_card.setObjectName("cmd_card")
-        cmd_card.setStyleSheet("""
-            QFrame#cmd_card {
-                background-color: #111520;
-                border: 1px solid rgba(38, 176, 228, 0.45);
-                border-radius: 12px;
-            }
-        """)
-        cmd_layout = QHBoxLayout(cmd_card)
+        self.cmd_card = QFrame()
+        self.cmd_card.setObjectName("cmd_card")
+        cmd_layout = QHBoxLayout(self.cmd_card)
         cmd_layout.setContentsMargins(14, 10, 14, 10)
         cmd_layout.setSpacing(10)
 
-        search_icon = QLabel("⚡")
-        search_icon.setStyleSheet("border: none; background: transparent; font-size: 16px; color: #26B0E4;")
-        cmd_layout.addWidget(search_icon)
+        self.search_icon_lbl = QLabel()
+        self.search_icon_lbl.setStyleSheet("border: none; background: transparent;")
+        self.search_icon_lbl.setPixmap(get_symbol_pixmap("search", color="#0284C7" if is_light else "#26B0E4", size=18))
+        cmd_layout.addWidget(self.search_icon_lbl)
 
         self.query_input = QLineEdit()
         self.query_input.setPlaceholderText("提问会议记忆 (例如: 设计海报找谁？昨天讨论了什么？预算定了吗？)")
-        self.query_input.setStyleSheet("""
-            QLineEdit {
-                background: transparent;
-                border: none;
-                font-size: 13px;
-                color: #FFFFFF;
-                padding: 4px;
-            }
-        """)
         self.query_input.returnPressed.connect(self._handle_query)
         self.query_input.textChanged.connect(lambda: self.search_status_lbl.setText(""))
         cmd_layout.addWidget(self.query_input, 1)
@@ -1995,27 +2320,34 @@ class MainWindow(QMainWindow):
         search_btn.clicked.connect(self._handle_query)
         cmd_layout.addWidget(search_btn)
 
-        page_layout.addWidget(cmd_card)
+        page_layout.addWidget(self.cmd_card)
 
-        # 知识溯源解答主卡 (全宽沉浸式展示，右侧切片流根据需求取消常驻)
-        self.ans_card = QFrame()
+        # 知识溯源解答主卡 (集成微动效 BorderBeam 呼吸边框容器)
+        self.ans_card = BorderBeamContainer(border_radius=12)
         self.ans_card.setObjectName("ans_card")
-        self._set_ans_card_style("MEETING")
         ans_layout = QVBoxLayout(self.ans_card)
         ans_layout.setContentsMargins(18, 16, 18, 16)
         ans_layout.setSpacing(10)
 
         ans_title_row = QHBoxLayout()
-        ans_title = QLabel("💬 知识溯源解答")
-        ans_title.setStyleSheet("font-size: 14px; font-weight: 700; color: #FFFFFF;")
-        ans_title_row.addWidget(ans_title)
+        ans_title_row.setSpacing(8)
+
+        self.ans_title_icon = QLabel()
+        self.ans_title_icon.setStyleSheet("border: none; background: transparent;")
+        self.ans_title_icon.setPixmap(get_symbol_pixmap("chat", color="#0284C7" if is_light else "#26B0E4", size=16))
+        ans_title_row.addWidget(self.ans_title_icon)
+
+        self.ans_title = QLabel("知识溯源解答")
+        self.ans_title.setStyleSheet("font-size: 14px; font-weight: 700; color: #FFFFFF;")
+        ans_title_row.addWidget(self.ans_title)
         ans_title_row.addStretch()
 
-        copy_btn = QPushButton("复制内容")
-        copy_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        copy_btn.setStyleSheet("background: transparent; border: none; color: #94A3B8; font-size: 11px;")
-        copy_btn.clicked.connect(self._copy_answer_to_clipboard)
-        ans_title_row.addWidget(copy_btn)
+        self.copy_btn = QPushButton("复制内容")
+        self.copy_btn.setIcon(get_symbol_icon("content_copy", color="#64748B" if is_light else "#94A3B8", size=13))
+        self.copy_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.copy_btn.setStyleSheet("background: transparent; border: none; color: #94A3B8; font-size: 11px;")
+        self.copy_btn.clicked.connect(self._copy_answer_to_clipboard)
+        ans_title_row.addWidget(self.copy_btn)
         ans_layout.addLayout(ans_title_row)
 
         # 全局语音对讲与检索动效长条
@@ -2023,27 +2355,10 @@ class MainWindow(QMainWindow):
         self.intercom_banner.interrupted_clicked.connect(self.stop_speaking)
         ans_layout.addWidget(self.intercom_banner)
 
-        # 核心解答文本区域 (独占全宽，舒适阅读)
+        # 核心解答文本区域 (独占全宽，纯净无内嵌冗余边框)
         self.answer_browser = StreamTextDisplay()
         self.answer_browser.setOpenExternalLinks(True)
-        self.answer_browser.setStyleSheet("""
-            QTextBrowser {
-                background-color: #0A0C10;
-                border: 1px solid rgba(255, 255, 255, 0.05);
-                border-radius: 10px;
-                padding: 14px;
-                color: #E2E8F0;
-                font-size: 13px;
-                line-height: 1.6;
-            }
-        """)
-        self.answer_browser.setHtml(
-            "<div style='color: #475569; text-align: center; padding-top: 100px; line-height: 1.8;'>"
-            "💡 在上方输入问题回车，或长按 <b>右 Alt</b> 启动语音对讲 (免按 Fn，空格键右侧直达)<br>"
-            "系统将自动完成 <b>Query Rewriting 意图蒸馏</b> 与 <b>Hybrid RAG 混合检索</b><br>"
-            "并以<b>音视分离</b>策略给出结论播报与精准上下文溯源"
-            "</div>"
-        )
+        self.answer_browser.clear_history()
         ans_layout.addWidget(self.answer_browser, 1)
 
         page_layout.addWidget(self.ans_card, 1)
@@ -2066,22 +2381,34 @@ class MainWindow(QMainWindow):
         self.current_selected_record = None
 
         # 1. 顶部模式切换与搜索条
-        header_card = QFrame()
-        header_card.setObjectName("card")
-        header_card.setStyleSheet("""
-            QFrame#card {
-                background-color: #11141D;
-                border: 1px solid rgba(255, 255, 255, 0.07);
-                border-radius: 10px;
-            }
-        """)
-        h_layout = QHBoxLayout(header_card)
+        is_light = ThemeManager.get_instance().is_light()
+        self.mem_header_card = QFrame()
+        self.mem_header_card.setObjectName("mem_header_card")
+        if is_light:
+            self.mem_header_card.setStyleSheet("""
+                QFrame#mem_header_card {
+                    background-color: #FFFFFF;
+                    border: 1px solid #E2E8F0;
+                    border-radius: 10px;
+                }
+            """)
+        else:
+            self.mem_header_card.setStyleSheet("""
+                QFrame#mem_header_card {
+                    background-color: #11141D;
+                    border: 1px solid rgba(255, 255, 255, 0.07);
+                    border-radius: 10px;
+                }
+            """)
+        h_layout = QHBoxLayout(self.mem_header_card)
         h_layout.setContentsMargins(14, 10, 14, 10)
         h_layout.setSpacing(10)
 
-        # 两个菜单入口：正式切片 vs 或许没用
-        self.btn_mem_normal = QPushButton("📑 正式会议切片 (0)")
-        self.btn_mem_trash = QPushButton("🗑️ 或许没用 (0)")
+        # 两个菜单入口：正式切片 vs 或许没用 (矢量图标，无 Emoji)
+        self.btn_mem_normal = QPushButton("正式会议切片 (0)")
+        self.btn_mem_normal.setIcon(get_symbol_icon("article", color="#0284C7" if is_light else "#38BDF8", size=14))
+        self.btn_mem_trash = QPushButton("或许没用 (0)")
+        self.btn_mem_trash.setIcon(get_symbol_icon("delete", color="#64748B" if is_light else "#94A3B8", size=14))
 
         for b in (self.btn_mem_normal, self.btn_mem_trash):
             b.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -2095,83 +2422,145 @@ class MainWindow(QMainWindow):
 
         self.mem_search_input = QLineEdit()
         self.mem_search_input.setPlaceholderText("在当前切片纪要中快速搜索关键词 (如: 预算, Logo, 机器人)...")
-        self.mem_search_input.setStyleSheet("""
-            QLineEdit {
-                background-color: #0A0C10;
-                border: 1px solid rgba(255, 255, 255, 0.08);
-                border-radius: 8px;
-                padding: 7px 12px;
-                font-size: 12px;
-                color: #FFFFFF;
-            }
-            QLineEdit:focus {
-                border-color: #26B0E4;
-            }
-        """)
+        if is_light:
+            self.mem_search_input.setStyleSheet("""
+                QLineEdit {
+                    background-color: #FFFFFF;
+                    border: 1px solid #CBD5E1;
+                    border-radius: 8px;
+                    padding: 7px 12px;
+                    font-size: 12px;
+                    color: #0F172A;
+                }
+                QLineEdit:focus {
+                    border-color: #0284C7;
+                }
+            """)
+        else:
+            self.mem_search_input.setStyleSheet("""
+                QLineEdit {
+                    background-color: #0A0C10;
+                    border: 1px solid rgba(255, 255, 255, 0.08);
+                    border-radius: 8px;
+                    padding: 7px 12px;
+                    font-size: 12px;
+                    color: #FFFFFF;
+                }
+                QLineEdit:focus {
+                    border-color: #26B0E4;
+                }
+            """)
         self.mem_search_input.returnPressed.connect(self._search_memory_slices)
         h_layout.addWidget(self.mem_search_input, 1)
 
-        mem_search_btn = QPushButton("筛选切片")
-        mem_search_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        mem_search_btn.setStyleSheet("""
-            QPushButton {
-                background-color: rgba(19, 69, 157, 0.35);
-                color: #26B0E4;
-                border: 1px solid rgba(38, 176, 228, 0.45);
-                border-radius: 8px;
-                padding: 7px 16px;
-                font-size: 12px;
-                font-weight: 600;
-            }
-            QPushButton:hover {
-                background-color: #26B0E4;
-                color: #FFFFFF;
-            }
-        """)
-        mem_search_btn.clicked.connect(self._search_memory_slices)
-        h_layout.addWidget(mem_search_btn)
+        self.mem_search_btn = QPushButton("筛选切片")
+        self.mem_search_btn.setIcon(get_symbol_icon("search", color="#0284C7" if is_light else "#26B0E4", size=13))
+        self.mem_search_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        if is_light:
+            self.mem_search_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: rgba(2, 132, 199, 0.08);
+                    color: #0284C7;
+                    border: 1px solid rgba(2, 132, 199, 0.35);
+                    border-radius: 8px;
+                    padding: 7px 16px;
+                    font-size: 12px;
+                    font-weight: 600;
+                }
+                QPushButton:hover {
+                    background-color: #0284C7;
+                    color: #FFFFFF;
+                }
+            """)
+        else:
+            self.mem_search_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: rgba(19, 69, 157, 0.35);
+                    color: #26B0E4;
+                    border: 1px solid rgba(38, 176, 228, 0.45);
+                    border-radius: 8px;
+                    padding: 7px 16px;
+                    font-size: 12px;
+                    font-weight: 600;
+                }
+                QPushButton:hover {
+                    background-color: #26B0E4;
+                    color: #FFFFFF;
+                }
+            """)
+        self.mem_search_btn.clicked.connect(self._search_memory_slices)
+        h_layout.addWidget(self.mem_search_btn)
 
-        page_layout.addWidget(header_card)
+        page_layout.addWidget(self.mem_header_card)
 
-        # 2. “或许没用”次要切片 AI 研判提醒与一键清理横幅 (默认隐藏，仅在 trash 模式显示)
+        # 2. “或许没用”次要切片 AI 研判提醒与一键清理横幅 (默认隐藏，仅在 trash 模式显示，无 Emoji)
         self.trash_banner = QFrame()
         self.trash_banner.setVisible(False)
-        self.trash_banner.setStyleSheet("""
-            QFrame {
-                background: rgba(245, 158, 11, 0.08);
-                border: 1px solid rgba(245, 158, 11, 0.3);
-                border-left: 4px solid #F59E0B;
-                border-radius: 8px;
-                padding: 6px 12px;
-            }
-        """)
+        if is_light:
+            self.trash_banner.setStyleSheet("""
+                QFrame {
+                    background: rgba(245, 158, 11, 0.08);
+                    border: 1px solid rgba(245, 158, 11, 0.35);
+                    border-left: 4px solid #D97706;
+                    border-radius: 8px;
+                    padding: 6px 12px;
+                }
+            """)
+        else:
+            self.trash_banner.setStyleSheet("""
+                QFrame {
+                    background: rgba(245, 158, 11, 0.08);
+                    border: 1px solid rgba(245, 158, 11, 0.3);
+                    border-left: 4px solid #F59E0B;
+                    border-radius: 8px;
+                    padding: 6px 12px;
+                }
+            """)
         trash_b_layout = QHBoxLayout(self.trash_banner)
         trash_b_layout.setContentsMargins(10, 6, 10, 6)
         trash_b_layout.setSpacing(10)
 
-        trash_tip_lbl = QLabel("🤖 经 AI 语义诊断：以下切片多为开场问候、测试试音、会议暂停或无关键决议/待办的次要内容，可安全清理以释放检索空间与提升问答命中率。")
-        trash_tip_lbl.setWordWrap(True)
-        trash_tip_lbl.setStyleSheet("color: #FCD34D; font-size: 11px; font-weight: 500;")
-        trash_b_layout.addWidget(trash_tip_lbl, 1)
+        self.trash_tip_lbl = QLabel("经 AI 语义诊断：以下切片多为开场问候、测试试音、会议暂停或无关键决议/待办的次要内容，可安全清理以释放检索空间与提升问答命中率。")
+        self.trash_tip_lbl.setWordWrap(True)
+        self.trash_tip_lbl.setStyleSheet(f"color: {'#92400E' if is_light else '#FCD34D'}; font-size: 11px; font-weight: 500;")
+        trash_b_layout.addWidget(self.trash_tip_lbl, 1)
 
-        self.btn_clean_all_trash = QPushButton("💥 一键清空所有次要切片")
+        self.btn_clean_all_trash = QPushButton("一键清空所有次要切片")
+        self.btn_clean_all_trash.setIcon(get_symbol_icon("delete_forever", color="#DC2626" if is_light else "#FCA5A5", size=13))
         self.btn_clean_all_trash.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_clean_all_trash.setStyleSheet("""
-            QPushButton {
-                background-color: rgba(239, 68, 68, 0.18);
-                color: #FCA5A5;
-                border: 1px solid rgba(239, 68, 68, 0.45);
-                border-radius: 6px;
-                padding: 6px 14px;
-                font-size: 11px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #EF4444;
-                color: #FFFFFF;
-                border-color: #DC2626;
-            }
-        """)
+        if is_light:
+            self.btn_clean_all_trash.setStyleSheet("""
+                QPushButton {
+                    background-color: rgba(239, 68, 68, 0.10);
+                    color: #DC2626;
+                    border: 1px solid rgba(239, 68, 68, 0.35);
+                    border-radius: 6px;
+                    padding: 6px 14px;
+                    font-size: 11px;
+                    font-weight: bold;
+                }
+                QPushButton:hover {
+                    background-color: #DC2626;
+                    color: #FFFFFF;
+                }
+            """)
+        else:
+            self.btn_clean_all_trash.setStyleSheet("""
+                QPushButton {
+                    background-color: rgba(239, 68, 68, 0.18);
+                    color: #FCA5A5;
+                    border: 1px solid rgba(239, 68, 68, 0.45);
+                    border-radius: 6px;
+                    padding: 6px 14px;
+                    font-size: 11px;
+                    font-weight: bold;
+                }
+                QPushButton:hover {
+                    background-color: #EF4444;
+                    color: #FFFFFF;
+                    border-color: #DC2626;
+                }
+            """)
         self.btn_clean_all_trash.clicked.connect(self._clean_all_trash_slices)
         trash_b_layout.addWidget(self.btn_clean_all_trash)
 
@@ -2190,59 +2579,51 @@ class MainWindow(QMainWindow):
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.setSpacing(6)
 
-        self.new_slice_pill = QPushButton("✨ 收到新会议切片已归档 · 点击置顶查看")
+        self.new_slice_pill = QPushButton("收到新会议切片已归档 · 点击置顶查看")
+        self.new_slice_pill.setIcon(get_symbol_icon("article", color="#0284C7" if is_light else "#38BDF8", size=13))
         self.new_slice_pill.setVisible(False)
         self.new_slice_pill.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.new_slice_pill.setStyleSheet("""
-            QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 rgba(38, 176, 228, 0.25), stop:1 rgba(99, 102, 241, 0.25));
-                color: #38BDF8;
-                border: 1px solid #26B0E4;
-                border-radius: 8px;
-                padding: 6px 12px;
-                font-size: 11.5px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background: #26B0E4;
-                color: #FFFFFF;
-                border: 1px solid #38BDF8;
-            }
-        """)
+        if is_light:
+            self.new_slice_pill.setStyleSheet("""
+                QPushButton {
+                    background: rgba(2, 132, 199, 0.12);
+                    color: #0284C7;
+                    border: 1px solid #0284C7;
+                    border-radius: 8px;
+                    padding: 6px 12px;
+                    font-size: 11.5px;
+                    font-weight: bold;
+                }
+                QPushButton:hover {
+                    background: #0284C7;
+                    color: #FFFFFF;
+                }
+            """)
+        else:
+            self.new_slice_pill.setStyleSheet("""
+                QPushButton {
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 rgba(38, 176, 228, 0.25), stop:1 rgba(99, 102, 241, 0.25));
+                    color: #38BDF8;
+                    border: 1px solid #26B0E4;
+                    border-radius: 8px;
+                    padding: 6px 12px;
+                    font-size: 11.5px;
+                    font-weight: bold;
+                }
+                QPushButton:hover {
+                    background: #26B0E4;
+                    color: #FFFFFF;
+                    border: 1px solid #38BDF8;
+                }
+            """)
         self.new_slice_pill.clicked.connect(self._apply_pending_slice_update)
         left_layout.addWidget(self.new_slice_pill)
 
-        # 列表
+        # 列表 (自适应 Light / Dark 主题)
         self.mem_list = QListWidget()
         self.mem_list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.mem_list.setVerticalScrollMode(QListWidget.ScrollMode.ScrollPerPixel)
-        self.mem_list.setStyleSheet("""
-            QListWidget {
-                background-color: #11141D;
-                border: 1px solid rgba(255, 255, 255, 0.07);
-                border-radius: 12px;
-                padding: 8px;
-                font-size: 12px;
-                outline: none;
-            }
-            QListWidget::item {
-                background-color: #0A0C10;
-                border: 1px solid rgba(255, 255, 255, 0.05);
-                border-radius: 8px;
-                padding: 10px;
-                margin-bottom: 8px;
-                color: #CBD5E1;
-            }
-            QListWidget::item:hover {
-                background-color: #151D2C;
-                border-color: rgba(38, 176, 228, 0.4);
-            }
-            QListWidget::item:selected {
-                background-color: #12213A;
-                border-color: #26B0E4;
-                color: #FFFFFF;
-            }
-        """)
+        self.mem_list.setStyleSheet(get_mem_list_style(is_light))
         self.mem_list.currentRowChanged.connect(self._on_mem_item_selected)
         self.mem_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.mem_list.customContextMenuRequested.connect(self._show_mem_list_context_menu)
@@ -2260,59 +2641,105 @@ class MainWindow(QMainWindow):
         # 次要切片详情顶部的删除与原因栏 (仅 trash 模式显示)
         self.trash_detail_action_bar = QFrame()
         self.trash_detail_action_bar.setVisible(False)
-        self.trash_detail_action_bar.setStyleSheet("""
-            QFrame {
-                background-color: #11141D;
-                border: 1px solid rgba(239, 68, 68, 0.25);
-                border-radius: 8px;
-                padding: 6px 10px;
-            }
-        """)
+        if is_light:
+            self.trash_detail_action_bar.setStyleSheet("""
+                QFrame {
+                    background-color: #FFFFFF;
+                    border: 1px solid rgba(239, 68, 68, 0.35);
+                    border-radius: 8px;
+                    padding: 6px 10px;
+                }
+            """)
+        else:
+            self.trash_detail_action_bar.setStyleSheet("""
+                QFrame {
+                    background-color: #11141D;
+                    border: 1px solid rgba(239, 68, 68, 0.25);
+                    border-radius: 8px;
+                    padding: 6px 10px;
+                }
+            """)
         t_action_layout = QHBoxLayout(self.trash_detail_action_bar)
         t_action_layout.setContentsMargins(8, 4, 8, 4)
 
-        self.trash_reason_lbl = QLabel("💡 AI 研判理由：无实质性决策且无落地待办推进")
-        self.trash_reason_lbl.setStyleSheet("color: #F87171; font-size: 11px; font-weight: 600;")
+        self.trash_reason_lbl = QLabel("AI 研判理由：无实质性决策且无落地待办推进")
+        self.trash_reason_lbl.setStyleSheet("color: #EF4444; font-size: 11px; font-weight: 600;")
         t_action_layout.addWidget(self.trash_reason_lbl, 1)
 
-        self.btn_restore_curr_slice = QPushButton("✨ 判定有用并恢复")
+        self.btn_restore_curr_slice = QPushButton("判定有用并恢复")
+        self.btn_restore_curr_slice.setIcon(get_symbol_icon("check_circle", color="#0284C7" if is_light else "#26B0E4", size=13))
         self.btn_restore_curr_slice.setToolTip("将此切片恢复为正式会议资产，杜绝 AI 误判")
         self.btn_restore_curr_slice.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_restore_curr_slice.setStyleSheet("""
-            QPushButton {
-                background: rgba(38, 176, 228, 0.2);
-                color: #26B0E4;
-                border: 1px solid #26B0E4;
-                border-radius: 6px;
-                padding: 5px 12px;
-                font-size: 11px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background: #26B0E4;
-                color: #FFFFFF;
-            }
-        """)
+        if is_light:
+            self.btn_restore_curr_slice.setStyleSheet("""
+                QPushButton {
+                    background: rgba(2, 132, 199, 0.08);
+                    color: #0284C7;
+                    border: 1px solid #0284C7;
+                    border-radius: 6px;
+                    padding: 5px 12px;
+                    font-size: 11px;
+                    font-weight: bold;
+                }
+                QPushButton:hover {
+                    background: #0284C7;
+                    color: #FFFFFF;
+                }
+            """)
+        else:
+            self.btn_restore_curr_slice.setStyleSheet("""
+                QPushButton {
+                    background: rgba(38, 176, 228, 0.2);
+                    color: #26B0E4;
+                    border: 1px solid #26B0E4;
+                    border-radius: 6px;
+                    padding: 5px 12px;
+                    font-size: 11px;
+                    font-weight: bold;
+                }
+                QPushButton:hover {
+                    background: #26B0E4;
+                    color: #FFFFFF;
+                }
+            """)
         self.btn_restore_curr_slice.clicked.connect(lambda: self._restore_slice_useful(self.current_selected_record))
         t_action_layout.addWidget(self.btn_restore_curr_slice)
 
-        self.btn_delete_curr_slice = QPushButton("🗑️ 确认删除此段次要切片")
+        self.btn_delete_curr_slice = QPushButton("确认删除此段次要切片")
+        self.btn_delete_curr_slice.setIcon(get_symbol_icon("delete_forever", color="#DC2626" if is_light else "#FCA5A5", size=13))
         self.btn_delete_curr_slice.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_delete_curr_slice.setStyleSheet("""
-            QPushButton {
-                background: rgba(239, 68, 68, 0.2);
-                color: #FCA5A5;
-                border: 1px solid #EF4444;
-                border-radius: 6px;
-                padding: 5px 12px;
-                font-size: 11px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background: #EF4444;
-                color: #FFFFFF;
-            }
-        """)
+        if is_light:
+            self.btn_delete_curr_slice.setStyleSheet("""
+                QPushButton {
+                    background: rgba(239, 68, 68, 0.10);
+                    color: #DC2626;
+                    border: 1px solid #EF4444;
+                    border-radius: 6px;
+                    padding: 5px 12px;
+                    font-size: 11px;
+                    font-weight: bold;
+                }
+                QPushButton:hover {
+                    background: #DC2626;
+                    color: #FFFFFF;
+                }
+            """)
+        else:
+            self.btn_delete_curr_slice.setStyleSheet("""
+                QPushButton {
+                    background: rgba(239, 68, 68, 0.2);
+                    color: #FCA5A5;
+                    border: 1px solid #EF4444;
+                    border-radius: 6px;
+                    padding: 5px 12px;
+                    font-size: 11px;
+                    font-weight: bold;
+                }
+                QPushButton:hover {
+                    background: #EF4444;
+                    color: #FFFFFF;
+                }
+            """)
         self.btn_delete_curr_slice.clicked.connect(self._delete_current_selected_slice)
         t_action_layout.addWidget(self.btn_delete_curr_slice)
         right_layout.addWidget(self.trash_detail_action_bar)
@@ -2375,60 +2802,117 @@ class MainWindow(QMainWindow):
     def _update_mem_tab_styles(self):
         if not hasattr(self, 'btn_mem_normal'):
             return
-        if self.current_mem_mode == "normal":
-            self.btn_mem_normal.setStyleSheet("""
-                QPushButton {
-                    background-color: rgba(38, 176, 228, 0.22);
-                    color: #FFFFFF;
-                    border: 1px solid #26B0E4;
-                    border-radius: 8px;
-                    padding: 7px 14px;
-                    font-size: 12px;
-                    font-weight: bold;
-                }
-            """)
-            self.btn_mem_trash.setStyleSheet("""
-                QPushButton {
-                    background-color: rgba(255, 255, 255, 0.04);
-                    color: #94A3B8;
-                    border: 1px solid rgba(255, 255, 255, 0.08);
-                    border-radius: 8px;
-                    padding: 7px 14px;
-                    font-size: 12px;
-                }
-                QPushButton:hover {
-                    background-color: rgba(239, 68, 68, 0.15);
-                    border-color: rgba(239, 68, 68, 0.35);
-                    color: #FCA5A5;
-                }
-            """)
+        is_light = ThemeManager.get_instance().is_light()
+        if is_light:
+            if self.current_mem_mode == "normal":
+                self.btn_mem_normal.setStyleSheet("""
+                    QPushButton {
+                        background-color: rgba(2, 132, 199, 0.12);
+                        color: #0284C7;
+                        border: 1px solid #0284C7;
+                        border-radius: 8px;
+                        padding: 7px 14px;
+                        font-size: 12px;
+                        font-weight: bold;
+                    }
+                """)
+                self.btn_mem_trash.setStyleSheet("""
+                    QPushButton {
+                        background-color: #F1F5F9;
+                        color: #64748B;
+                        border: 1px solid #CBD5E1;
+                        border-radius: 8px;
+                        padding: 7px 14px;
+                        font-size: 12px;
+                    }
+                    QPushButton:hover {
+                        background-color: rgba(239, 68, 68, 0.08);
+                        border-color: rgba(239, 68, 68, 0.35);
+                        color: #DC2626;
+                    }
+                """)
+            else:
+                self.btn_mem_normal.setStyleSheet("""
+                    QPushButton {
+                        background-color: #F1F5F9;
+                        color: #64748B;
+                        border: 1px solid #CBD5E1;
+                        border-radius: 8px;
+                        padding: 7px 14px;
+                        font-size: 12px;
+                    }
+                    QPushButton:hover {
+                        background-color: rgba(2, 132, 199, 0.08);
+                        border-color: #0284C7;
+                        color: #0284C7;
+                    }
+                """)
+                self.btn_mem_trash.setStyleSheet("""
+                    QPushButton {
+                        background-color: rgba(239, 68, 68, 0.12);
+                        color: #DC2626;
+                        border: 1px solid #EF4444;
+                        border-radius: 8px;
+                        padding: 7px 14px;
+                        font-size: 12px;
+                        font-weight: bold;
+                    }
+                """)
         else:
-            self.btn_mem_normal.setStyleSheet("""
-                QPushButton {
-                    background-color: rgba(255, 255, 255, 0.04);
-                    color: #94A3B8;
-                    border: 1px solid rgba(255, 255, 255, 0.08);
-                    border-radius: 8px;
-                    padding: 7px 14px;
-                    font-size: 12px;
-                }
-                QPushButton:hover {
-                    background-color: rgba(38, 176, 228, 0.15);
-                    border-color: #26B0E4;
-                    color: #38BDF8;
-                }
-            """)
-            self.btn_mem_trash.setStyleSheet("""
-                QPushButton {
-                    background-color: rgba(239, 68, 68, 0.22);
-                    color: #FECACA;
-                    border: 1px solid #EF4444;
-                    border-radius: 8px;
-                    padding: 7px 14px;
-                    font-size: 12px;
-                    font-weight: bold;
-                }
-            """)
+            if self.current_mem_mode == "normal":
+                self.btn_mem_normal.setStyleSheet("""
+                    QPushButton {
+                        background-color: rgba(38, 176, 228, 0.22);
+                        color: #FFFFFF;
+                        border: 1px solid #26B0E4;
+                        border-radius: 8px;
+                        padding: 7px 14px;
+                        font-size: 12px;
+                        font-weight: bold;
+                    }
+                """)
+                self.btn_mem_trash.setStyleSheet("""
+                    QPushButton {
+                        background-color: rgba(255, 255, 255, 0.04);
+                        color: #94A3B8;
+                        border: 1px solid rgba(255, 255, 255, 0.08);
+                        border-radius: 8px;
+                        padding: 7px 14px;
+                        font-size: 12px;
+                    }
+                    QPushButton:hover {
+                        background-color: rgba(239, 68, 68, 0.15);
+                        border-color: rgba(239, 68, 68, 0.35);
+                        color: #FCA5A5;
+                    }
+                """)
+            else:
+                self.btn_mem_normal.setStyleSheet("""
+                    QPushButton {
+                        background-color: rgba(255, 255, 255, 0.04);
+                        color: #94A3B8;
+                        border: 1px solid rgba(255, 255, 255, 0.08);
+                        border-radius: 8px;
+                        padding: 7px 14px;
+                        font-size: 12px;
+                    }
+                    QPushButton:hover {
+                        background-color: rgba(38, 176, 228, 0.15);
+                        border-color: #26B0E4;
+                        color: #38BDF8;
+                    }
+                """)
+                self.btn_mem_trash.setStyleSheet("""
+                    QPushButton {
+                        background-color: rgba(239, 68, 68, 0.22);
+                        color: #FECACA;
+                        border: 1px solid #EF4444;
+                        border-radius: 8px;
+                        padding: 7px 14px;
+                        font-size: 12px;
+                        font-weight: bold;
+                    }
+                """)
 
     # ---------------- Page 2: 企业通讯录 (Org Directory) ----------------
     def _build_page_roster(self, stack: QStackedWidget):
@@ -2441,22 +2925,39 @@ class MainWindow(QMainWindow):
         filter_bar = QHBoxLayout()
         filter_bar.setSpacing(10)
 
+        is_light = ThemeManager.get_instance().is_light()
+
         self.roster_search_input = QLineEdit()
-        self.roster_search_input.setPlaceholderText("🔍 快速筛选成员姓名、职务、职责或技能关键词...")
-        self.roster_search_input.setStyleSheet("""
-            QLineEdit {
-                background-color: #12151F;
-                color: #FFFFFF;
-                border: 1px solid rgba(255, 255, 255, 0.08);
-                border-radius: 8px;
-                padding: 7px 14px;
-                font-size: 12px;
-            }
-            QLineEdit:focus {
-                border-color: #26B0E4;
-                background-color: #161A28;
-            }
-        """)
+        self.roster_search_input.setPlaceholderText("快速筛选成员姓名、职务、职责或技能关键词...")
+        if is_light:
+            self.roster_search_input.setStyleSheet("""
+                QLineEdit {
+                    background-color: #FFFFFF;
+                    color: #0F172A;
+                    border: 1px solid #CBD5E1;
+                    border-radius: 8px;
+                    padding: 7px 14px;
+                    font-size: 12px;
+                }
+                QLineEdit:focus {
+                    border-color: #0284C7;
+                }
+            """)
+        else:
+            self.roster_search_input.setStyleSheet("""
+                QLineEdit {
+                    background-color: #12151F;
+                    color: #FFFFFF;
+                    border: 1px solid rgba(255, 255, 255, 0.08);
+                    border-radius: 8px;
+                    padding: 7px 14px;
+                    font-size: 12px;
+                }
+                QLineEdit:focus {
+                    border-color: #26B0E4;
+                    background-color: #161A28;
+                }
+            """)
         self.roster_search_input.textChanged.connect(self._filter_roster_cards)
         filter_bar.addWidget(self.roster_search_input, 1)
 
@@ -2464,32 +2965,50 @@ class MainWindow(QMainWindow):
         departed_emps = [e for e in EMPLOYEES if e.get("status") == "departed"]
 
         if len(departed_emps) > 0:
-            self.roster_stat_lbl = QLabel(f"👥 在职成员 {len(active_emps)} 位 · 归档离职 {len(departed_emps)} 位 · 会议画像全量留存")
+            self.roster_stat_lbl = QLabel(f"在职成员 {len(active_emps)} 位 · 归档离职 {len(departed_emps)} 位 · 会议画像全量留存")
         else:
-            self.roster_stat_lbl = QLabel(f"👥 共收录 {len(active_emps)} 位组织核心成员 · 实时关联中台会议动态画像")
-        self.roster_stat_lbl.setStyleSheet("color: #8AC657; font-size: 11px; font-weight: 600; padding: 0 4px;")
+            self.roster_stat_lbl = QLabel(f"共收录 {len(active_emps)} 位组织核心成员 · 实时关联中台会议动态画像")
+        self.roster_stat_lbl.setStyleSheet(f"color: {'#16A34A' if is_light else '#8AC657'}; font-size: 11px; font-weight: 600; padding: 0 4px;")
         filter_bar.addWidget(self.roster_stat_lbl)
 
-        refresh_roster_btn = QPushButton("🔄 刷新画像")
-        refresh_roster_btn.setToolTip("重新从会议记忆中台反查提取最新的成员参与决议与动态")
-        refresh_roster_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        refresh_roster_btn.setStyleSheet("""
-            QPushButton {
-                background: rgba(255, 255, 255, 0.05);
-                color: #CBD5E1;
-                border: 1px solid rgba(255, 255, 255, 0.08);
-                border-radius: 6px;
-                padding: 6px 12px;
-                font-size: 11px;
-            }
-            QPushButton:hover {
-                background: rgba(255, 255, 255, 0.1);
-                color: #FFFFFF;
-                border-color: #26B0E4;
-            }
-        """)
-        refresh_roster_btn.clicked.connect(self.refresh_roster)
-        filter_bar.addWidget(refresh_roster_btn)
+        self.refresh_roster_btn = QPushButton("刷新画像")
+        self.refresh_roster_btn.setIcon(get_symbol_icon("history", color="#0284C7" if is_light else "#CBD5E1", size=13))
+        self.refresh_roster_btn.setToolTip("重新从会议记忆中台反查提取最新的成员参与决议与动态")
+        self.refresh_roster_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        if is_light:
+            self.refresh_roster_btn.setStyleSheet("""
+                QPushButton {
+                    background: #FFFFFF;
+                    color: #334155;
+                    border: 1px solid #CBD5E1;
+                    border-radius: 6px;
+                    padding: 6px 12px;
+                    font-size: 11px;
+                }
+                QPushButton:hover {
+                    background: #F1F5F9;
+                    border-color: #0284C7;
+                    color: #0284C7;
+                }
+            """)
+        else:
+            self.refresh_roster_btn.setStyleSheet("""
+                QPushButton {
+                    background: rgba(255, 255, 255, 0.05);
+                    color: #CBD5E1;
+                    border: 1px solid rgba(255, 255, 255, 0.08);
+                    border-radius: 6px;
+                    padding: 6px 12px;
+                    font-size: 11px;
+                }
+                QPushButton:hover {
+                    background: rgba(255, 255, 255, 0.1);
+                    color: #FFFFFF;
+                    border-color: #26B0E4;
+                }
+            """)
+        self.refresh_roster_btn.clicked.connect(self.refresh_roster)
+        filter_bar.addWidget(self.refresh_roster_btn)
 
         page_layout.addLayout(filter_bar)
 
@@ -2552,25 +3071,45 @@ class MainWindow(QMainWindow):
                 self.col_right.addWidget(card)
 
         # 3. 已离职成员折叠区分隔与展开栏 (直接折叠收起，信息留存)
-        self.departed_toggle_btn = QPushButton(f"📁 已离职成员归档 ({len(departed_emps)} 人)  ▾ 点击展开历史沉淀档案")
+        self.departed_toggle_btn = QPushButton(f"已离职成员归档 ({len(departed_emps)} 人)  ▾ 点击展开历史沉淀档案")
+        self.departed_toggle_btn.setIcon(get_symbol_icon("apartment", color="#64748B", size=13))
         self.departed_toggle_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.departed_toggle_btn.setStyleSheet("""
-            QPushButton {
-                background-color: rgba(255, 255, 255, 0.02);
-                color: #94A3B8;
-                border: 1px dashed rgba(255, 255, 255, 0.12);
-                border-radius: 8px;
-                padding: 10px 14px;
-                font-size: 11.5px;
-                font-weight: 600;
-                text-align: left;
-            }
-            QPushButton:hover {
-                background-color: rgba(255, 255, 255, 0.05);
-                color: #E2E8F0;
-                border-color: rgba(38, 176, 228, 0.3);
-            }
-        """)
+        if is_light:
+            self.departed_toggle_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #F8FAFC;
+                    color: #64748B;
+                    border: 1px dashed #CBD5E1;
+                    border-radius: 8px;
+                    padding: 10px 14px;
+                    font-size: 11.5px;
+                    font-weight: 600;
+                    text-align: left;
+                }
+                QPushButton:hover {
+                    background-color: #F1F5F9;
+                    color: #0F172A;
+                    border-color: #94A3B8;
+                }
+            """)
+        else:
+            self.departed_toggle_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: rgba(255, 255, 255, 0.02);
+                    color: #94A3B8;
+                    border: 1px dashed rgba(255, 255, 255, 0.12);
+                    border-radius: 8px;
+                    padding: 10px 14px;
+                    font-size: 11.5px;
+                    font-weight: 600;
+                    text-align: left;
+                }
+                QPushButton:hover {
+                    background-color: rgba(255, 255, 255, 0.05);
+                    color: #E2E8F0;
+                    border-color: rgba(38, 176, 228, 0.3);
+                }
+            """)
         self.departed_toggle_btn.clicked.connect(self._toggle_departed_section)
         self.departed_toggle_btn.setVisible(len(departed_emps) > 0)
         cards_vbox.addWidget(self.departed_toggle_btn)
@@ -2618,39 +3157,63 @@ class MainWindow(QMainWindow):
         self.departed_expanded = not getattr(self, "departed_expanded", False)
         self.departed_container.setVisible(self.departed_expanded)
         dep_count = len(self.departed_cards)
+        is_light = ThemeManager.get_instance().is_light()
         if self.departed_expanded:
-            self.departed_toggle_btn.setText(f"📁 已离职成员归档 ({dep_count} 人)  ▴ 点击收起历史归档")
-            self.departed_toggle_btn.setStyleSheet("""
-                QPushButton {
-                    background-color: rgba(38, 176, 228, 0.05);
-                    color: #26B0E4;
-                    border: 1px solid rgba(38, 176, 228, 0.25);
-                    border-radius: 8px;
-                    padding: 10px 14px;
-                    font-size: 11.5px;
-                    font-weight: 600;
-                    text-align: left;
-                }
-            """)
+            self.departed_toggle_btn.setText(f"已离职成员归档 ({dep_count} 人)  ▴ 点击收起历史归档")
+            if is_light:
+                self.departed_toggle_btn.setStyleSheet("""
+                    QPushButton {
+                        background-color: rgba(2, 132, 199, 0.06);
+                        color: #0284C7;
+                        border: 1px solid rgba(2, 132, 199, 0.3);
+                        border-radius: 8px;
+                        padding: 10px 14px;
+                        font-size: 11.5px;
+                        font-weight: 600;
+                        text-align: left;
+                    }
+                """)
+            else:
+                self.departed_toggle_btn.setStyleSheet("""
+                    QPushButton {
+                        background-color: rgba(38, 176, 228, 0.05);
+                        color: #26B0E4;
+                        border: 1px solid rgba(38, 176, 228, 0.25);
+                        border-radius: 8px;
+                        padding: 10px 14px;
+                        font-size: 11.5px;
+                        font-weight: 600;
+                        text-align: left;
+                    }
+                """)
         else:
-            self.departed_toggle_btn.setText(f"📁 已离职成员归档 ({dep_count} 人)  ▾ 点击展开历史沉淀档案")
-            self.departed_toggle_btn.setStyleSheet("""
-                QPushButton {
-                    background-color: rgba(255, 255, 255, 0.02);
-                    color: #94A3B8;
-                    border: 1px dashed rgba(255, 255, 255, 0.12);
-                    border-radius: 8px;
-                    padding: 10px 14px;
-                    font-size: 11.5px;
-                    font-weight: 600;
-                    text-align: left;
-                }
-                QPushButton:hover {
-                    background-color: rgba(255, 255, 255, 0.05);
-                    color: #E2E8F0;
-                    border-color: rgba(38, 176, 228, 0.3);
-                }
-            """)
+            self.departed_toggle_btn.setText(f"已离职成员归档 ({dep_count} 人)  ▾ 点击展开历史沉淀档案")
+            if is_light:
+                self.departed_toggle_btn.setStyleSheet("""
+                    QPushButton {
+                        background-color: #F8FAFC;
+                        color: #64748B;
+                        border: 1px dashed #CBD5E1;
+                        border-radius: 8px;
+                        padding: 10px 14px;
+                        font-size: 11.5px;
+                        font-weight: 600;
+                        text-align: left;
+                    }
+                """)
+            else:
+                self.departed_toggle_btn.setStyleSheet("""
+                    QPushButton {
+                        background-color: rgba(255, 255, 255, 0.02);
+                        color: #94A3B8;
+                        border: 1px dashed rgba(255, 255, 255, 0.12);
+                        border-radius: 8px;
+                        padding: 10px 14px;
+                        font-size: 11.5px;
+                        font-weight: 600;
+                        text-align: left;
+                    }
+                """)
 
     def _on_roster_search_requested(self, query: str):
         """卡片内一键点击检索发起跳转对讲搜索"""
@@ -2683,25 +3246,25 @@ class MainWindow(QMainWindow):
         dep_total = len(self.departed_cards)
 
         if kw:
-            self.roster_stat_lbl.setText(f"🔍 筛选出 {matched_count} 位成员 (共 {len(EMPLOYEES)} 位)")
+            self.roster_stat_lbl.setText(f"筛选出 {matched_count} 位成员 (共 {len(EMPLOYEES)} 位)")
             if departed_matched > 0:
                 self.departed_container.setVisible(True)
                 self.departed_expanded = True
-                self.departed_toggle_btn.setText(f"📁 已离职成员归档 (包含 {departed_matched} 位搜索命中)  ▴ 已自动展开")
+                self.departed_toggle_btn.setText(f"已离职成员归档 (包含 {departed_matched} 位搜索命中)  ▴ 已自动展开")
             else:
                 self.departed_container.setVisible(False)
                 self.departed_expanded = False
-                self.departed_toggle_btn.setText(f"📁 已离职成员归档 ({dep_total} 人)  ▾ 点击展开历史沉淀档案")
+                self.departed_toggle_btn.setText(f"已离职成员归档 ({dep_total} 人)  ▾ 点击展开历史沉淀档案")
         else:
             if dep_total > 0:
-                self.roster_stat_lbl.setText(f"👥 在职成员 {active_count} 位 · 归档离职 {dep_total} 位 · 会议画像全量留存")
+                self.roster_stat_lbl.setText(f"在职成员 {active_count} 位 · 归档离职 {dep_total} 位 · 会议画像全量留存")
                 self.departed_toggle_btn.setVisible(True)
             else:
-                self.roster_stat_lbl.setText(f"👥 共收录 {active_count} 位组织核心成员 · 实时关联中台会议动态画像")
+                self.roster_stat_lbl.setText(f"共收录 {active_count} 位组织核心成员 · 实时关联中台会议动态画像")
                 self.departed_toggle_btn.setVisible(False)
             self.departed_container.setVisible(False)
             self.departed_expanded = False
-            self.departed_toggle_btn.setText(f"📁 已离职成员归档 ({dep_total} 人)  ▾ 点击展开历史沉淀档案")
+            self.departed_toggle_btn.setText(f"已离职成员归档 ({dep_total} 人)  ▾ 点击展开历史沉淀档案")
 
     def refresh_roster(self):
         """刷新所有成员卡片的动态画像与最新会议关联"""
@@ -2728,16 +3291,36 @@ class MainWindow(QMainWindow):
         v_layout.setContentsMargins(4, 4, 12, 36)
         v_layout.setSpacing(14)
 
+        is_light = ThemeManager.get_instance().is_light()
+
         # 引擎矩阵卡
-        engine_card = QFrame()
-        engine_card.setObjectName("card")
-        e_layout = QVBoxLayout(engine_card)
+        self.engine_card = QFrame()
+        self.engine_card.setObjectName("card")
+        if is_light:
+            self.engine_card.setStyleSheet("""
+                QFrame#card {
+                    background-color: #FFFFFF;
+                    border: 1px solid #E2E8F0;
+                    border-radius: 12px;
+                    padding: 16px;
+                }
+            """)
+        else:
+            self.engine_card.setStyleSheet("""
+                QFrame#card {
+                    background-color: #11141D;
+                    border: 1px solid rgba(255, 255, 255, 0.08);
+                    border-radius: 12px;
+                    padding: 16px;
+                }
+            """)
+        e_layout = QVBoxLayout(self.engine_card)
         e_layout.setContentsMargins(20, 18, 20, 18)
         e_layout.setSpacing(12)
 
-        e_title = QLabel("⚙️ DeskEcho AI 引擎与硬件通信栈 (MVP)")
-        e_title.setStyleSheet("font-size: 15px; font-weight: bold; color: #FFFFFF;")
-        e_layout.addWidget(e_title)
+        self.engine_title = QLabel("DeskEcho AI 引擎与硬件通信栈 (MVP)")
+        self.engine_title.setStyleSheet(f"font-size: 15px; font-weight: bold; color: {'#0F172A' if is_light else '#FFFFFF'};")
+        e_layout.addWidget(self.engine_title)
 
         grid = QGridLayout()
         grid.setSpacing(12)
@@ -2751,50 +3334,72 @@ class MainWindow(QMainWindow):
             ("全局交互与对讲", f"pynput 全局底层热键监听 [{Config.INTERCOM_KEY}]\n支持长按对讲、释放检索 (<0.5s 防抖拦截)\nAlma 风格三态浮窗与动态波形", "#8B5CF6")
         ]
 
+        self.engine_boxes = []
+        self.engine_desc_labels = []
         for idx, (t, d, c) in enumerate(items):
             r = idx // 2
             col = idx % 2
             box = QFrame()
-            box.setStyleSheet("background-color: #0A0C10; border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 12px;")
+            self.engine_boxes.append(box)
+            if is_light:
+                box.setStyleSheet("background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px;")
+            else:
+                box.setStyleSheet("background-color: #0A0C10; border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 12px;")
             b_layout = QVBoxLayout(box)
             b_layout.setSpacing(4)
             lbl_t = QLabel(t)
             lbl_t.setStyleSheet(f"color: {c}; font-size: 12px; font-weight: bold;")
             lbl_d = QLabel(d)
-            lbl_d.setStyleSheet("color: #94A3B8; font-size: 11px; line-height: 1.4;")
+            self.engine_desc_labels.append(lbl_d)
+            lbl_d.setStyleSheet(f"color: {'#475569' if is_light else '#94A3B8'}; font-size: 11px; line-height: 1.4;")
             lbl_d.setWordWrap(True)
             b_layout.addWidget(lbl_t)
             b_layout.addWidget(lbl_d)
             grid.addWidget(box, r, col)
 
         e_layout.addLayout(grid)
-        v_layout.addWidget(engine_card)
+        v_layout.addWidget(self.engine_card)
 
         # 发版管理快速跳转
         goto_update_box = QHBoxLayout()
         goto_update_box.setContentsMargins(4, 4, 4, 4)
-        goto_lbl = QLabel("🚀 DeskEcho 现已接入 GitHub Releases 官方发版通道与单一 Windows EXE 自动更新")
-        goto_lbl.setStyleSheet("color: #64748B; font-size: 11px;")
-        goto_update_box.addWidget(goto_lbl, 1)
+        self.goto_lbl = QLabel("DeskEcho 现已接入 GitHub Releases 官方发版通道与单一 Windows EXE 自动更新")
+        self.goto_lbl.setStyleSheet(f"color: {'#64748B' if is_light else '#94A3B8'}; font-size: 11px;")
+        goto_update_box.addWidget(self.goto_lbl, 1)
 
-        btn_goto_update = QPushButton("打开软件更新中心 →")
-        btn_goto_update.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn_goto_update.setStyleSheet("""
-            QPushButton {
-                background: rgba(38, 176, 228, 0.12);
-                color: #38BDF8;
-                border: 1px solid rgba(38, 176, 228, 0.3);
-                border-radius: 5px;
-                padding: 4px 10px;
-                font-size: 11px;
-            }
-            QPushButton:hover {
-                background: rgba(38, 176, 228, 0.25);
-                color: #FFFFFF;
-            }
-        """)
-        btn_goto_update.clicked.connect(lambda: self._switch_nav(4))
-        goto_update_box.addWidget(btn_goto_update)
+        self.btn_goto_update = QPushButton("打开软件更新中心 →")
+        self.btn_goto_update.setCursor(Qt.CursorShape.PointingHandCursor)
+        if is_light:
+            self.btn_goto_update.setStyleSheet("""
+                QPushButton {
+                    background: rgba(2, 132, 199, 0.08);
+                    color: #0284C7;
+                    border: 1px solid rgba(2, 132, 199, 0.3);
+                    border-radius: 5px;
+                    padding: 4px 10px;
+                    font-size: 11px;
+                }
+                QPushButton:hover {
+                    background: rgba(2, 132, 199, 0.18);
+                }
+            """)
+        else:
+            self.btn_goto_update.setStyleSheet("""
+                QPushButton {
+                    background: rgba(38, 176, 228, 0.12);
+                    color: #38BDF8;
+                    border: 1px solid rgba(38, 176, 228, 0.3);
+                    border-radius: 5px;
+                    padding: 4px 10px;
+                    font-size: 11px;
+                }
+                QPushButton:hover {
+                    background: rgba(38, 176, 228, 0.25);
+                    color: #FFFFFF;
+                }
+            """)
+        self.btn_goto_update.clicked.connect(lambda: self._switch_nav(4))
+        goto_update_box.addWidget(self.btn_goto_update)
         v_layout.addLayout(goto_update_box)
 
         v_layout.addStretch()
@@ -2816,51 +3421,85 @@ class MainWindow(QMainWindow):
         v_layout.setContentsMargins(4, 4, 12, 36)
         v_layout.setSpacing(14)
 
+        is_light = ThemeManager.get_instance().is_light()
+
         # 1. 软件更新控制台主卡片
-        version_card = QFrame()
-        version_card.setObjectName("card")
-        version_card.setStyleSheet("""
-            QFrame#card {
-                background-color: #11141D;
-                border: 1px solid rgba(255, 255, 255, 0.08);
-                border-radius: 12px;
-                padding: 16px;
-            }
-        """)
-        v_card_layout = QVBoxLayout(version_card)
+        self.version_card = QFrame()
+        self.version_card.setObjectName("card")
+        if is_light:
+            self.version_card.setStyleSheet("""
+                QFrame#card {
+                    background-color: #FFFFFF;
+                    border: 1px solid #E2E8F0;
+                    border-radius: 12px;
+                    padding: 16px;
+                }
+            """)
+        else:
+            self.version_card.setStyleSheet("""
+                QFrame#card {
+                    background-color: #11141D;
+                    border: 1px solid rgba(255, 255, 255, 0.08);
+                    border-radius: 12px;
+                    padding: 16px;
+                }
+            """)
+        v_card_layout = QVBoxLayout(self.version_card)
         v_card_layout.setContentsMargins(18, 16, 18, 16)
         v_card_layout.setSpacing(12)
 
         v_head_layout = QHBoxLayout()
-        v_title = QLabel("🚀 发版与版本自动更新管理 (GitHub Release 官方发版通道)")
-        v_title.setStyleSheet("font-size: 15px; font-weight: bold; color: #FFFFFF;")
-        v_head_layout.addWidget(v_title, 1)
+        self.version_title = QLabel("发版与版本自动更新管理 (GitHub Release 官方发版通道)")
+        self.version_title.setStyleSheet(f"font-size: 15px; font-weight: bold; color: {'#0F172A' if is_light else '#FFFFFF'};")
+        v_head_layout.addWidget(self.version_title, 1)
 
         self.ver_badge = QLabel(f"v{APP_VERSION} (当前运行版本)")
-        self.ver_badge.setStyleSheet("color: #26B0E4; font-size: 11px; background: rgba(38,176,228,0.15); border: 1px solid rgba(38,176,228,0.4); padding: 3px 8px; border-radius: 5px; font-weight: bold;")
+        if is_light:
+            self.ver_badge.setStyleSheet("color: #0284C7; font-size: 11px; background: rgba(2,132,199,0.10); border: 1px solid rgba(2,132,199,0.3); padding: 3px 8px; border-radius: 5px; font-weight: bold;")
+        else:
+            self.ver_badge.setStyleSheet("color: #26B0E4; font-size: 11px; background: rgba(38,176,228,0.15); border: 1px solid rgba(38,176,228,0.4); padding: 3px 8px; border-radius: 5px; font-weight: bold;")
         v_head_layout.addWidget(self.ver_badge)
 
-        self.btn_check_update = QPushButton("🔍 检查新版本")
+        self.btn_check_update = QPushButton("检查新版本")
+        self.btn_check_update.setIcon(get_symbol_icon("search", color="#0284C7" if is_light else "#26B0E4", size=13))
         self.btn_check_update.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_check_update.setStyleSheet("""
-            QPushButton {
-                background: rgba(38, 176, 228, 0.22);
-                color: #26B0E4;
-                border: 1px solid rgba(38, 176, 228, 0.5);
-                border-radius: 6px;
-                padding: 6px 16px;
-                font-size: 11.5px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background: #26B0E4;
-                color: #FFFFFF;
-            }
-        """)
+        if is_light:
+            self.btn_check_update.setStyleSheet("""
+                QPushButton {
+                    background: rgba(2, 132, 199, 0.08);
+                    color: #0284C7;
+                    border: 1px solid rgba(2, 132, 199, 0.35);
+                    border-radius: 6px;
+                    padding: 6px 16px;
+                    font-size: 11.5px;
+                    font-weight: bold;
+                }
+                QPushButton:hover {
+                    background: #0284C7;
+                    color: #FFFFFF;
+                }
+            """)
+        else:
+            self.btn_check_update.setStyleSheet("""
+                QPushButton {
+                    background: rgba(38, 176, 228, 0.22);
+                    color: #26B0E4;
+                    border: 1px solid rgba(38, 176, 228, 0.5);
+                    border-radius: 6px;
+                    padding: 6px 16px;
+                    font-size: 11.5px;
+                    font-weight: bold;
+                }
+                QPushButton:hover {
+                    background: #26B0E4;
+                    color: #FFFFFF;
+                }
+            """)
         self.btn_check_update.clicked.connect(self._manual_check_update)
         v_head_layout.addWidget(self.btn_check_update)
 
-        self.btn_restart_app = QPushButton("🚀 立即重启客户端")
+        self.btn_restart_app = QPushButton("立即重启客户端")
+        self.btn_restart_app.setIcon(get_symbol_icon("rocket_launch", color="#FFFFFF", size=13))
         self.btn_restart_app.setVisible(False)
         self.btn_restart_app.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_restart_app.setStyleSheet("""
@@ -2880,56 +3519,78 @@ class MainWindow(QMainWindow):
         self.btn_restart_app.clicked.connect(self._restart_app)
         v_head_layout.addWidget(self.btn_restart_app)
 
-        self.btn_cancel_restart = QPushButton("⏸ 暂缓重启")
+        self.btn_cancel_restart = QPushButton("暂缓重启")
         self.btn_cancel_restart.setVisible(False)
         self.btn_cancel_restart.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_cancel_restart.setStyleSheet("""
-            QPushButton {
-                background: rgba(255, 255, 255, 0.08);
-                color: #CBD5E1;
-                border: 1px solid rgba(255, 255, 255, 0.15);
-                border-radius: 6px;
-                padding: 6px 14px;
-                font-size: 11.5px;
-            }
-            QPushButton:hover {
-                background: rgba(255, 255, 255, 0.15);
-                color: #FFFFFF;
-            }
-        """)
+        if is_light:
+            self.btn_cancel_restart.setStyleSheet("""
+                QPushButton {
+                    background: #F1F5F9;
+                    color: #475569;
+                    border: 1px solid #CBD5E1;
+                    border-radius: 6px;
+                    padding: 6px 14px;
+                    font-size: 11.5px;
+                }
+                QPushButton:hover {
+                    background: #E2E8F0;
+                    color: #0F172A;
+                }
+            """)
+        else:
+            self.btn_cancel_restart.setStyleSheet("""
+                QPushButton {
+                    background: rgba(255, 255, 255, 0.08);
+                    color: #CBD5E1;
+                    border: 1px solid rgba(255, 255, 255, 0.15);
+                    border-radius: 6px;
+                    padding: 6px 14px;
+                    font-size: 11.5px;
+                }
+                QPushButton:hover {
+                    background: rgba(255, 255, 255, 0.15);
+                    color: #FFFFFF;
+                }
+            """)
         self.btn_cancel_restart.clicked.connect(self._cancel_restart_countdown)
         v_head_layout.addWidget(self.btn_cancel_restart)
 
         v_card_layout.addLayout(v_head_layout)
 
         self.update_info_lbl = QLabel(f"当前构建日期：{RELEASE_DATE} · 采用 GitHub Releases 官方云端发版通道，客户端已开启后台静默自检。")
-        self.update_info_lbl.setStyleSheet("color: #CBD5E1; font-size: 12px; line-height: 1.6; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 12px 14px;")
+        if is_light:
+            self.update_info_lbl.setStyleSheet("color: #334155; font-size: 12px; line-height: 1.6; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px 14px;")
+        else:
+            self.update_info_lbl.setStyleSheet("color: #CBD5E1; font-size: 12px; line-height: 1.6; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 12px 14px;")
         self.update_info_lbl.setWordWrap(True)
         v_card_layout.addWidget(self.update_info_lbl)
 
-        v_layout.addWidget(version_card)
+        v_layout.addWidget(self.version_card)
 
         # 2. 发版规格与自动化通道机制卡片
-        spec_card = QFrame()
-        spec_card.setObjectName("card")
-        spec_card.setStyleSheet("QFrame#card { background-color: #11141D; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 16px; }")
-        s_layout = QVBoxLayout(spec_card)
+        self.spec_card = QFrame()
+        self.spec_card.setObjectName("card")
+        if is_light:
+            self.spec_card.setStyleSheet("QFrame#card { background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; padding: 16px; }")
+        else:
+            self.spec_card.setStyleSheet("QFrame#card { background-color: #11141D; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 16px; }")
+        s_layout = QVBoxLayout(self.spec_card)
         s_layout.setContentsMargins(18, 16, 18, 16)
         s_layout.setSpacing(10)
 
-        s_title = QLabel("📦 发版规格与自动化通道机制")
-        s_title.setStyleSheet("font-size: 13.5px; font-weight: bold; color: #FFFFFF;")
-        s_layout.addWidget(s_title)
+        self.spec_title = QLabel("发版规格与自动化通道机制")
+        self.spec_title.setStyleSheet(f"font-size: 13.5px; font-weight: bold; color: {'#0F172A' if is_light else '#FFFFFF'};")
+        s_layout.addWidget(self.spec_title)
 
-        s_desc = QLabel(
+        self.spec_desc = QLabel(
             "• 发版标准：DeskEcho 后续版本统一以单一 Windows 可执行程序 (DeskEcho.exe) 在 GitHub Releases 官方页面正规发版。\n"
             "• 客户端自愈：后台静默轮询 GitHub Releases，当检测到最新发版推送时，自动下载并在 3 秒内自动重启生效。\n"
             "• 数据安全隔离：自动更新全程保留本地密钥 (.env)、本地会议知识库 (omni_data/records.db) 与向量索引，无感平滑升级。"
         )
-        s_desc.setStyleSheet("color: #94A3B8; font-size: 11.5px; line-height: 1.7;")
-        s_desc.setWordWrap(True)
-        s_layout.addWidget(s_desc)
-        v_layout.addWidget(spec_card)
+        self.spec_desc.setStyleSheet(f"color: {'#475569' if is_light else '#94A3B8'}; font-size: 11.5px; line-height: 1.7;")
+        self.spec_desc.setWordWrap(True)
+        s_layout.addWidget(self.spec_desc)
+        v_layout.addWidget(self.spec_card)
 
         v_layout.addStretch()
         scroll.setWidget(container)
@@ -2937,11 +3598,11 @@ class MainWindow(QMainWindow):
 
     def _manual_check_update(self):
         self.btn_check_update.setEnabled(False)
-        self.update_info_lbl.setText("🔍 正在连接 GitHub Releases 官方接口检查最新版本...")
+        self.update_info_lbl.setText("正在连接 GitHub Releases 官方接口检查最新版本...")
 
         self.update_worker = AutoUpdateWorker(current_version=APP_VERSION, auto_apply=True, parent=self)
         self.update_worker.update_detected.connect(self._on_update_detected)
-        self.update_worker.update_progress.connect(lambda msg: self.update_info_lbl.setText(f"⏳ {msg}"))
+        self.update_worker.update_progress.connect(lambda msg: self.update_info_lbl.setText(f"{msg}"))
         self.update_worker.update_finished.connect(self._on_update_finished)
         self.update_worker.update_failed.connect(self._on_update_failed)
         self.update_worker.start()
@@ -2950,27 +3611,27 @@ class MainWindow(QMainWindow):
         new_v = info.get("version", "")
         self.ver_badge.setText(f"发现新版 v{new_v}")
         self.ver_badge.setStyleSheet("color: #F59E0B; font-size: 11px; background: rgba(245,158,11,0.15); border: 1px solid rgba(245,158,11,0.4); padding: 3px 8px; border-radius: 5px; font-weight: bold;")
-        self.update_info_lbl.setText(f"🚀 发现新版本 DeskEcho v{new_v}！正在为您全自动下载并应用更新...")
+        self.update_info_lbl.setText(f"发现新版本 DeskEcho v{new_v}！正在为您全自动下载并应用更新...")
 
     def _on_update_finished(self, new_v: str, info: dict):
         self.btn_check_update.setEnabled(True)
-        self.btn_check_update.setText("✓ 检查更新")
+        self.btn_check_update.setText("检查更新")
         self.ver_badge.setText(f"v{new_v} (已就绪)")
         self.ver_badge.setStyleSheet("color: #10B981; font-size: 11px; background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.4); padding: 3px 8px; border-radius: 5px; font-weight: bold;")
         self.btn_restart_app.setVisible(True)
         self.btn_cancel_restart.setVisible(True)
         
         changelog_str = "；".join(info.get("changelog", [])[:3])
-        self.search_status_lbl.setText(f"🎉 已自动升级至 v{new_v}，即将重启")
+        self.search_status_lbl.setText(f"已自动升级至 v{new_v}，即将重启")
 
         # 启动 3 秒自动重启倒计时
         self._countdown_seconds = 3
         self.update_info_lbl.setText(
-            f"🎉 升级成功！DeskEcho 已自动更新至 v{new_v}。\n"
+            f"升级成功！DeskEcho 已自动更新至 v{new_v}。\n"
             f"更新内容：{changelog_str}\n"
-            f"⚡ 收到最新版本推送，客户端将在 {self._countdown_seconds} 秒后自动重启生效..."
+            f"收到最新版本推送，客户端将在 {self._countdown_seconds} 秒后自动重启生效..."
         )
-        self.btn_restart_app.setText(f"🚀 立即重启 ({self._countdown_seconds}s)")
+        self.btn_restart_app.setText(f"立即重启 ({self._countdown_seconds}s)")
 
         if hasattr(self, "_countdown_timer") and self._countdown_timer.isActive():
             self._countdown_timer.stop()
@@ -2983,11 +3644,11 @@ class MainWindow(QMainWindow):
                 self._countdown_timer.stop()
                 self._restart_app()
             else:
-                self.btn_restart_app.setText(f"🚀 立即重启 ({self._countdown_seconds}s)")
+                self.btn_restart_app.setText(f"立即重启 ({self._countdown_seconds}s)")
                 self.update_info_lbl.setText(
-                    f"🎉 升级成功！DeskEcho 已自动更新至 v{new_v}。\n"
+                    f"升级成功！DeskEcho 已自动更新至 v{new_v}。\n"
                     f"更新内容：{changelog_str}\n"
-                    f"⚡ 收到最新版本推送，客户端将在 {self._countdown_seconds} 秒后自动重启生效..."
+                    f"收到最新版本推送，客户端将在 {self._countdown_seconds} 秒后自动重启生效..."
                 )
 
         self._countdown_timer.timeout.connect(_tick)
@@ -2997,13 +3658,13 @@ class MainWindow(QMainWindow):
         if hasattr(self, "_countdown_timer") and self._countdown_timer.isActive():
             self._countdown_timer.stop()
         self.btn_cancel_restart.setVisible(False)
-        self.btn_restart_app.setText("🚀 立即重启客户端")
-        self.update_info_lbl.setText("✓ 已取消自动重启。您可以随时点击【立即重启客户端】使新版本生效。")
+        self.btn_restart_app.setText("立即重启客户端")
+        self.update_info_lbl.setText("已取消自动重启。您可以随时点击【立即重启客户端】使新版本生效。")
 
     def _on_update_failed(self, err_msg: str):
         self.btn_check_update.setEnabled(True)
         self.update_info_lbl.setText(f"当前已是最新版本 (v{APP_VERSION})，或远端暂无更高发布版本。")
-        self.search_status_lbl.setText("✓ 已是最新版本")
+        self.search_status_lbl.setText("已是最新版本")
         QTimer.singleShot(3000, lambda: self.search_status_lbl.setText(""))
 
     def _restart_app(self):
@@ -3038,6 +3699,53 @@ class MainWindow(QMainWindow):
                 pix = self.grab()
                 pix.save(out_img)
                 result = {"status": "success", "page": 0, "image_saved": out_img}
+                Path("C:/DeskEcho/action_result.json").write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding='utf-8')
+                trigger_file.unlink()
+                return
+
+            if action == "set_theme":
+                target_t = content.get("theme", "light")
+                ThemeManager.get_instance().set_theme(ThemeType.LIGHT if target_t == "light" else ThemeType.DARK)
+                from PyQt6.QtWidgets import QApplication
+                QApplication.processEvents()
+                pix = self.grab()
+                pix.save(out_img)
+                result = {"status": "success", "theme": target_t, "image_saved": out_img}
+                Path("C:/DeskEcho/action_result.json").write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding='utf-8')
+                trigger_file.unlink()
+                return
+
+            if action.startswith("switch_page_"):
+                page_idx = int(action.split("_")[-1])
+                self._switch_nav(page_idx)
+                from PyQt6.QtWidgets import QApplication
+                QApplication.processEvents()
+                pix = self.grab()
+                pix.save(out_img)
+                result = {"status": "success", "page": page_idx, "image_saved": out_img}
+                Path("C:/DeskEcho/action_result.json").write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding='utf-8')
+                trigger_file.unlink()
+                return
+
+            if action == "test_dialog":
+                from ui.components.modern_dialog import ModernDialog
+                from PyQt6.QtCore import QTimer
+                dlg = ModernDialog(
+                    parent=self,
+                    title="确定彻底销毁所选切片？",
+                    message="操作后将从知识库中永久物理删除该记录，不可撤销恢复。",
+                    detail="切片时间: 2026-10-29 14:30:00\n核心议题: 研发效能与跨域协同机制\n研判原因: 闲聊及无实质决议碎片",
+                    dialog_type="danger",
+                    confirm_text="彻底销毁",
+                    cancel_text="放弃操作"
+                )
+                def _do_cap():
+                    dlg_pix = dlg.grab()
+                    dlg_pix.save(out_img)
+                    dlg.accept()
+                QTimer.singleShot(300, _do_cap)
+                dlg.exec()
+                result = {"status": "success", "image_saved": out_img}
                 Path("C:/DeskEcho/action_result.json").write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding='utf-8')
                 trigger_file.unlink()
                 return
@@ -3221,11 +3929,11 @@ class MainWindow(QMainWindow):
             self.cached_trash_records = trash_recs
 
             if hasattr(self, 'btn_mem_normal'):
-                self.btn_mem_normal.setText(f"📑 正式会议切片 ({len(normal_recs)})")
+                self.btn_mem_normal.setText(f"正式会议切片 ({len(normal_recs)})")
             if hasattr(self, 'btn_mem_trash'):
-                self.btn_mem_trash.setText(f"🗑️ 或许没用 ({len(trash_recs)})")
+                self.btn_mem_trash.setText(f"或许没用 ({len(trash_recs)})")
             if hasattr(self, 'sub_btn_memory'):
-                self.sub_btn_memory.setText(f"🧠 会议记忆库 ({len(normal_recs)})")
+                self.sub_btn_memory.setText(f"会议记忆库 ({len(normal_recs)})")
 
             # 智能防打断机制：仅当数据切实变动时响应
             if data_changed:
@@ -3240,7 +3948,7 @@ class MainWindow(QMainWindow):
                 if user_is_busy_reading:
                     self._has_pending_update = True
                     if hasattr(self, "new_slice_pill"):
-                        self.new_slice_pill.setText("✨ 收到新归档会议切片 · 点击置顶查看")
+                        self.new_slice_pill.setText("收到新归档会议切片 · 点击置顶查看")
                         self.new_slice_pill.setVisible(True)
                 else:
                     self._has_pending_update = False
@@ -3279,7 +3987,7 @@ class MainWindow(QMainWindow):
 
         if not target_records:
             self.mem_list.blockSignals(False)
-            empty_msg = "🎉 暂无低价值次要切片，会议记忆库非常健康！" if self.current_mem_mode == "trash" else "暂无沉淀正式切片数据"
+            empty_msg = "暂无低价值次要切片，会议记忆库非常健康！" if self.current_mem_mode == "trash" else "暂无沉淀正式切片数据"
             empty_item = QListWidgetItem(empty_msg)
             empty_item.setFlags(Qt.ItemFlag.NoItemFlags)
             empty_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -3301,13 +4009,13 @@ class MainWindow(QMainWindow):
 
             clean_topic = first_line[:32] + "..." if len(first_line) > 32 else first_line
             if self.current_mem_mode == "trash":
-                item = QListWidgetItem(f"🗑️ {time_str}\n   {clean_topic}")
+                item = QListWidgetItem(f"{time_str}\n   {clean_topic}")
                 reason = rec.get("trash_reason", "次要碎片")
                 item.setToolTip(f"【次要切片】: {time_str}\n【AI 研判理由】: {reason}\n{first_line}")
                 item.setData(Qt.ItemDataRole.UserRole, rec)
                 self.mem_list.addItem(item)
             else:
-                item = QListWidgetItem(f"📅 {time_str}\n   {clean_topic}")
+                item = QListWidgetItem(f"{time_str}\n   {clean_topic}")
                 item.setToolTip(f"{time_str}\n{first_line}")
                 item.setData(Qt.ItemDataRole.UserRole, rec)
                 self.mem_list.addItem(item)
@@ -3360,7 +4068,7 @@ class MainWindow(QMainWindow):
 
         if self.current_mem_mode == "trash":
             reason = rec.get("trash_reason", "无实质性决策且无落地待办推进")
-            self.trash_reason_lbl.setText(f"💡 AI 研判理由：{reason}")
+            self.trash_reason_lbl.setText(f"AI 研判理由：{reason}")
             self.trash_detail_action_bar.setVisible(True)
         else:
             self.trash_detail_action_bar.setVisible(False)
@@ -3369,32 +4077,44 @@ class MainWindow(QMainWindow):
         start_t = rec.get("start_time", "")
         end_t = rec.get("end_time", "")
         summary = rec.get("summary", "")
+        summary = re.sub(r'[\U0001F000-\U0001FAFF\u2600-\u26FF\u2700-\u27BF]', '', summary)
         raw_text = rec.get("raw_text", "")
+        raw_text = re.sub(r'[\U0001F000-\U0001FAFF\u2600-\u26FF\u2700-\u27BF]', '', raw_text)
         is_trash = rec.get("is_low_utility", False)
         reason = rec.get("trash_reason", "")
+        is_light = ThemeManager.get_instance().is_light()
+
+        heading_c = "#0F172A" if is_light else "#F8FAFC"
+        box_bg = "#F8FAFC" if is_light else "#0A0C10"
+        box_border = "#E2E8F0" if is_light else "rgba(255,255,255,0.06)"
+        summary_c = "#0F172A" if is_light else "#CBD5E1"
+        raw_c = "#475569" if is_light else "#94A3B8"
+        time_text_c = "#0F172A" if is_light else "#FFFFFF"
+        slice_bg = "rgba(2, 132, 199, 0.08)" if is_light else "rgba(19, 69, 157, 0.22)"
+        slice_border = "#0284C7" if is_light else "#26B0E4"
 
         trash_badge_html = f"""
-        <div style="background-color: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.35); border-left: 4px solid #EF4444; padding: 8px 12px; border-radius: 6px; margin-bottom: 12px;">
-            <span style="color: #F87171; font-weight: bold; font-size: 11px;">⚠️ AI 价值分级：次要级切片 (或许没用)</span><br>
-            <span style="color: #FECACA; font-size: 12px;">诊断原因：{reason}</span>
+        <div style="background-color: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.35); border-left: 4px solid #EF4444; padding: 8px 12px; border-radius: 6px; margin-bottom: 12px;">
+            <span style="color: {'#DC2626' if is_light else '#F87171'}; font-weight: bold; font-size: 11px;">AI 价值分级：次要级切片 (或许没用)</span><br>
+            <span style="color: {'#7F1D1D' if is_light else '#FECACA'}; font-size: 12px;">诊断原因：{reason}</span>
         </div>
         """ if is_trash else ""
 
         detail_html = f"""
-        <div style="font-family: 'Segoe UI', sans-serif; line-height: 1.6;">
+        <div style="font-family: -apple-system, 'Segoe UI', sans-serif; line-height: 1.6;">
             {trash_badge_html}
-            <div style="background-color: rgba(19, 69, 157, 0.22); border-left: 3px solid #26B0E4; padding: 10px 14px; border-radius: 6px; margin-bottom: 14px;">
-                <span style="color: #26B0E4; font-weight: bold; font-size: 11px;">会议切片区间</span><br>
-                <span style="color: #FFFFFF; font-size: 13px; font-weight: 600;">{start_t} 至 {end_t}</span>
+            <div style="background-color: {slice_bg}; border-left: 3px solid {slice_border}; padding: 10px 14px; border-radius: 6px; margin-bottom: 14px;">
+                <span style="color: {slice_border}; font-weight: bold; font-size: 11px;">会议切片区间</span><br>
+                <span style="color: {time_text_c}; font-size: 13px; font-weight: 600;">{start_t} 至 {end_t}</span>
             </div>
 
-            <div style="color: #F8FAFC; font-size: 14px; font-weight: bold; margin-bottom: 6px;">📋 结构化纪要提取</div>
-            <div style="background-color: #0A0C10; border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 12px; color: #CBD5E1; font-size: 12px; white-space: pre-wrap; margin-bottom: 14px;">
+            <div style="color: {heading_c}; font-size: 13.5px; font-weight: bold; margin-bottom: 6px;">结构化纪要提取</div>
+            <div style="background-color: {box_bg}; border: 1px solid {box_border}; border-radius: 8px; padding: 12px; color: {summary_c}; font-size: 12px; white-space: pre-wrap; margin-bottom: 14px; line-height: 1.6;">
 {summary}
             </div>
 
-            <div style="color: #F8FAFC; font-size: 14px; font-weight: bold; margin-bottom: 6px;">🎙️ 原始语音对话转录</div>
-            <div style="background-color: #0A0C10; border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 12px; color: #94A3B8; font-size: 12px; line-height: 1.5; white-space: pre-wrap;">
+            <div style="color: {heading_c}; font-size: 13.5px; font-weight: bold; margin-bottom: 6px;">原始语音对话转录</div>
+            <div style="background-color: {box_bg}; border: 1px solid {box_border}; border-radius: 8px; padding: 12px; color: {raw_c}; font-size: 12px; line-height: 1.5; white-space: pre-wrap;">
 {raw_text}
             </div>
         </div>
@@ -3410,21 +4130,21 @@ class MainWindow(QMainWindow):
         if not sid:
             return
 
-        reply = QMessageBox.question(
+        ok = ModernDialog.confirm_action(
             self,
-            "恢复为正式切片",
-            f"确定将此切片恢复为【正式会议资产】吗？\n\n切片标识: {sid}\n会议时间: {time_str}\n\n恢复后，该切片将移入【正式会议切片】库，受到防误删保护，并可在后续对讲检索中作为核心证据参与计算。",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.Yes
+            title="恢复为正式切片",
+            message="确定将此切片恢复为【正式会议资产】吗？",
+            detail=f"切片标识: {sid}\n会议时间: {time_str}\n\n恢复后，该切片将移入【正式会议切片】库，受到防误删保护，并可在后续对讲检索中作为核心证据参与计算。",
+            confirm_text="恢复为正式资产"
         )
-        if reply == QMessageBox.StandardButton.Yes:
+        if ok:
             success = self.store.set_slice_useful(sid, is_useful=True)
             if success:
                 self.search_status_lbl.setText("✓ 已恢复为正式会议切片资产")
                 self.current_selected_record = None
                 self.refresh_records()
             else:
-                QMessageBox.warning(self, "操作失败", f"更新切片 {sid} 状态时出错。")
+                ModernDialog.show_warning(self, "操作失败", f"更新切片 {sid} 状态时出错。")
 
     def _delete_current_selected_slice(self):
         """选择性删除当前选中的次要切片 (仅在'或许没用'生效)"""
@@ -3435,38 +4155,38 @@ class MainWindow(QMainWindow):
         time_str = rec.get("start_time", "")
         reason = rec.get("trash_reason", "次要碎片")
 
-        reply = QMessageBox.question(
+        ok = ModernDialog.confirm_danger(
             self,
-            "确认删除次要切片",
-            f"确定彻底删除此段次要切片吗？\n\n切片标识: {sid}\n会议时间: {time_str}\n研判原因: {reason}\n\n该操作将同步从 SQLite 数据库及 ChromaDB 向量集合中彻底清除，不可恢复。",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No
+            title="确认彻底删除次要切片",
+            message="确定彻底删除此段次要切片吗？",
+            detail=f"切片标识: {sid}\n会议时间: {time_str}\n研判原因: {reason}\n\n该操作将同步从 SQLite 数据库及 ChromaDB 向量集合中彻底清除，不可恢复。",
+            confirm_text="彻底删除"
         )
-        if reply == QMessageBox.StandardButton.Yes:
+        if ok:
             success = self.store.delete_slice(sid)
             if success:
                 self.search_status_lbl.setText("✓ 次要切片已删除")
                 self.current_selected_record = None
                 self.refresh_records()
             else:
-                QMessageBox.warning(self, "删除失败", f"删除切片 {sid} 遇到错误，请检查日志。")
+                ModernDialog.show_warning(self, "删除失败", f"删除切片 {sid} 遇到错误，请检查日志。")
 
     def _clean_all_trash_slices(self):
         """一键清空所有次要切片 (仅在'或许没用'生效)"""
         if self.current_mem_mode != "trash" or not self.cached_trash_records:
-            QMessageBox.information(self, "暂无数据", "当前没有识别出的次要切片。")
+            ModernDialog.show_info(self, "暂无数据", "当前没有识别出的次要切片。")
             return
 
         trash_ids = [r.get("id") for r in self.cached_trash_records if r.get("id")]
         count = len(trash_ids)
-        reply = QMessageBox.warning(
+        ok = ModernDialog.confirm_danger(
             self,
-            "一键清空次要切片",
-            f"确定要一键清理当前识别出的全部 {count} 段次要切片吗？\n\n这些切片经 AI 研判为闲聊、试音或无决议/无待办碎片。删除后将彻底释放空间并优化检索效率，操作不可逆！",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No
+            title="一键清空次要切片",
+            message=f"确定要一键清理当前识别出的全部 {count} 段次要切片吗？",
+            detail="这些切片经 AI 研判为闲聊、试音或无决议/无待办碎片。\n删除后将彻底释放空间并优化检索效率，操作不可逆！",
+            confirm_text=f"一键清空 ({count})"
         )
-        if reply == QMessageBox.StandardButton.Yes:
+        if ok:
             deleted_count = self.store.delete_slices(trash_ids)
             self.search_status_lbl.setText(f"✓ 已一键清理 {deleted_count} 段次要切片")
             self.current_selected_record = None
@@ -3483,23 +4203,42 @@ class MainWindow(QMainWindow):
         if not rec:
             return
 
+        is_light = ThemeManager.get_instance().is_light()
         menu = QMenu(self)
-        menu.setStyleSheet("""
-            QMenu {
-                background-color: #121724;
-                border: 1px solid rgba(255, 255, 255, 0.1);
-                color: #E2E8F0;
-                font-size: 11px;
-                padding: 4px;
-            }
-            QMenu::item:selected {
-                background-color: #1E293B;
-                color: #FFFFFF;
-                border-radius: 4px;
-            }
-        """)
-        restore_action = menu.addAction("✨ 判定有用并恢复 (移回正式资产)")
-        del_action = menu.addAction("🗑️ 确认删除此段次要切片")
+        if is_light:
+            menu.setStyleSheet("""
+                QMenu {
+                    background-color: #FFFFFF;
+                    border: 1px solid #CBD5E1;
+                    color: #0F172A;
+                    font-size: 11px;
+                    padding: 4px;
+                }
+                QMenu::item:selected {
+                    background-color: #F1F5F9;
+                    color: #0284C7;
+                    border-radius: 4px;
+                }
+            """)
+        else:
+            menu.setStyleSheet("""
+                QMenu {
+                    background-color: #121724;
+                    border: 1px solid rgba(255, 255, 255, 0.1);
+                    color: #E2E8F0;
+                    font-size: 11px;
+                    padding: 4px;
+                }
+                QMenu::item:selected {
+                    background-color: #1E293B;
+                    color: #FFFFFF;
+                    border-radius: 4px;
+                }
+            """)
+        restore_action = menu.addAction("判定有用并恢复 (移回正式资产)")
+        restore_action.setIcon(get_symbol_icon("check_circle", color="#16A34A" if is_light else "#8AC657", size=13))
+        del_action = menu.addAction("确认删除此段次要切片")
+        del_action.setIcon(get_symbol_icon("delete_forever", color="#DC2626" if is_light else "#EF4444", size=13))
         action = menu.exec(self.mem_list.mapToGlobal(pos))
         if action == restore_action:
             self._restore_slice_useful(rec)
@@ -3536,13 +4275,13 @@ class MainWindow(QMainWindow):
 
             clean_topic = first_line[:30] + "..." if len(first_line) > 30 else first_line
             if self.current_mem_mode == "trash":
-                item = QListWidgetItem(f"🗑️ {time_str}\n   🔍 {clean_topic}")
+                item = QListWidgetItem(f"{time_str}\n   {clean_topic}")
                 reason = rec.get("trash_reason", "次要碎片")
                 item.setToolTip(f"【次要切片】: {time_str}\n【AI 研判理由】: {reason}\n{first_line}")
                 item.setData(Qt.ItemDataRole.UserRole, rec)
                 self.mem_list.addItem(item)
             else:
-                item = QListWidgetItem(f"📅 {time_str}\n   🔍 {clean_topic}")
+                item = QListWidgetItem(f"{time_str}\n   {clean_topic}")
                 item.setData(Qt.ItemDataRole.UserRole, rec)
                 self.mem_list.addItem(item)
 
@@ -3667,7 +4406,10 @@ class MainWindow(QMainWindow):
         else:
             self.new_session_requested.emit()
             self.intercom_banner.set_idle()
-            self.search_status_lbl.setText(f"📚 已载入历史会话回顾「{title}」")
+            self.search_status_lbl.setText(f"已载入历史会话回顾「{title}」")
+
+        # 3.5 秒后自动消隐提示，绝不永久常驻
+        QTimer.singleShot(3500, lambda: self.search_status_lbl.setText(""))
 
         # 3.5 秒后自动消隐提示，绝不永久常驻
         QTimer.singleShot(3500, lambda: self.search_status_lbl.setText(""))
@@ -3681,30 +4423,696 @@ class MainWindow(QMainWindow):
         """根据当前回答来源动态切换解答卡边框：科技青(内部会议) vs 灵动紫(全网通识) vs 琥珀金(敏捷指令)"""
         if not hasattr(self, 'ans_card'):
             return
-        if mode == "INSTRUCTION":
-            self.ans_card.setStyleSheet("""
-                QFrame#ans_card {
-                    background-color: #13100B;
-                    border: 1.5px solid rgba(245, 158, 11, 0.7);
-                    border-radius: 12px;
+        is_light = ThemeManager.get_instance().is_light()
+        self.ans_card.setStyleSheet(get_ans_card_style(mode, is_light))
+
+    def _build_clean_status_bar(self):
+        """构建轻量优雅的程序状态栏 (非系统原生灰框，无浮夸动效，极简高质感)"""
+        sb = self.statusBar()
+        sb.setSizeGripEnabled(False)
+        sb.setFixedHeight(26)
+
+        is_light = ThemeManager.get_instance().is_light()
+
+        # 左侧：引擎就绪状态
+        self.status_engine_widget = QWidget()
+        eng_layout = QHBoxLayout(self.status_engine_widget)
+        eng_layout.setContentsMargins(8, 0, 8, 0)
+        eng_layout.setSpacing(5)
+        self.status_engine_icon = QLabel()
+        self.status_engine_icon.setPixmap(get_symbol_pixmap("check_circle", color="#16A34A" if is_light else "#10B981", size=13))
+        self.status_engine_lbl = QLabel("向量引擎与数据库已就绪")
+        eng_layout.addWidget(self.status_engine_icon)
+        eng_layout.addWidget(self.status_engine_lbl)
+        sb.addWidget(self.status_engine_widget)
+
+        # 右侧 1：热键提示
+        self.status_hotkey_widget = QWidget()
+        hot_layout = QHBoxLayout(self.status_hotkey_widget)
+        hot_layout.setContentsMargins(6, 0, 6, 0)
+        hot_layout.setSpacing(4)
+        self.status_hotkey_icon = QLabel()
+        self.status_hotkey_icon.setPixmap(get_symbol_pixmap("keyboard", color="#475569" if is_light else "#94A3B8", size=13))
+        self.status_hotkey_lbl = QLabel(f"长按 [{Config.get_intercom_display_key()}] 随心对讲")
+        hot_layout.addWidget(self.status_hotkey_icon)
+        hot_layout.addWidget(self.status_hotkey_lbl)
+        sb.addPermanentWidget(self.status_hotkey_widget)
+
+        # 右侧 2：企业空间
+        self.status_space_widget = QWidget()
+        spc_layout = QHBoxLayout(self.status_space_widget)
+        spc_layout.setContentsMargins(6, 0, 10, 0)
+        spc_layout.setSpacing(4)
+        self.status_space_icon = QLabel()
+        self.status_space_icon.setPixmap(get_symbol_pixmap("apartment", color="#0284C7" if is_light else "#26B0E4", size=13))
+        self.status_space_lbl = QLabel("美好智能 企业常驻空间")
+        spc_layout.addWidget(self.status_space_icon)
+        spc_layout.addWidget(self.status_space_lbl)
+        sb.addPermanentWidget(self.status_space_widget)
+
+    def _update_status_bar_theme(self, is_light: bool):
+        sb = self.statusBar()
+        if not sb:
+            return
+        if is_light:
+            sb.setStyleSheet("""
+                QStatusBar {
+                    background-color: #F8FAFC;
+                    border-top: 1px solid #E2E8F0;
+                    color: #64748B;
+                }
+                QStatusBar::item {
+                    border: none;
                 }
             """)
-        elif mode == "GENERAL":
-            self.ans_card.setStyleSheet("""
-                QFrame#ans_card {
-                    background-color: #0E1019;
-                    border: 1.5px solid rgba(139, 92, 246, 0.65);
-                    border-radius: 12px;
-                }
-            """)
+            if hasattr(self, 'status_engine_lbl'):
+                self.status_engine_lbl.setStyleSheet("color: #0F766E; font-size: 11px; font-weight: 500;")
+                self.status_engine_icon.setPixmap(get_symbol_pixmap("check_circle", color="#16A34A", size=13))
+            if hasattr(self, 'status_hotkey_lbl'):
+                self.status_hotkey_lbl.setStyleSheet("color: #475569; font-size: 11px;")
+                self.status_hotkey_icon.setPixmap(get_symbol_pixmap("keyboard", color="#475569", size=13))
+            if hasattr(self, 'status_space_lbl'):
+                self.status_space_lbl.setStyleSheet("color: #0284C7; font-size: 11px; font-weight: 600;")
+                self.status_space_icon.setPixmap(get_symbol_pixmap("apartment", color="#0284C7", size=13))
         else:
-            self.ans_card.setStyleSheet("""
-                QFrame#ans_card {
-                    background-color: #0E1017;
-                    border: 1px solid rgba(38, 176, 228, 0.28);
-                    border-radius: 12px;
+            sb.setStyleSheet("""
+                QStatusBar {
+                    background-color: #0A0C10;
+                    border-top: 1px solid rgba(255, 255, 255, 0.05);
+                    color: #64748B;
+                }
+                QStatusBar::item {
+                    border: none;
                 }
             """)
+            if hasattr(self, 'status_engine_lbl'):
+                self.status_engine_lbl.setStyleSheet("color: #10B981; font-size: 11px; font-weight: 500;")
+                self.status_engine_icon.setPixmap(get_symbol_pixmap("check_circle", color="#10B981", size=13))
+            if hasattr(self, 'status_hotkey_lbl'):
+                self.status_hotkey_lbl.setStyleSheet("color: #94A3B8; font-size: 11px;")
+                self.status_hotkey_icon.setPixmap(get_symbol_pixmap("keyboard", color="#94A3B8", size=13))
+            if hasattr(self, 'status_space_lbl'):
+                self.status_space_lbl.setStyleSheet("color: #26B0E4; font-size: 11px; font-weight: 600;")
+                self.status_space_icon.setPixmap(get_symbol_pixmap("apartment", color="#26B0E4", size=13))
+
+    def _on_toggle_theme(self):
+        ThemeManager.get_instance().toggle_theme()
+
+    def _apply_current_theme(self):
+        tm = ThemeManager.get_instance()
+        is_light = tm.is_light()
+        colors = tm.get_colors()
+
+        # 1. 全局窗口 QSS
+        self.setStyleSheet(tm.get_global_qss())
+
+        # 2. 品牌卡与侧边栏
+        if hasattr(self, 'brand_card'):
+            if is_light:
+                self.brand_card.setStyleSheet("""
+                    QFrame#brand_card {
+                        background-color: #FFFFFF;
+                        border: 1px solid #E2E8F0;
+                        border-radius: 10px;
+                        padding: 4px;
+                    }
+                """)
+                self.brand_title_lbl.setStyleSheet("font-size: 13.5px; font-weight: 800; color: #0F172A; letter-spacing: 0.5px;")
+                self.brand_sub_lbl.setStyleSheet("font-size: 10px; font-weight: 600; color: #0284C7; letter-spacing: 0.5px;")
+                if hasattr(self, 'brand_nav_label'):
+                    self.brand_nav_label.setStyleSheet("font-size: 10px; font-weight: bold; color: #94A3B8; letter-spacing: 0.8px; padding-left: 6px;")
+                if hasattr(self, 'hotkey_tag'):
+                    self.hotkey_tag.setStyleSheet("color: #64748B; font-size: 10.5px;")
+            else:
+                self.brand_card.setStyleSheet("""
+                    QFrame#brand_card {
+                        background-color: rgba(255, 255, 255, 0.03);
+                        border: 1px solid rgba(255, 255, 255, 0.06);
+                        border-radius: 10px;
+                        padding: 4px;
+                    }
+                """)
+                self.brand_title_lbl.setStyleSheet("font-size: 13.5px; font-weight: 800; color: #FFFFFF; letter-spacing: 0.5px;")
+                self.brand_sub_lbl.setStyleSheet("font-size: 10px; font-weight: 600; color: #26B0E4; letter-spacing: 0.5px;")
+                if hasattr(self, 'brand_nav_label'):
+                    self.brand_nav_label.setStyleSheet("font-size: 10px; font-weight: bold; color: #64748B; letter-spacing: 0.8px; padding-left: 6px;")
+                if hasattr(self, 'hotkey_tag'):
+                    self.hotkey_tag.setStyleSheet("color: #64748B; font-size: 10.5px;")
+
+        # 3. 顶部 Top Bar
+        if hasattr(self, 'breadcrumb_lbl'):
+            self.breadcrumb_lbl.setStyleSheet(f"font-size: 13px; font-weight: 600; color: {colors['text_muted']};")
+
+        if hasattr(self, 'theme_btn'):
+            self.theme_btn.setStyleSheet(get_theme_btn_style(is_light))
+            if is_light:
+                self.theme_btn.setIcon(get_symbol_icon("dark_mode", color="#475569", size=16))
+                self.theme_btn.setToolTip("切换为深色模式 (Dark Mode)")
+            else:
+                self.theme_btn.setIcon(get_symbol_icon("light_mode", color="#FBBF24", size=16))
+                self.theme_btn.setToolTip("切换为浅色模式 (Light Mode)")
+
+        if hasattr(self, 'top_version_btn'):
+            self.top_version_btn.setStyleSheet(get_top_version_style(is_light))
+            self.top_version_btn.setIcon(get_symbol_icon("rocket_launch", color="#0284C7" if is_light else "#38BDF8", size=13))
+
+        # 4. Page 0 控件
+        if hasattr(self, 'cmd_card'):
+            self.cmd_card.setStyleSheet(get_cmd_card_style(is_light))
+        if hasattr(self, 'search_icon_lbl'):
+            self.search_icon_lbl.setPixmap(get_symbol_pixmap("search", color="#0284C7" if is_light else "#26B0E4", size=18))
+        if hasattr(self, 'query_input'):
+            input_color = colors["text_primary"]
+            self.query_input.setStyleSheet(f"QLineEdit {{ background: transparent; border: none; font-size: 13px; color: {input_color}; padding: 4px; }}")
+
+        mode = getattr(self, '_last_response_mode', 'MEETING')
+        if hasattr(self, 'ans_card'):
+            self._set_ans_card_style(mode)
+        if hasattr(self, 'ans_title_icon'):
+            self.ans_title_icon.setPixmap(get_symbol_pixmap("chat", color="#0284C7" if is_light else "#26B0E4", size=16))
+        if hasattr(self, 'ans_title'):
+            self.ans_title.setStyleSheet(f"font-size: 14px; font-weight: 700; color: {colors['text_primary']};")
+        if hasattr(self, 'copy_btn'):
+            self.copy_btn.setIcon(get_symbol_icon("content_copy", color="#64748B" if is_light else "#94A3B8", size=13))
+            self.copy_btn.setStyleSheet(f"background: transparent; border: none; color: {colors['text_muted']}; font-size: 11px;")
+        if hasattr(self, 'answer_browser'):
+            self.answer_browser.setStyleSheet(get_answer_browser_style(is_light))
+            if hasattr(self.answer_browser, '_full_text') and self.answer_browser._full_text:
+                self.answer_browser._render_combined(self.answer_browser._full_text, is_streaming=False, use_cached_latest=True)
+            else:
+                self.answer_browser.clear_history()
+
+        if hasattr(self, 'intercom_banner'):
+            if "对讲" in self.intercom_banner.badge_lbl.text():
+                self.intercom_banner.set_idle()
+
+        # 5. 简约程序状态栏
+        self._update_status_bar_theme(is_light)
+
+        # 6. 刷新其他动态组件
+        if hasattr(self, 'record_switch'):
+            self.record_switch.update()
+        if hasattr(self, 'btn_ask'):
+            self.btn_ask.update()
+        if hasattr(self, 'btn_gear'):
+            self._update_gear_button_style(active=(self.stack.currentIndex() in (1, 2, 3, 4)))
+        if hasattr(self, 'session_menu'):
+            self.session_menu.apply_theme()
+            self.session_menu.refresh_sessions()
+        self._update_settings_sub_tab_styles(self.stack.currentIndex())
+
+        # 7. Page 1 会议记忆库动态样式
+        if hasattr(self, 'mem_header_card'):
+            if is_light:
+                self.mem_header_card.setStyleSheet("""
+                    QFrame#mem_header_card {
+                        background-color: #FFFFFF;
+                        border: 1px solid #E2E8F0;
+                        border-radius: 10px;
+                    }
+                """)
+            else:
+                self.mem_header_card.setStyleSheet("""
+                    QFrame#mem_header_card {
+                        background-color: #11141D;
+                        border: 1px solid rgba(255, 255, 255, 0.07);
+                        border-radius: 10px;
+                    }
+                """)
+        if hasattr(self, 'mem_search_input'):
+            if is_light:
+                self.mem_search_input.setStyleSheet("""
+                    QLineEdit {
+                        background-color: #F8FAFC;
+                        border: 1px solid #CBD5E1;
+                        border-radius: 8px;
+                        padding: 7px 12px;
+                        font-size: 12px;
+                        color: #0F172A;
+                    }
+                    QLineEdit:focus {
+                        border-color: #0284C7;
+                    }
+                """)
+            else:
+                self.mem_search_input.setStyleSheet("""
+                    QLineEdit {
+                        background-color: #0A0C10;
+                        border: 1px solid rgba(255, 255, 255, 0.08);
+                        border-radius: 8px;
+                        padding: 7px 12px;
+                        font-size: 12px;
+                        color: #FFFFFF;
+                    }
+                    QLineEdit:focus {
+                        border-color: #26B0E4;
+                    }
+                """)
+        if hasattr(self, 'mem_search_btn'):
+            self.mem_search_btn.setIcon(get_symbol_icon("search", color="#0284C7" if is_light else "#26B0E4", size=13))
+            if is_light:
+                self.mem_search_btn.setStyleSheet("""
+                    QPushButton {
+                        background-color: rgba(2, 132, 199, 0.08);
+                        color: #0284C7;
+                        border: 1px solid rgba(2, 132, 199, 0.35);
+                        border-radius: 8px;
+                        padding: 7px 16px;
+                        font-size: 12px;
+                        font-weight: 600;
+                    }
+                    QPushButton:hover {
+                        background-color: #0284C7;
+                        color: #FFFFFF;
+                    }
+                """)
+            else:
+                self.mem_search_btn.setStyleSheet("""
+                    QPushButton {
+                        background-color: rgba(19, 69, 157, 0.35);
+                        color: #26B0E4;
+                        border: 1px solid rgba(38, 176, 228, 0.45);
+                        border-radius: 8px;
+                        padding: 7px 16px;
+                        font-size: 12px;
+                        font-weight: 600;
+                    }
+                    QPushButton:hover {
+                        background-color: #26B0E4;
+                        color: #FFFFFF;
+                    }
+                """)
+        if hasattr(self, 'trash_banner'):
+            if is_light:
+                self.trash_banner.setStyleSheet("""
+                    QFrame {
+                        background: rgba(245, 158, 11, 0.08);
+                        border: 1px solid rgba(245, 158, 11, 0.35);
+                        border-left: 4px solid #D97706;
+                        border-radius: 8px;
+                        padding: 6px 12px;
+                    }
+                """)
+            else:
+                self.trash_banner.setStyleSheet("""
+                    QFrame {
+                        background: rgba(245, 158, 11, 0.08);
+                        border: 1px solid rgba(245, 158, 11, 0.3);
+                        border-left: 4px solid #F59E0B;
+                        border-radius: 8px;
+                        padding: 6px 12px;
+                    }
+                """)
+        if hasattr(self, 'trash_tip_lbl'):
+            self.trash_tip_lbl.setStyleSheet(f"color: {'#92400E' if is_light else '#FCD34D'}; font-size: 11px; font-weight: 500;")
+        if hasattr(self, 'btn_clean_all_trash'):
+            self.btn_clean_all_trash.setIcon(get_symbol_icon("delete_forever", color="#DC2626" if is_light else "#FCA5A5", size=13))
+            if is_light:
+                self.btn_clean_all_trash.setStyleSheet("""
+                    QPushButton {
+                        background-color: rgba(239, 68, 68, 0.10);
+                        color: #DC2626;
+                        border: 1px solid rgba(239, 68, 68, 0.35);
+                        border-radius: 6px;
+                        padding: 6px 14px;
+                        font-size: 11px;
+                        font-weight: bold;
+                    }
+                    QPushButton:hover {
+                        background-color: #DC2626;
+                        color: #FFFFFF;
+                    }
+                """)
+            else:
+                self.btn_clean_all_trash.setStyleSheet("""
+                    QPushButton {
+                        background-color: rgba(239, 68, 68, 0.18);
+                        color: #FCA5A5;
+                        border: 1px solid rgba(239, 68, 68, 0.45);
+                        border-radius: 6px;
+                        padding: 6px 14px;
+                        font-size: 11px;
+                        font-weight: bold;
+                    }
+                    QPushButton:hover {
+                        background-color: #EF4444;
+                        color: #FFFFFF;
+                        border-color: #DC2626;
+                    }
+                """)
+        if hasattr(self, 'mem_list'):
+            self.mem_list.setStyleSheet(get_mem_list_style(is_light))
+        if hasattr(self, 'mem_detail_browser'):
+            self.mem_detail_browser.setStyleSheet(get_mem_detail_style(is_light))
+            if hasattr(self, 'current_selected_record') and self.current_selected_record:
+                self._render_record_to_detail(self.current_selected_record, self.mem_detail_browser)
+        if hasattr(self, 'trash_detail_action_bar'):
+            if is_light:
+                self.trash_detail_action_bar.setStyleSheet("""
+                    QFrame {
+                        background-color: #FFFFFF;
+                        border: 1px solid rgba(239, 68, 68, 0.35);
+                        border-radius: 8px;
+                        padding: 6px 10px;
+                    }
+                """)
+            else:
+                self.trash_detail_action_bar.setStyleSheet("""
+                    QFrame {
+                        background-color: #11141D;
+                        border: 1px solid rgba(239, 68, 68, 0.25);
+                        border-radius: 8px;
+                        padding: 6px 10px;
+                    }
+                """)
+        if hasattr(self, 'btn_restore_curr_slice'):
+            self.btn_restore_curr_slice.setIcon(get_symbol_icon("check_circle", color="#0284C7" if is_light else "#26B0E4", size=13))
+            if is_light:
+                self.btn_restore_curr_slice.setStyleSheet("""
+                    QPushButton {
+                        background: rgba(2, 132, 199, 0.08);
+                        color: #0284C7;
+                        border: 1px solid #0284C7;
+                        border-radius: 6px;
+                        padding: 5px 12px;
+                        font-size: 11px;
+                        font-weight: bold;
+                    }
+                    QPushButton:hover {
+                        background: #0284C7;
+                        color: #FFFFFF;
+                    }
+                """)
+            else:
+                self.btn_restore_curr_slice.setStyleSheet("""
+                    QPushButton {
+                        background: rgba(38, 176, 228, 0.2);
+                        color: #26B0E4;
+                        border: 1px solid #26B0E4;
+                        border-radius: 6px;
+                        padding: 5px 12px;
+                        font-size: 11px;
+                        font-weight: bold;
+                    }
+                    QPushButton:hover {
+                        background: #26B0E4;
+                        color: #FFFFFF;
+                    }
+                """)
+        if hasattr(self, 'btn_delete_curr_slice'):
+            self.btn_delete_curr_slice.setIcon(get_symbol_icon("delete_forever", color="#DC2626" if is_light else "#FCA5A5", size=13))
+            if is_light:
+                self.btn_delete_curr_slice.setStyleSheet("""
+                    QPushButton {
+                        background: rgba(239, 68, 68, 0.10);
+                        color: #DC2626;
+                        border: 1px solid rgba(239, 68, 68, 0.35);
+                        border-radius: 6px;
+                        padding: 5px 12px;
+                        font-size: 11px;
+                        font-weight: bold;
+                    }
+                    QPushButton:hover {
+                        background: #DC2626;
+                        color: #FFFFFF;
+                    }
+                """)
+            else:
+                self.btn_delete_curr_slice.setStyleSheet("""
+                    QPushButton {
+                        background: rgba(239, 68, 68, 0.2);
+                        color: #FCA5A5;
+                        border: 1px solid rgba(239, 68, 68, 0.45);
+                        border-radius: 6px;
+                        padding: 5px 12px;
+                        font-size: 11px;
+                        font-weight: bold;
+                    }
+                    QPushButton:hover {
+                        background: #EF4444;
+                        color: #FFFFFF;
+                        border-color: #DC2626;
+                    }
+                """)
+        if hasattr(self, 'btn_mem_normal'):
+            self._update_mem_tab_styles()
+
+        # 8. Page 2: 企业通讯录动态样式
+        if hasattr(self, 'roster_search_input'):
+            if is_light:
+                self.roster_search_input.setStyleSheet("""
+                    QLineEdit {
+                        background-color: #FFFFFF;
+                        border: 1px solid #CBD5E1;
+                        border-radius: 8px;
+                        color: #0F172A;
+                        padding: 7px 14px;
+                        font-size: 12px;
+                    }
+                    QLineEdit:focus {
+                        border-color: #0284C7;
+                    }
+                """)
+            else:
+                self.roster_search_input.setStyleSheet("""
+                    QLineEdit {
+                        background-color: #12151F;
+                        border: 1px solid rgba(255, 255, 255, 0.08);
+                        border-radius: 8px;
+                        color: #FFFFFF;
+                        padding: 7px 14px;
+                        font-size: 12px;
+                    }
+                    QLineEdit:focus {
+                        border-color: #26B0E4;
+                        background-color: #161A28;
+                    }
+                """)
+        if hasattr(self, 'refresh_roster_btn'):
+            self.refresh_roster_btn.setIcon(get_symbol_icon("history", color="#0284C7" if is_light else "#CBD5E1", size=13))
+            if is_light:
+                self.refresh_roster_btn.setStyleSheet("""
+                    QPushButton {
+                        background: #FFFFFF;
+                        color: #334155;
+                        border: 1px solid #CBD5E1;
+                        border-radius: 6px;
+                        padding: 6px 12px;
+                        font-size: 11px;
+                    }
+                    QPushButton:hover {
+                        background: #F1F5F9;
+                        border-color: #0284C7;
+                        color: #0284C7;
+                    }
+                """)
+            else:
+                self.refresh_roster_btn.setStyleSheet("""
+                    QPushButton {
+                        background: rgba(255, 255, 255, 0.05);
+                        color: #CBD5E1;
+                        border: 1px solid rgba(255, 255, 255, 0.08);
+                        border-radius: 6px;
+                        padding: 6px 12px;
+                        font-size: 11px;
+                    }
+                    QPushButton:hover {
+                        background: rgba(255, 255, 255, 0.1);
+                        color: #FFFFFF;
+                        border-color: #26B0E4;
+                    }
+                """)
+        if hasattr(self, 'departed_toggle_btn'):
+            self.departed_toggle_btn.setIcon(get_symbol_icon("apartment", color="#64748B", size=13))
+            if is_light:
+                self.departed_toggle_btn.setStyleSheet("""
+                    QPushButton {
+                        background-color: #F8FAFC;
+                        color: #64748B;
+                        border: 1px dashed #CBD5E1;
+                        border-radius: 8px;
+                        padding: 9px;
+                        font-size: 11.5px;
+                        font-weight: 600;
+                    }
+                    QPushButton:hover {
+                        background-color: #F1F5F9;
+                        color: #334155;
+                        border-color: #94A3B8;
+                    }
+                """)
+            else:
+                self.departed_toggle_btn.setStyleSheet("""
+                    QPushButton {
+                        background-color: #0D1017;
+                        color: #64748B;
+                        border: 1px dashed rgba(255, 255, 255, 0.1);
+                        border-radius: 8px;
+                        padding: 9px;
+                        font-size: 11.5px;
+                        font-weight: 600;
+                    }
+                    QPushButton:hover {
+                        background-color: #121622;
+                        color: #94A3B8;
+                        border-color: rgba(255, 255, 255, 0.2);
+                    }
+                """)
+        if hasattr(self, 'employee_cards'):
+            for card in self.employee_cards:
+                card._apply_style(hover=False)
+
+        # 9. Page 3: 引擎配置动态样式
+        if hasattr(self, 'engine_card'):
+            if is_light:
+                self.engine_card.setStyleSheet("""
+                    QFrame#card {
+                        background-color: #FFFFFF;
+                        border: 1px solid #E2E8F0;
+                        border-radius: 12px;
+                        padding: 16px;
+                    }
+                """)
+            else:
+                self.engine_card.setStyleSheet("""
+                    QFrame#card {
+                        background-color: #11141D;
+                        border: 1px solid rgba(255, 255, 255, 0.08);
+                        border-radius: 12px;
+                        padding: 16px;
+                    }
+                """)
+        if hasattr(self, 'engine_title'):
+            self.engine_title.setStyleSheet(f"font-size: 15px; font-weight: bold; color: {'#0F172A' if is_light else '#FFFFFF'};")
+        if hasattr(self, 'engine_boxes'):
+            for box in self.engine_boxes:
+                box.setStyleSheet("background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px;" if is_light else "background-color: #0A0C10; border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 12px;")
+        if hasattr(self, 'engine_desc_labels'):
+            for lbl in self.engine_desc_labels:
+                lbl.setStyleSheet(f"color: {'#475569' if is_light else '#94A3B8'}; font-size: 11px; line-height: 1.4;")
+        if hasattr(self, 'goto_lbl'):
+            self.goto_lbl.setStyleSheet(f"color: {'#64748B' if is_light else '#94A3B8'}; font-size: 11px;")
+        if hasattr(self, 'btn_goto_update'):
+            if is_light:
+                self.btn_goto_update.setStyleSheet("""
+                    QPushButton {
+                        background: rgba(2, 132, 199, 0.08);
+                        color: #0284C7;
+                        border: 1px solid rgba(2, 132, 199, 0.3);
+                        border-radius: 5px;
+                        padding: 4px 10px;
+                        font-size: 11px;
+                    }
+                    QPushButton:hover {
+                        background: rgba(2, 132, 199, 0.18);
+                    }
+                """)
+            else:
+                self.btn_goto_update.setStyleSheet("""
+                    QPushButton {
+                        background: rgba(38, 176, 228, 0.12);
+                        color: #38BDF8;
+                        border: 1px solid rgba(38, 176, 228, 0.3);
+                        border-radius: 5px;
+                        padding: 4px 10px;
+                        font-size: 11px;
+                    }
+                    QPushButton:hover {
+                        background: rgba(38, 176, 228, 0.25);
+                        color: #FFFFFF;
+                    }
+                """)
+
+        # 10. Page 4: 软件发版动态样式
+        if hasattr(self, 'version_card'):
+            if is_light:
+                self.version_card.setStyleSheet("""
+                    QFrame#card {
+                        background-color: #FFFFFF;
+                        border: 1px solid #E2E8F0;
+                        border-radius: 12px;
+                        padding: 16px;
+                    }
+                """)
+            else:
+                self.version_card.setStyleSheet("""
+                    QFrame#card {
+                        background-color: #11141D;
+                        border: 1px solid rgba(255, 255, 255, 0.08);
+                        border-radius: 12px;
+                        padding: 16px;
+                    }
+                """)
+        if hasattr(self, 'version_title'):
+            self.version_title.setStyleSheet(f"font-size: 15px; font-weight: bold; color: {'#0F172A' if is_light else '#FFFFFF'};")
+        if hasattr(self, 'ver_badge'):
+            self.ver_badge.setStyleSheet("color: #0284C7; font-size: 11px; background: rgba(2,132,199,0.10); border: 1px solid rgba(2,132,199,0.3); padding: 3px 8px; border-radius: 5px; font-weight: bold;" if is_light else "color: #26B0E4; font-size: 11px; background: rgba(38,176,228,0.15); border: 1px solid rgba(38,176,228,0.4); padding: 3px 8px; border-radius: 5px; font-weight: bold;")
+        if hasattr(self, 'btn_check_update'):
+            self.btn_check_update.setIcon(get_symbol_icon("search", color="#0284C7" if is_light else "#26B0E4", size=13))
+            if is_light:
+                self.btn_check_update.setStyleSheet("""
+                    QPushButton {
+                        background: rgba(2, 132, 199, 0.08);
+                        color: #0284C7;
+                        border: 1px solid rgba(2, 132, 199, 0.35);
+                        border-radius: 6px;
+                        padding: 6px 16px;
+                        font-size: 11.5px;
+                        font-weight: bold;
+                    }
+                    QPushButton:hover {
+                        background: #0284C7;
+                        color: #FFFFFF;
+                    }
+                """)
+            else:
+                self.btn_check_update.setStyleSheet("""
+                    QPushButton {
+                        background: rgba(38, 176, 228, 0.22);
+                        color: #26B0E4;
+                        border: 1px solid rgba(38, 176, 228, 0.5);
+                        border-radius: 6px;
+                        padding: 6px 16px;
+                        font-size: 11.5px;
+                        font-weight: bold;
+                    }
+                    QPushButton:hover {
+                        background: #26B0E4;
+                        color: #FFFFFF;
+                    }
+                """)
+        if hasattr(self, 'btn_cancel_restart'):
+            if is_light:
+                self.btn_cancel_restart.setStyleSheet("""
+                    QPushButton {
+                        background: #F1F5F9;
+                        color: #475569;
+                        border: 1px solid #CBD5E1;
+                        border-radius: 6px;
+                        padding: 6px 14px;
+                        font-size: 11.5px;
+                    }
+                    QPushButton:hover {
+                        background: #E2E8F0;
+                        color: #0F172A;
+                    }
+                """)
+            else:
+                self.btn_cancel_restart.setStyleSheet("""
+                    QPushButton {
+                        background: rgba(255, 255, 255, 0.08);
+                        color: #CBD5E1;
+                        border: 1px solid rgba(255, 255, 255, 0.15);
+                        border-radius: 6px;
+                        padding: 6px 14px;
+                    }
+                """)
+        if hasattr(self, 'spec_card'):
+            self.spec_card.setStyleSheet("QFrame#card { background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; padding: 16px; }" if is_light else "QFrame#card { background-color: #11141D; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 16px; }")
+        if hasattr(self, 'spec_title'):
+            self.spec_title.setStyleSheet(f"font-size: 13.5px; font-weight: bold; color: {'#0F172A' if is_light else '#FFFFFF'};")
+        if hasattr(self, 'spec_desc'):
+            self.spec_desc.setStyleSheet(f"color: {'#475569' if is_light else '#94A3B8'}; font-size: 11.5px; line-height: 1.7;")
 
     def clear_answer_session(self):
         """清空当前问答界面和会话上下文，开启新会话"""

@@ -93,9 +93,9 @@ class InstructionHandler:
             # 操作员只说了“改进一下”，未说具体内容
             spoken_ack = "已进入敏捷改进模式。请说出您期望优化的界面细节或功能需求。"
             answer_md = (
-                "> 🚀 **敏捷自进化指令模式已就绪**\n>\n"
-                "> 🎙️ **状态提示**：检测到指令触发词，但未采集到具体内容。\n\n"
-                "### 💡 使用说明\n"
+                "> **敏捷自进化指令模式已就绪**\n>\n"
+                "> **状态提示**：检测到指令触发词，但未采集到具体内容。\n\n"
+                "### 使用说明\n"
                 "请长按【右 Alt】直接说出您的建议，例如：\n"
                 "- “*改进一下：把或许没用列表项的高度增加一些*”\n"
                 "- “*优化一下：首页搜索框的圆角调整得更加柔和*”\n"
@@ -143,23 +143,23 @@ class InstructionHandler:
         modules_str = ", ".join(f"`{m}`" for m in task_record["target_modules"]) if task_record["target_modules"] else "`UI/核心模块`"
         clarify_section = ""
         if task_record["clarification_prompt"] and task_record["clarification_prompt"] != "无":
-            clarify_section = f"\n> ⚠️ **方案沟通提示**：{task_record['clarification_prompt']}\n"
+            clarify_section = f"\n> **方案沟通提示**：{task_record['clarification_prompt']}\n"
 
-        markdown_card = f"""> 🚀 **敏捷自进化工单**：编号 {task_id}
+        markdown_card = f"""> **敏捷自进化工单**：编号 {task_id}
 
-> 🎙️ **架构师响应**：{task_record['spoken_ack']}
+> **架构师响应**：{task_record['spoken_ack']}
 {clarify_section}
-### 📋 需求要点与实施拆解
+### 需求要点与实施拆解
 - **需求议题**：**{task_record['task_title']}**
 - **归属分类**：`{task_record['category']}`（评估结果：**{task_record['feasibility']}**）
 - **诉求归纳**：{task_record['requirement_summary']}
 - **技术方案**：
 {exec_plan_str}
 - **预期模块**：{modules_str}
-- **任务状态**：⏳ `PENDING` (已入库等待后台 Autonomous Loop 自动调度更新)
+- **任务状态**：`PENDING` (已入库等待后台 Autonomous Loop 自动调度更新)
 
 ---
-> 💡 **自动流转**：后台智能体验证通过并发版后，本客户端将收到推送并自动重启生效。
+> **自动流转**：后台智能体验证通过并发版后，本客户端将收到推送并自动重启生效。
 """
 
         print(f"[InstructionHandler] 新需求工单已生成: {task_id} | 标题: {task_record['task_title']}")
