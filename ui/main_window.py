@@ -1696,15 +1696,15 @@ class MainWindow(QMainWindow):
             self.breadcrumb_lbl.setText("DeskEcho / 对讲与即时检索")
             if hasattr(self, 'settings_tab_bar'):
                 self.settings_tab_bar.setVisible(False)
-            if hasattr(self, 'refresh_btn'):
-                self.refresh_btn.setVisible(True)
         else:
             self.breadcrumb_lbl.setText(f"DeskEcho / 设置中心 · {titles[index]}")
             if hasattr(self, 'settings_tab_bar'):
                 self.settings_tab_bar.setVisible(True)
-            if hasattr(self, 'refresh_btn'):
-                self.refresh_btn.setVisible(False)
             self._update_settings_sub_tab_styles(index)
+
+        # 若从其他页面切换至会议记忆库且存在待更新的新切片，立即平滑呈现
+        if index == 1 and getattr(self, "_has_pending_update", False):
+            self._apply_pending_slice_update()
 
         if index == 2 and hasattr(self, "refresh_roster"):
             self.refresh_roster()
@@ -1830,29 +1830,6 @@ class MainWindow(QMainWindow):
         """)
         self.top_version_btn.clicked.connect(lambda: self._switch_nav(4))
         top_bar.addWidget(self.top_version_btn)
-
-        # 快捷刷新操作按钮
-        self.refresh_btn = QPushButton("🔄 刷新列表")
-        self.refresh_btn.setToolTip("手动同步最新的会议切片与检索索引")
-        self.refresh_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.refresh_btn.setStyleSheet("""
-            QPushButton {
-                background-color: rgba(255, 255, 255, 0.05);
-                color: #CBD5E1;
-                border: 1px solid rgba(255, 255, 255, 0.09);
-                border-radius: 6px;
-                padding: 6px 14px;
-                font-size: 11px;
-                font-weight: 500;
-            }
-            QPushButton:hover {
-                background-color: rgba(255, 255, 255, 0.1);
-                color: #FFFFFF;
-                border-color: rgba(255, 255, 255, 0.18);
-            }
-        """)
-        self.refresh_btn.clicked.connect(self.refresh_records)
-        top_bar.addWidget(self.refresh_btn)
 
         parent_layout.addLayout(top_bar)
 
@@ -2118,7 +2095,35 @@ class MainWindow(QMainWindow):
         splitter.setHandleWidth(6)
         splitter.setStyleSheet("QSplitter::handle { background: transparent; }")
 
-        # 左栏：列表
+        # 左栏：容器 (新切片静默浮动提示胶囊 + 切片列表)
+        left_container = QWidget()
+        left_layout = QVBoxLayout(left_container)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setSpacing(6)
+
+        self.new_slice_pill = QPushButton("✨ 收到新会议切片已归档 · 点击置顶查看")
+        self.new_slice_pill.setVisible(False)
+        self.new_slice_pill.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.new_slice_pill.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 rgba(38, 176, 228, 0.25), stop:1 rgba(99, 102, 241, 0.25));
+                color: #38BDF8;
+                border: 1px solid #26B0E4;
+                border-radius: 8px;
+                padding: 6px 12px;
+                font-size: 11.5px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background: #26B0E4;
+                color: #FFFFFF;
+                border: 1px solid #38BDF8;
+            }
+        """)
+        self.new_slice_pill.clicked.connect(self._apply_pending_slice_update)
+        left_layout.addWidget(self.new_slice_pill)
+
+        # 列表
         self.mem_list = QListWidget()
         self.mem_list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.mem_list.setVerticalScrollMode(QListWidget.ScrollMode.ScrollPerPixel)
@@ -2152,7 +2157,10 @@ class MainWindow(QMainWindow):
         self.mem_list.currentRowChanged.connect(self._on_mem_item_selected)
         self.mem_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.mem_list.customContextMenuRequested.connect(self._show_mem_list_context_menu)
-        splitter.addWidget(self.mem_list)
+        self.mem_list.verticalScrollBar().valueChanged.connect(self._on_mem_scroll_changed)
+        left_layout.addWidget(self.mem_list, 1)
+
+        splitter.addWidget(left_container)
 
         # 右栏容器：详情卡 + 顶部专属操作栏 (次要切片专属删除按钮)
         right_detail_container = QWidget()
@@ -2253,7 +2261,25 @@ class MainWindow(QMainWindow):
         self._update_mem_tab_styles()
         self.trash_banner.setVisible(mode == "trash")
         self.trash_detail_action_bar.setVisible(False)
+        if hasattr(self, "new_slice_pill"):
+            self.new_slice_pill.setVisible(False)
+        self._has_pending_update = False
         self._render_mem_list(preserve_selection=False)
+
+    def _apply_pending_slice_update(self):
+        """平滑应用积压的待更新切片，置顶显示最新会议内容"""
+        if hasattr(self, "new_slice_pill"):
+            self.new_slice_pill.setVisible(False)
+        self._has_pending_update = False
+        self._render_mem_list(preserve_selection=False)
+        if self.mem_list.count() > 0:
+            self.mem_list.setCurrentRow(0)
+        self.mem_list.verticalScrollBar().setValue(0)
+
+    def _on_mem_scroll_changed(self, val: int):
+        """当操作员主动滚回顶部且有待更新的新切片时，自动平滑合并并隐藏胶囊"""
+        if val == 0 and getattr(self, "_has_pending_update", False):
+            self._apply_pending_slice_update()
 
     def _update_mem_tab_styles(self):
         if not hasattr(self, 'btn_mem_normal'):
@@ -2914,7 +2940,46 @@ class MainWindow(QMainWindow):
             action = content.get("action")
             out_img = content.get("output_path", "C:/DeskEcho/real_window.png")
 
-            if action == "inspect_trash":
+            if action == "inspect_page0":
+                self._switch_nav(0)
+                from PyQt6.QtWidgets import QApplication
+                QApplication.processEvents()
+                pix = self.grab()
+                pix.save(out_img)
+                result = {"status": "success", "page": 0, "image_saved": out_img}
+                Path("C:/DeskEcho/action_result.json").write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding='utf-8')
+                trigger_file.unlink()
+                return
+
+            if action == "test_non_intrusive_update":
+                # 切换到切片库
+                self._switch_nav(1)
+                self._switch_mem_mode("normal")
+                from PyQt6.QtWidgets import QApplication
+                QApplication.processEvents()
+                # 模拟操作员正在阅读过往切片 (选中第 2 项，滚轮下移)
+                if self.mem_list.count() > 2:
+                    self.mem_list.setCurrentRow(2)
+                    self._on_mem_item_selected(2)
+                    self.mem_list.verticalScrollBar().setValue(120)
+                QApplication.processEvents()
+                # 模拟后台到达新切片 (插入假变更并触发 refresh_records)
+                self.cached_records = list(self.cached_records)[:-1] if self.cached_records else []
+                self.refresh_records()
+                QApplication.processEvents()
+                pix = self.grab()
+                pix.save(out_img)
+                result = {
+                    "status": "success",
+                    "pill_visible": self.new_slice_pill.isVisible(),
+                    "pill_text": self.new_slice_pill.text(),
+                    "current_row": self.mem_list.currentRow(),
+                    "scroll_value": self.mem_list.verticalScrollBar().value(),
+                    "image_saved": out_img
+                }
+                Path("C:/DeskEcho/action_result.json").write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding='utf-8')
+                trigger_file.unlink()
+                return
                 # 切换到会议记忆切片库 (Page 1)
                 self._switch_nav(1)
                 # 切换到或许没用分类
@@ -3002,11 +3067,28 @@ class MainWindow(QMainWindow):
             if hasattr(self, 'sub_btn_memory'):
                 self.sub_btn_memory.setText(f"🧠 会议记忆库 ({len(normal_recs)})")
 
-            # 仅当数据库内容切实发生变动时才重绘切片列表，并保持当前选中项与滚动条位置，杜绝自动跳顶
+            # 智能防打断机制：仅当数据切实变动时响应
             if data_changed:
-                self._render_mem_list(preserve_selection=True)
-                if hasattr(self, "refresh_roster"):
-                    self.refresh_roster()
+                is_on_mem_page = (self.stack.currentIndex() == 1)
+                is_scrolled_down = (self.mem_list.verticalScrollBar().value() > 20)
+                is_inspecting_history = (self.mem_list.currentRow() > 0)
+                is_searching = bool(hasattr(self, "mem_search_input") and self.mem_search_input.text().strip())
+
+                # 判断操作员是否正在查看过往切片或搜索历史，若是则绝不打断
+                user_is_busy_reading = is_on_mem_page and (is_scrolled_down or is_inspecting_history or is_searching)
+
+                if user_is_busy_reading:
+                    self._has_pending_update = True
+                    if hasattr(self, "new_slice_pill"):
+                        self.new_slice_pill.setText("✨ 收到新归档会议切片 · 点击置顶查看")
+                        self.new_slice_pill.setVisible(True)
+                else:
+                    self._has_pending_update = False
+                    if hasattr(self, "new_slice_pill"):
+                        self.new_slice_pill.setVisible(False)
+                    self._render_mem_list(preserve_selection=True)
+                    if hasattr(self, "refresh_roster"):
+                        self.refresh_roster()
 
         except Exception as e:
             print(f"[MainWindow] 刷新记录失败: {e}")
