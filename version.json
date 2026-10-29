@@ -1,0 +1,13 @@
+{
+  "version": "0.2.0",
+  "release_date": "2026-10-29",
+  "title": "DeskEcho v0.2.0 正式发版：双角色TTS音色感知、切片有用恢复与自动更新机制",
+  "changelog": [
+    "✨ TTS 双角色音色自适应：会议结论使用严肃沉稳男声，全网通识科普使用知性女声，秒级听觉感知信息源",
+    "🧹 会议记忆库‘或许没用’切片增加每一项直观‘✨ 有用’一键恢复功能，彻底消除 AI 偶发误判",
+    "⚡ 修复切片列表与详情窗口定时刷新自动跳顶与选中重置问题，视口与阅读位置精准记忆",
+    "🚀 启动 GitHub 正规发版与应用内全自动静默检测更新机制"
+  ],
+  "download_url": "https://github.com/bababoyibibilabu/DeskEcho/archive/refs/tags/v0.2.0.zip",
+  "min_version": "0.1.0"
+}

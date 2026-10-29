@@ -106,6 +106,9 @@ class DeskEchoApp:
         self.hotkey_listener.start()
         self.main_window.showMaximized()
 
+        # 启动后台自动更新检查 (为方便高频迭代测试，客户端在后台静默自动检测并升级)
+        self._start_auto_update_daemon()
+
         self.tray.tray_icon.showMessage(
             "DeskEcho 桌面回响",
             f"已就绪！会议监听开启中，长按【{key_display}】可随时对讲提问。",
@@ -352,6 +355,31 @@ class DeskEchoApp:
         self.store.insert_record(slice_id, t1, t2, raw_text, summary)
         self.main_window.refresh_records()
         self.tray.tray_icon.showMessage("演示数据已注入", "已成功写入一段模拟会议记录，可直接在控制台检索或长按【右 Alt】提问！", self.tray.tray_icon.MessageIcon.Information, 2500)
+
+    def _start_auto_update_daemon(self):
+        """后台静默启动自动更新检测 (方便高频迭代测试，有新发布自动下载就绪)"""
+        try:
+            from core.updater import AutoUpdateWorker
+            from version import APP_VERSION
+            self.auto_updater = AutoUpdateWorker(current_version=APP_VERSION, auto_apply=True, parent=self.main_window)
+            
+            def _on_finished(new_v, info):
+                print(f"[AutoUpdater] 客户端已成功后台自动升级至 v{new_v}！")
+                if hasattr(self, "tray") and hasattr(self.tray, "tray_icon"):
+                    self.tray.tray_icon.showMessage(
+                        "DeskEcho 自动更新完成",
+                        f"已全自动升级至最新版本 v{new_v}！\n重启客户端即可体验最新功能。",
+                        self.tray.tray_icon.MessageIcon.Information,
+                        5000
+                    )
+                if hasattr(self, "main_window"):
+                    self.main_window._on_update_finished(new_v, info)
+
+            self.auto_updater.update_finished.connect(_on_finished)
+            # 延时 2.5 秒触发，避开应用启动期的音频硬件与 UI 争抢
+            threading.Timer(2.5, self.auto_updater.start).start()
+        except Exception as e:
+            print(f"[AutoUpdater] 启动自动更新守护失败: {e}")
 
     def quit(self):
         print("[DeskEcho] 正在退出应用...")

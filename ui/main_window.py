@@ -17,8 +17,10 @@ from PyQt6.QtGui import QColor, QFont, QIcon, QPainter, QBrush, QPen, QLinearGra
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
 
 from config import Config
+from version import APP_VERSION, APP_NAME, RELEASE_DATE
 from core.knowledge_engine import MeetingStore, assess_slice_utility
 from core.entity_dict import EMPLOYEES, COMPANY_INFO, get_dynamic_employee_profile
+from core.updater import AutoUpdateWorker, UpdateChecker
 from ui.audio_visualizer import AudioWaveVisualizer
 
 class ModernBreathingSwitch(QPushButton):
@@ -2598,10 +2600,120 @@ class MainWindow(QMainWindow):
 
         e_layout.addLayout(grid)
         v_layout.addWidget(engine_card)
+
+        # 2. 版本发布与自动升级控制台卡片 (GitHub Releases)
+        version_card = QFrame()
+        version_card.setObjectName("card")
+        version_card.setStyleSheet("""
+            QFrame#card {
+                background-color: #11141D;
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 12px;
+                padding: 16px;
+            }
+        """)
+        v_card_layout = QVBoxLayout(version_card)
+        v_card_layout.setContentsMargins(16, 14, 16, 14)
+        v_card_layout.setSpacing(10)
+
+        v_head_layout = QHBoxLayout()
+        v_title = QLabel("🚀 发版与版本自动更新管理 (GitHub Release)")
+        v_title.setStyleSheet("font-size: 14px; font-weight: bold; color: #FFFFFF;")
+        v_head_layout.addWidget(v_title, 1)
+
+        self.ver_badge = QLabel(f"v{APP_VERSION} (当前版本)")
+        self.ver_badge.setStyleSheet("color: #26B0E4; font-size: 11px; background: rgba(38,176,228,0.15); border: 1px solid rgba(38,176,228,0.4); padding: 3px 8px; border-radius: 5px; font-weight: bold;")
+        v_head_layout.addWidget(self.ver_badge)
+
+        self.btn_check_update = QPushButton("🔍 检查新版本")
+        self.btn_check_update.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_check_update.setStyleSheet("""
+            QPushButton {
+                background: rgba(38, 176, 228, 0.22);
+                color: #26B0E4;
+                border: 1px solid rgba(38, 176, 228, 0.5);
+                border-radius: 6px;
+                padding: 5px 14px;
+                font-size: 11.5px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background: #26B0E4;
+                color: #FFFFFF;
+            }
+        """)
+        self.btn_check_update.clicked.connect(self._manual_check_update)
+        v_head_layout.addWidget(self.btn_check_update)
+
+        self.btn_restart_app = QPushButton("🚀 立即重启客户端")
+        self.btn_restart_app.setVisible(False)
+        self.btn_restart_app.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_restart_app.setStyleSheet("""
+            QPushButton {
+                background: #10B981;
+                color: #FFFFFF;
+                border: 1px solid #059669;
+                border-radius: 6px;
+                padding: 5px 14px;
+                font-size: 11.5px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background: #059669;
+            }
+        """)
+        self.btn_restart_app.clicked.connect(self._restart_app)
+        v_head_layout.addWidget(self.btn_restart_app)
+
+        v_card_layout.addLayout(v_head_layout)
+
+        self.update_info_lbl = QLabel(f"当前构建日期：{RELEASE_DATE} · 采用 GitHub Releases 官方云端发版通道，客户端已开启后台静默自检。")
+        self.update_info_lbl.setStyleSheet("color: #94A3B8; font-size: 11.5px; line-height: 1.4;")
+        self.update_info_lbl.setWordWrap(True)
+        v_card_layout.addWidget(self.update_info_lbl)
+
+        v_layout.addWidget(version_card)
         v_layout.addStretch()
 
         scroll.setWidget(container)
         stack.addWidget(scroll)
+
+    def _manual_check_update(self):
+        self.btn_check_update.setEnabled(False)
+        self.update_info_lbl.setText("🔍 正在连接 GitHub Releases 官方接口检查最新版本...")
+
+        self.update_worker = AutoUpdateWorker(current_version=APP_VERSION, auto_apply=True, parent=self)
+        self.update_worker.update_detected.connect(self._on_update_detected)
+        self.update_worker.update_progress.connect(lambda msg: self.update_info_lbl.setText(f"⏳ {msg}"))
+        self.update_worker.update_finished.connect(self._on_update_finished)
+        self.update_worker.update_failed.connect(self._on_update_failed)
+        self.update_worker.start()
+
+    def _on_update_detected(self, info: dict):
+        new_v = info.get("version", "")
+        self.ver_badge.setText(f"发现新版 v{new_v}")
+        self.ver_badge.setStyleSheet("color: #F59E0B; font-size: 11px; background: rgba(245,158,11,0.15); border: 1px solid rgba(245,158,11,0.4); padding: 3px 8px; border-radius: 5px; font-weight: bold;")
+        self.update_info_lbl.setText(f"🚀 发现新版本 DeskEcho v{new_v}！正在为您全自动下载并应用更新...")
+
+    def _on_update_finished(self, new_v: str, info: dict):
+        self.btn_check_update.setEnabled(True)
+        self.btn_check_update.setText("✓ 检查更新")
+        self.ver_badge.setText(f"v{new_v} (已就绪)")
+        self.ver_badge.setStyleSheet("color: #10B981; font-size: 11px; background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.4); padding: 3px 8px; border-radius: 5px; font-weight: bold;")
+        self.btn_restart_app.setVisible(True)
+        changelog_str = "；".join(info.get("changelog", [])[:3])
+        self.update_info_lbl.setText(f"🎉 升级成功！DeskEcho 已自动更新至 v{new_v}。\n更新内容：{changelog_str}\n请点击右侧【立即重启客户端】使新版本生效。")
+        self.search_status_lbl.setText(f"🎉 已自动升级至 v{new_v}，点击重启生效")
+
+    def _on_update_failed(self, err_msg: str):
+        self.btn_check_update.setEnabled(True)
+        self.update_info_lbl.setText(f"当前已是最新版本 (v{APP_VERSION})，或远端暂无更高发布版本。")
+        self.search_status_lbl.setText("✓ 已是最新版本")
+        QTimer.singleShot(3000, lambda: self.search_status_lbl.setText(""))
+
+    def _restart_app(self):
+        checker = UpdateChecker()
+        checker.restart_app()
 
     # ---------------- 定时与刷新逻辑 ----------------
     def _setup_timer(self):
