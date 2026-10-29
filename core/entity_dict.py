@@ -1,98 +1,98 @@
 from typing import List, Dict, Any, Optional
 
-# 企业实体与组织架构知识库 (企业实际组织架构)
+# 企业实体与组织架构知识库 (根据企业实际真实组织架构与团队成员配置)
 COMPANY_INFO = {
-    "name": "未来智能",
-    "aliases": ["公司", "咱们公司", "团队", "研发部"],
+    "name": "未来智能 / 巨升科技",
+    "aliases": ["公司", "咱们公司", "团队", "研发部", "巨升机器人"],
     "projects": [
         "AI 桌面智能助手 (DeskEcho)",
         "企业级常驻会议记忆中台",
-        "多模态工作流与自适应知识库",
-        "智能硬件交互与端侧大模型"
+        "K12 互动学习平板与陪伴机器人",
+        "多模态工作流与自适应知识库"
     ]
 }
 
 EMPLOYEES: List[Dict[str, Any]] = [
     {
-        "name": "张明",
-        "title": "董事长 / 战略决策层",
+        "name": "陈佳彤",
+        "title": "行政人事与组织办公室负责人",
         "status": "active",
-        "aliases": ["张总", "董事长", "老板"],
-        "duties": "公司董事长，统筹公司全局方向、长期发展战略与关键资本规划",
-        "tech_stack": "战略规划 / 资本运作 / 商业决策",
-        "current_focus": "2026年度AI创新专项预算批复，要求严把采购招标关"
+        "aliases": ["陈佳彤", "小陈", "佳彤", "陈经理", "行政人事"],
+        "duties": "负责团队行政人事、日常办公保障、组织协同与团队后勤支撑，新员工入职对接",
+        "tech_stack": "行政管理 / 人事组织 / 流程规范 / 日常协调",
+        "current_focus": "团队行政人事规范化推进、流程无缝衔接与办公保障"
     },
     {
-        "name": "李志成",
-        "title": "核心算法团队负责人",
+        "name": "吕明秋",
+        "title": "算法与大模型应用专家",
         "status": "active",
-        "aliases": ["李工", "算法李", "志成"],
-        "duties": "负责自适应学习系统、知识追踪模型（BKT）与算法工程落地",
-        "tech_stack": "Python / PyTorch / BKT / 深度学习",
-        "current_focus": "自适应学习知识点掌握度动态追踪算法与0.85阈值研发"
+        "aliases": ["吕明秋", "吕工", "老吕", "小吕"],
+        "duties": "负责大模型应用落地、课程脚本AI辅助生成、自适应评估与交互逻辑调优",
+        "tech_stack": "Python / 大模型工作流 / Prompt工程 / 算法工程",
+        "current_focus": "智能陪学系统核心交互与AI生成工作流构建"
     },
     {
-        "name": "王程",
-        "title": "产品总监 / 架构协调",
+        "name": "杨年新",
+        "title": "总经理 / 业务与资源统筹总负责人",
         "status": "active",
-        "aliases": ["王总", "程哥", "产品王"],
-        "duties": "负责 DeskEcho 客户端体验、上线排期与跨部门研发试点推进",
-        "tech_stack": "产品规划 / 敏捷交付 / 系统架构",
-        "current_focus": "DeskEcho 11月15日全员内测与研发部先行试点落地"
+        "aliases": ["杨总", "杨年新", "杨建新", "老杨", "发言人1", "发言人7"],
+        "duties": "公司整体业务推进与技术资源兜底，统筹多端产品交付、外部院校合作与商务资源",
+        "tech_stack": "战略运营 / 商业推进 / 综合调度 / 资源协调",
+        "current_focus": "推进“奋斗一百天”核心目标、东北师大/吉大合作项目与场地规划落地"
     },
     {
-        "name": "陈佳",
-        "title": "供应链与采购总监",
+        "name": "陈思豪",
+        "title": "系统后端与接口开发主管",
         "status": "active",
-        "aliases": ["陈总监", "佳姐", "陈经理"],
-        "duties": "负责硬件设备采购、算力集群设备招标及供应链把关",
-        "tech_stack": "采购供应链 / 招投标 / 成本控制",
-        "current_focus": "2026年度AI专项GPU算力集群设备采购招标严格把关"
+        "aliases": ["陈思豪", "陈哥", "思豪", "陈工"],
+        "duties": "负责服务端架构设计、API接口定义与高可用微服务搭建，主导前后端并行高效交付",
+        "tech_stack": "Python / 后端架构 / RESTful API / 数据库 / 微服务",
+        "current_focus": "先行出具API接口体系与数据处理流程梳理"
     },
     {
-        "name": "赵文",
-        "title": "人力资源与组织发展总监",
+        "name": "程远",
+        "title": "技术总监 / 架构与研发协调",
         "status": "active",
-        "aliases": ["赵总监", "文姐", "赵主管"],
-        "duties": "统筹全公司职级晋升、薪酬绩效考核及组织人才发展",
-        "tech_stack": "HRBP / 绩效激励体系 / 组织发展",
-        "current_focus": "年终P5-P8职级晋升答辩组织与S/A/B档绩效考核宣贯"
+        "aliases": ["程远", "成远", "成哥", "程哥", "发言人3"],
+        "duties": "统筹技术研发全局协调、跨端架构设计、软硬件技术方案打通与开发节奏把控",
+        "tech_stack": "系统架构 / 技术协调 / 软硬协同 / 跨平台交付",
+        "current_focus": "整体技术方案架构协调、安卓端与机器人端协同落地"
     },
     {
-        "name": "周工",
-        "title": "系统架构师 / 运维容灾专家",
+        "name": "荣硕",
+        "title": "硬件与嵌入式测试工程师",
         "status": "active",
-        "aliases": ["老周", "周工", "架构师"],
-        "duties": "负责公司高可用服务器架构、双活灾备网络及专线容灾系统",
-        "tech_stack": "高可用架构 / BGP多线容灾 / 故障应急",
-        "current_focus": "华东客户双活灾备光纤中断复盘与BGP多线冗余改造"
+        "aliases": ["荣硕", "小荣", "荣工", "荣"],
+        "duties": "负责硬件白板/平板、麦克风拾音、天机900板卡调试、硬件交互与声音测试",
+        "tech_stack": "硬件调试 / 嵌入式开发 / 拾音设备 / 系统部署",
+        "current_focus": "天机900双麦克风调试与硬件白板测试环境搭建"
     },
     {
-        "name": "刘晓",
-        "title": "市场公关与商业合作经理",
+        "name": "张文嘉",
+        "title": "商业运营与合作拓展主管",
         "status": "active",
-        "aliases": ["刘经理", "刘总", "市场公关"],
-        "duties": "负责全球科技峰会参展布展、特装展位搭建及媒体公关合作",
-        "tech_stack": "公关传播 / 展会统筹 / 商务合作",
-        "current_focus": "2026 Q4全球AI峰会特装展台搭建与王总主题演讲安排"
+        "aliases": ["张文嘉", "张文佳", "文嘉", "小张"],
+        "duties": "负责合作院校（东北师大、吉大等）项目落地推进、承办代表对接与商业合作拓展",
+        "tech_stack": "商务拓展 / 项目承办 / 商务运营 / 院校合作",
+        "current_focus": "东北师大校区部等关键合作项目跟进与承办落地"
     },
     {
-        "name": "林浩",
-        "title": "质量监控与数据埋点工程师",
-        "status": "active",
-        "aliases": ["林经理", "小林", "质量监控"],
-        "duties": "负责客户端稳定性监控、核心用户行为埋点收集与故障告警",
-        "tech_stack": "数据埋点 / APM 监控 / 日志分析",
-        "current_focus": "DeskEcho 研发部首期试点数据监控与全链路埋点分析"
-    },
-    {
-        "name": "李华",
+        "name": "李洋",
         "title": "产品 UI / UE 视觉与交互专家",
         "status": "active",
-        "aliases": ["华哥", "李设计师", "UI", "设计"],
-        "duties": "负责产品全链路视觉系统、Alma 美学黑曜石科技风格沉淀",
-        "tech_stack": "UI/UE 设计 / 动效交互 / 视觉传达",
-        "current_focus": "桌面回响三色渐变极光微交互与通讯录动态卡片体验"
+        "aliases": ["李洋", "李阳", "洋哥", "UI", "设计", "美编"],
+        "duties": "负责产品 UI / UE 视觉与全链路交互设计、页面定稿、视觉规范与动效打磨",
+        "tech_stack": "UI/UE 设计 / 视觉传达 / 动效交互 / 原型设计",
+        "current_focus": "学习平板与机器人端多端视觉定稿与交互规范输出"
+    },
+    {
+        "name": "郎琦",
+        "title": "安卓端核心研发工程师",
+        "status": "active",
+        "aliases": ["郎琦", "郎琪", "小郎", "安卓郎", "安卓开发"],
+        "duties": "负责安卓端机器人/平板应用架构、数据库表结构设计与客户端交互功能落地",
+        "tech_stack": "Android / Kotlin / Java / SQLite / 客户端通信",
+        "current_focus": "安卓数据库设计与核心页面功能开发"
     }
 ]
 
@@ -113,7 +113,7 @@ def extract_action_summary(emp_name: str, aliases: List[str], slices: List[Dict[
             if "【核心议题】" in line or "【议题】" in line or "1. 核心议题" in line:
                 topic = line.replace("【核心议题】", "").replace("【议题】", "").replace("1. 核心议题（Topic）：", "").strip()
             if any(k in line for k in keywords):
-                conclusion = line.replace("【关键结论】", "").replace("【结论】", "").replace("2. 决策与结论（Key Decisions）：", "").strip()
+                conclusion = line.replace("【关键结论】", "").replace("【结论】", "").replace("2. 决策与结论（Key Decisions）：", "").replace("3. 待办事项（Action Items）：", "").strip()
 
         if not conclusion:
             for sent in raw_text.split("。"):
