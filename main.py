@@ -259,7 +259,7 @@ class DeskEchoApp:
             self.signals.query_answered.emit(query_text, answer_markdown, audio_path, is_followup, focal_topic, response_mode)
 
         if Config.ENABLE_TTS and spoken_text:
-            self.tts.speak_async(spoken_text, on_audio_ready=on_tts_ready)
+            self.tts.speak_async(spoken_text, on_audio_ready=on_tts_ready, mode=response_mode)
             self.signals.query_answered.emit(query_text, answer_markdown, "", is_followup, focal_topic, response_mode)
         else:
             self.signals.query_answered.emit(query_text, answer_markdown, "", is_followup, focal_topic, response_mode)
@@ -289,7 +289,7 @@ class DeskEchoApp:
                 self.signals.query_answered.emit(query_text, answer_markdown, audio_path, is_followup, focal_topic, response_mode)
 
             if Config.ENABLE_TTS and spoken_text:
-                self.tts.speak_async(spoken_text, on_audio_ready=on_tts_ready)
+                self.tts.speak_async(spoken_text, on_audio_ready=on_tts_ready, mode=response_mode)
                 self.signals.query_answered.emit(query_text, answer_markdown, "", is_followup, focal_topic, response_mode)
             else:
                 self.signals.query_answered.emit(query_text, answer_markdown, "", is_followup, focal_topic, response_mode)

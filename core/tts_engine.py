@@ -1,6 +1,7 @@
 import os
 import re
 import uuid
+import time
 import base64
 import asyncio
 import threading
@@ -15,6 +16,7 @@ class TTSEngine:
     多引擎自适应语音合成播报 (TTS Engine)
     - 优先支持：火山引擎豆包语音大模型 TTS (自然度极高、拟真情感)
     - 免费备选：微软 Edge-TTS (免配置免 Key，极速稳定)
+    - 角色分离：会议内部结论采用【沉稳男声】，全网通识科普采用【知性女声】，听觉显著区分来源
     """
     def __init__(self):
         self.provider = Config.TTS_PROVIDER
@@ -58,7 +60,7 @@ class TTSEngine:
             cleaned = cleaned[:220] + "，详细内容请查看屏幕卡片。"
         return cleaned.strip()
 
-    def speak_async(self, text: str, on_audio_ready: Callable[[str], None]):
+    def speak_async(self, text: str, on_audio_ready: Callable[[str], None], mode: str = "MEETING"):
         if not self.enabled:
             return
 
@@ -66,23 +68,27 @@ class TTSEngine:
         if not plain_text:
             return
 
+        is_general = (str(mode).upper() == "GENERAL")
+        edge_voice = Config.TTS_VOICE_GENERAL if is_general else Config.TTS_VOICE_MEETING
+        volc_voice = Config.VOLC_TTS_VOICE_GENERAL if is_general else Config.VOLC_TTS_VOICE_MEETING
+
         def _worker():
             # 1. 若配置了火山引擎 TTS，优先尝试火山豆包 TTS
             if self.provider == "volcengine" and self.volc_appid and self.volc_token:
-                volc_path = self._synthesize_volcengine(plain_text)
+                volc_path = self._synthesize_volcengine(plain_text, voice_type=volc_voice)
                 if volc_path:
                     on_audio_ready(volc_path)
                     return
                 print("[TTSEngine] 火山豆包 TTS 未返回有效音频，自动平滑切换至 Edge-TTS...")
 
-            # 2. 默认 / 备选 Edge-TTS
-            edge_path = self._synthesize_edge_tts(plain_text)
+            # 2. 默认 / 备选 Edge-TTS (会议沉稳男声 vs 全网科普知性女声)
+            edge_path = self._synthesize_edge_tts(plain_text, voice=edge_voice)
             if edge_path:
                 on_audio_ready(edge_path)
 
         threading.Thread(target=_worker, daemon=True).start()
 
-    def _synthesize_volcengine(self, text: str) -> Optional[str]:
+    def _synthesize_volcengine(self, text: str, voice_type: Optional[str] = None) -> Optional[str]:
         """
         调用火山引擎豆包语音合成 API (HTTP 极速模式)
         """
@@ -92,6 +98,7 @@ class TTSEngine:
                 "Authorization": f"Bearer; {self.volc_token}",
                 "Content-Type": "application/json"
             }
+            v_type = voice_type or self.volc_voice_type
             payload = {
                 "app": {
                     "appid": self.volc_appid,
@@ -102,7 +109,7 @@ class TTSEngine:
                     "uid": "deskecho_client"
                 },
                 "audio": {
-                    "voice_type": self.volc_voice_type,
+                    "voice_type": v_type,
                     "encoding": "mp3",
                     "speed_ratio": 1.0,
                     "volume_ratio": 1.0,
@@ -131,13 +138,13 @@ class TTSEngine:
             print(f"[TTSEngine] 火山 TTS 异常: {e}")
         return None
 
-    def _synthesize_edge_tts(self, text: str) -> Optional[str]:
+    def _synthesize_edge_tts(self, text: str, voice: Optional[str] = None) -> Optional[str]:
         try:
-            import time
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             output_path = Config.TEMP_DIR / f"tts_edge_{int(time.time()*1000)}.mp3"
-            communicate = edge_tts.Communicate(text, self.voice)
+            v = voice or self.voice
+            communicate = edge_tts.Communicate(text, v)
             loop.run_until_complete(communicate.save(str(output_path)))
             loop.close()
             if output_path.exists():

@@ -62,7 +62,12 @@ class Config:
         return cls.INTERCOM_KEY
     TTS_PROVIDER = os.getenv("TTS_PROVIDER", "edge-tts").lower().strip() # edge-tts | volcengine
     TTS_VOICE = os.getenv("TTS_VOICE", "zh-CN-YunxiNeural").strip()
+    # TTS 双角色音色配置 (会议男声 vs 全网科普女声，用不同性别音色明确区分数据来源)
+    TTS_VOICE_MEETING = os.getenv("TTS_VOICE_MEETING", "zh-CN-YunxiNeural").strip()        # 会议记录播报：云希 (男声，严肃严谨)
+    TTS_VOICE_GENERAL = os.getenv("TTS_VOICE_GENERAL", "zh-CN-XiaoxiaoNeural").strip()      # 全网通识播报：晓晓 (女声，知性温暖)
     VOLC_TTS_VOICE_TYPE = os.getenv("VOLC_TTS_VOICE_TYPE", "BV001_streaming").strip()
+    VOLC_TTS_VOICE_MEETING = os.getenv("VOLC_TTS_VOICE_MEETING", "BV002_streaming").strip() # 火山通用男声
+    VOLC_TTS_VOICE_GENERAL = os.getenv("VOLC_TTS_VOICE_GENERAL", "BV001_streaming").strip() # 火山通用女声
     VOLC_TTS_CLUSTER = os.getenv("VOLC_TTS_CLUSTER", "volcano_tts").strip()
 
     @classmethod

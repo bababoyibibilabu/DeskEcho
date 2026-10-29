@@ -36,9 +36,14 @@ class MeetingStore:
                     raw_text TEXT,
                     summary TEXT,
                     audio_path TEXT,
+                    is_useful INTEGER DEFAULT NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
+            try:
+                self.conn.execute("ALTER TABLE meeting_slices ADD COLUMN is_useful INTEGER DEFAULT NULL")
+            except Exception:
+                pass
             self.conn.execute("""
                 CREATE TABLE IF NOT EXISTS chat_sessions (
                     id TEXT PRIMARY KEY,
@@ -279,6 +284,17 @@ class MeetingStore:
         with self.conn:
             self.conn.execute("DELETE FROM chat_turns WHERE session_id = ?", (session_id,))
             self.conn.execute("DELETE FROM chat_sessions WHERE id = ?", (session_id,))
+
+    def set_slice_useful(self, slice_id: str, is_useful: bool = True) -> bool:
+        """标记或恢复切片为有用资产 (1=有用, 0=次要, NULL=默认AI研判)"""
+        try:
+            val = 1 if is_useful else 0
+            with self.conn:
+                self.conn.execute("UPDATE meeting_slices SET is_useful = ? WHERE id = ?", (val, slice_id))
+            return True
+        except Exception as e:
+            print(f"[MeetingStore] 更新切片 {slice_id} 状态失败: {e}")
+            return False
 
     def delete_slice(self, slice_id: str) -> bool:
         """删除单个会议切片 (同步清理 SQLite 与 ChromaDB 向量集合)"""

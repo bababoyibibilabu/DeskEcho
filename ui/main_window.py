@@ -1268,6 +1268,82 @@ class ExpandableEmployeeCard(QFrame):
             self.timeline_layout.addWidget(no_act_lbl)
 
 
+class TrashSliceItemWidget(QWidget):
+    """
+    或许没用切片列表单项组件
+    左侧：时间戳、AI 研判理由与截取的议题第一行
+    右侧：“✨ 有用”按钮，点击可直接将误判切片恢复为正式会议资产
+    """
+    def __init__(self, rec: dict, list_item: QListWidgetItem, list_widget: QListWidget, on_restore_callback, parent=None):
+        super().__init__(parent)
+        self.rec = rec
+        self.list_item = list_item
+        self.list_widget = list_widget
+        self.on_restore_callback = on_restore_callback
+        self.setStyleSheet("background: transparent;")
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(8, 5, 8, 5)
+        layout.setSpacing(6)
+
+        v_box = QVBoxLayout()
+        v_box.setSpacing(2)
+
+        time_str = rec.get("start_time", "")
+        summary = rec.get("summary", "")
+        first_line = summary.split("\n")[0] if summary else "常驻录音切片"
+        first_line = re.sub(r'^[\s\d\.\-、*#]*(?:核心议题|议题|Topic|【核心议题】|主题)(?:[（\(].*?[）\)])?[：:\s]*', '', first_line).strip() or "常规沟通"
+        reason = rec.get("trash_reason", "次要碎片")
+
+        lbl_head = QLabel(f"🗑️ {time_str} · [{reason}]")
+        lbl_head.setStyleSheet("color: #F87171; font-size: 10px; font-weight: bold;")
+        lbl_head.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+
+        lbl_title = QLabel(first_line[:19] + ("..." if len(first_line) > 19 else ""))
+        lbl_title.setStyleSheet("color: #CBD5E1; font-size: 11.5px;")
+        lbl_title.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+
+        v_box.addWidget(lbl_head)
+        v_box.addWidget(lbl_title)
+        layout.addLayout(v_box, 1)
+
+        self.btn_useful = QPushButton("✨ 有用")
+        self.btn_useful.setToolTip("将此切片判定为有用并恢复为正式会议资产 (消除误判)")
+        self.btn_useful.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_useful.setFixedSize(58, 25)
+        self.btn_useful.setStyleSheet("""
+            QPushButton {
+                background: rgba(38, 176, 228, 0.16);
+                color: #26B0E4;
+                border: 1px solid rgba(38, 176, 228, 0.45);
+                border-radius: 5px;
+                font-size: 11px;
+                font-weight: bold;
+                padding: 0;
+            }
+            QPushButton:hover {
+                background: #26B0E4;
+                color: #FFFFFF;
+                border: 1px solid #26B0E4;
+            }
+        """)
+        self.btn_useful.clicked.connect(self._handle_restore)
+        layout.addWidget(self.btn_useful, 0, Qt.AlignmentFlag.AlignVCenter)
+
+    def _handle_restore(self):
+        if self.on_restore_callback:
+            self.on_restore_callback(self.rec)
+
+    def mousePressEvent(self, event):
+        child = self.childAt(event.pos())
+        if child == self.btn_useful:
+            super().mousePressEvent(event)
+            return
+        if self.list_widget and self.list_item:
+            self.list_widget.setCurrentItem(self.list_item)
+        super().mousePressEvent(event)
+
+
 class MainWindow(QMainWindow):
     record_toggled = pyqtSignal(bool)
     query_submitted = pyqtSignal(str)
@@ -2048,6 +2124,27 @@ class MainWindow(QMainWindow):
         self.trash_reason_lbl.setStyleSheet("color: #F87171; font-size: 11px; font-weight: 600;")
         t_action_layout.addWidget(self.trash_reason_lbl, 1)
 
+        self.btn_restore_curr_slice = QPushButton("✨ 判定有用并恢复")
+        self.btn_restore_curr_slice.setToolTip("将此切片恢复为正式会议资产，杜绝 AI 误判")
+        self.btn_restore_curr_slice.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_restore_curr_slice.setStyleSheet("""
+            QPushButton {
+                background: rgba(38, 176, 228, 0.2);
+                color: #26B0E4;
+                border: 1px solid #26B0E4;
+                border-radius: 6px;
+                padding: 5px 12px;
+                font-size: 11px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background: #26B0E4;
+                color: #FFFFFF;
+            }
+        """)
+        self.btn_restore_curr_slice.clicked.connect(lambda: self._restore_slice_useful(self.current_selected_record))
+        t_action_layout.addWidget(self.btn_restore_curr_slice)
+
         self.btn_delete_curr_slice = QPushButton("🗑️ 确认删除此段次要切片")
         self.btn_delete_curr_slice.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_delete_curr_slice.setStyleSheet("""
@@ -2517,9 +2614,9 @@ class MainWindow(QMainWindow):
         try:
             records = self.store.query_recent(limit=200)
 
-            # 比对数据库记录指纹 (ID、开始时间及纪要)，判断数据库切片是否发生新增、删除或变更
-            old_keys = [(r.get("id"), r.get("start_time"), r.get("summary")) for r in getattr(self, "cached_records", [])]
-            new_keys = [(r.get("id"), r.get("start_time"), r.get("summary")) for r in records]
+            # 比对数据库记录指纹 (ID、开始时间、纪要及有用标记)，判断数据库切片是否发生新增、删除或变更
+            old_keys = [(r.get("id"), r.get("start_time"), r.get("summary"), r.get("is_useful")) for r in getattr(self, "cached_records", [])]
+            new_keys = [(r.get("id"), r.get("start_time"), r.get("summary"), r.get("is_useful")) for r in records]
             data_changed = (old_keys != new_keys)
 
             normal_recs = []
@@ -2527,7 +2624,12 @@ class MainWindow(QMainWindow):
             for rec in records:
                 summ = rec.get("summary", "")
                 raw = rec.get("raw_text", "")
-                is_low, reason = assess_slice_utility(summ, raw)
+                is_user_useful = (rec.get("is_useful") == 1)
+                if is_user_useful:
+                    is_low = False
+                    reason = "用户手动标记为有用资产"
+                else:
+                    is_low, reason = assess_slice_utility(summ, raw)
                 rec_copy = dict(rec)
                 rec_copy["is_low_utility"] = is_low
                 rec_copy["trash_reason"] = reason
@@ -2603,14 +2705,22 @@ class MainWindow(QMainWindow):
                 first_line = "常规会议沟通讨论"
 
             if self.current_mem_mode == "trash":
-                reason = rec.get("trash_reason", "次要碎片")
-                item = QListWidgetItem(f"🗑️ {time_str}\n   ⚠️ [{reason}]\n   {first_line[:24]}")
+                item = QListWidgetItem()
+                item.setSizeHint(QSize(280, 54))
+                item.setData(Qt.ItemDataRole.UserRole, rec)
+                self.mem_list.addItem(item)
+                widget = TrashSliceItemWidget(
+                    rec=rec,
+                    list_item=item,
+                    list_widget=self.mem_list,
+                    on_restore_callback=self._restore_slice_useful
+                )
+                self.mem_list.setItemWidget(item, widget)
             else:
                 item = QListWidgetItem(f"📅 {time_str}\n   {first_line[:28]}")
-
-            item.setToolTip(f"{time_str}\n{first_line}")
-            item.setData(Qt.ItemDataRole.UserRole, rec)
-            self.mem_list.addItem(item)
+                item.setToolTip(f"{time_str}\n{first_line}")
+                item.setData(Qt.ItemDataRole.UserRole, rec)
+                self.mem_list.addItem(item)
 
             if selected_id and rec.get("id") == selected_id:
                 target_row_to_select = idx
@@ -2701,6 +2811,31 @@ class MainWindow(QMainWindow):
         """
         browser.setHtml(detail_html)
 
+    def _restore_slice_useful(self, rec: dict):
+        """将次要切片恢复为正式切片资产 (纠正 AI 误判)"""
+        if not rec:
+            return
+        sid = rec.get("id", "")
+        time_str = rec.get("start_time", "")
+        if not sid:
+            return
+
+        reply = QMessageBox.question(
+            self,
+            "恢复为正式切片",
+            f"确定将此切片恢复为【正式会议资产】吗？\n\n切片标识: {sid}\n会议时间: {time_str}\n\n恢复后，该切片将移入【正式会议切片】库，受到防误删保护，并可在后续对讲检索中作为核心证据参与计算。",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            success = self.store.set_slice_useful(sid, is_useful=True)
+            if success:
+                self.search_status_lbl.setText("✓ 已恢复为正式会议切片资产")
+                self.current_selected_record = None
+                self.refresh_records()
+            else:
+                QMessageBox.warning(self, "操作失败", f"更新切片 {sid} 状态时出错。")
+
     def _delete_current_selected_slice(self):
         """选择性删除当前选中的次要切片 (仅在'或许没用'生效)"""
         if self.current_mem_mode != "trash" or not self.current_selected_record:
@@ -2748,7 +2883,7 @@ class MainWindow(QMainWindow):
             self.refresh_records()
 
     def _show_mem_list_context_menu(self, pos):
-        """切片列表右键菜单 (仅在'或许没用'显示删除功能，正常切片无删除)"""
+        """切片列表右键菜单 (仅在'或许没用'显示恢复与删除功能，正常切片无删除)"""
         if self.current_mem_mode != "trash":
             return
         item = self.mem_list.itemAt(pos)
@@ -2768,14 +2903,17 @@ class MainWindow(QMainWindow):
                 padding: 4px;
             }
             QMenu::item:selected {
-                background-color: #EF4444;
+                background-color: #1E293B;
                 color: #FFFFFF;
                 border-radius: 4px;
             }
         """)
-        del_action = menu.addAction("🗑️ 删除此段次要切片")
+        restore_action = menu.addAction("✨ 判定有用并恢复 (移回正式资产)")
+        del_action = menu.addAction("🗑️ 确认删除此段次要切片")
         action = menu.exec(self.mem_list.mapToGlobal(pos))
-        if action == del_action:
+        if action == restore_action:
+            self._restore_slice_useful(rec)
+        elif action == del_action:
             self._delete_current_selected_slice()
 
     def _search_memory_slices(self, preserve_selection: bool = False):
@@ -2805,10 +2943,24 @@ class MainWindow(QMainWindow):
             time_str = rec.get("start_time", "")
             summary = rec.get("summary", "")
             first_line = summary.split("\n")[0] if summary else "匹配切片"
-            prefix = "🗑️ " if self.current_mem_mode == "trash" else "📅 "
-            item = QListWidgetItem(f"{prefix}{time_str}\n   🔍 {first_line[:26]}")
-            item.setData(Qt.ItemDataRole.UserRole, rec)
-            self.mem_list.addItem(item)
+
+            if self.current_mem_mode == "trash":
+                item = QListWidgetItem()
+                item.setSizeHint(QSize(280, 54))
+                item.setData(Qt.ItemDataRole.UserRole, rec)
+                self.mem_list.addItem(item)
+                widget = TrashSliceItemWidget(
+                    rec=rec,
+                    list_item=item,
+                    list_widget=self.mem_list,
+                    on_restore_callback=self._restore_slice_useful
+                )
+                self.mem_list.setItemWidget(item, widget)
+            else:
+                item = QListWidgetItem(f"📅 {time_str}\n   🔍 {first_line[:26]}")
+                item.setData(Qt.ItemDataRole.UserRole, rec)
+                self.mem_list.addItem(item)
+
             if selected_id and rec.get("id") == selected_id:
                 target_row_to_select = idx
 
