@@ -142,21 +142,30 @@ class StreamTextDisplay(QTextBrowser):
     """
     Alma 风格的打字机流式输出渲染器 (富文本 Markdown 转换，支持多轮对话卡片连续追加)
     """
+    streaming_started = pyqtSignal()
+    streaming_finished = pyqtSignal()
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self._history_turns = []
         self._full_text = ""
         self._current_index = 0
+        self._is_streaming = False
         self._timer = QTimer(self)
         self._timer.setInterval(16)
         self._timer.timeout.connect(self._stream_step)
 
+    def is_streaming(self) -> bool:
+        return self._is_streaming
+
     def clear_history(self):
-        """清空历史追问卡片，恢复默认导引页 (高对比度纯净排版，无 Emoji)"""
+        """清空历史追问卡片，恢复默认导引页 (立足用户视角，呈现具体可行动示例，无机械模版套话)"""
         self._timer.stop()
+        self._is_streaming = False
         self._history_turns.clear()
         self._full_text = ""
         self._current_index = 0
+        self.streaming_finished.emit()
         is_light = ThemeManager.get_instance().is_light()
 
         title_color = "#0F172A" if is_light else "#F8FAFC"
@@ -165,17 +174,23 @@ class StreamTextDisplay(QTextBrowser):
         key_border = "#CBD5E1" if is_light else "rgba(38, 176, 228, 0.4)"
         body_color = "#334155" if is_light else "#94A3B8"
         sub_color = "#64748B" if is_light else "#64748B"
+        pill_bg = "#FFFFFF" if is_light else "#121622"
+        pill_border = "#E2E8F0" if is_light else "rgba(255, 255, 255, 0.08)"
+        quote_c = "#475569" if is_light else "#CBD5E1"
 
         self.setHtml(f"""
-            <div style="text-align: center; padding-top: 85px; line-height: 2.2; font-family: -apple-system, 'Segoe UI', 'Microsoft YaHei', sans-serif;">
-                <div style="font-size: 15px; font-weight: 700; color: {title_color}; margin-bottom: 6px;">
-                    在上方检索框输入问题，或长按 <span style="background-color: {key_bg}; color: {key_color}; padding: 2px 8px; border-radius: 4px; font-size: 13px; font-weight: bold; border: 1px solid {key_border};">右 Alt</span> 随时语音对讲
+            <div style="text-align: center; padding-top: 75px; font-family: -apple-system, 'Segoe UI', 'Microsoft YaHei', sans-serif;">
+                <div style="font-size: 16px; font-weight: 700; color: {title_color}; margin-bottom: 8px;">
+                    随时唤醒企业会议记忆
                 </div>
-                <div style="font-size: 13px; color: {body_color}; margin-bottom: 4px;">
-                    系统自动完成 <b>Query Rewriting 意图蒸馏</b> 与 <b>Hybrid RAG 混合检索</b>
+                <div style="font-size: 13px; color: {body_color}; margin-bottom: 22px; line-height: 1.6;">
+                    长按 <span style="background-color: {key_bg}; color: {key_color}; padding: 2px 7px; border-radius: 4px; font-size: 12px; font-weight: 600; border: 1px solid {key_border};">右 Alt</span> 语音对讲，或在上方直接输入问题
                 </div>
-                <div style="font-size: 12px; color: {sub_color};">
-                    以<b>音视分离</b>策略给出极简结论播报与毫秒级会议上下文溯源
+                <div style="display: inline-block; text-align: left; background: {pill_bg}; border: 1px solid {pill_border}; border-radius: 10px; padding: 14px 22px; line-height: 1.85;">
+                    <div style="font-size: 11px; font-weight: 600; color: {sub_color}; margin-bottom: 4px;">例如你可以询问：</div>
+                    <div style="font-size: 12.5px; color: {quote_c};">“昨天下午的会议主要讨论了什么？”</div>
+                    <div style="font-size: 12.5px; color: {quote_c};">“杨年新最近主导负责哪些业务推进？”</div>
+                    <div style="font-size: 12.5px; color: {quote_c};">“关于机器人后端接口规范，定下来了吗？”</div>
                 </div>
             </div>
         """)
@@ -215,6 +230,8 @@ class StreamTextDisplay(QTextBrowser):
 
         self._full_text = markdown_text
         self._current_index = 0
+        self._is_streaming = True
+        self.streaming_started.emit()
         self._timer.start()
 
     def _stream_step(self):
@@ -225,6 +242,8 @@ class StreamTextDisplay(QTextBrowser):
             self._render_combined(partial, is_streaming=(self._current_index < len(self._full_text)))
         else:
             self._timer.stop()
+            self._is_streaming = False
+            self.streaming_finished.emit()
             completed_turn_html = self._format_turn_html(self._full_text, is_streaming=False)
             self._history_turns.append(completed_turn_html)
             self._render_combined(self._full_text, is_streaming=False, use_cached_latest=True)
@@ -1897,19 +1916,12 @@ class MainWindow(QMainWindow):
         side_layout.setContentsMargins(14, 18, 14, 18)
         side_layout.setSpacing(8)
 
-        # 品牌 Workspace 标识卡
+        # 品牌 Workspace 标识区 (无多余嵌套外框，纯粹通透的品牌 Header)
         self.brand_card = QFrame()
         self.brand_card.setObjectName("brand_card")
-        self.brand_card.setStyleSheet("""
-            QFrame {
-                background-color: rgba(255, 255, 255, 0.03);
-                border: 1px solid rgba(255, 255, 255, 0.06);
-                border-radius: 10px;
-                padding: 4px;
-            }
-        """)
+        self.brand_card.setStyleSheet("background: transparent; border: none;")
         brand_layout = QHBoxLayout(self.brand_card)
-        brand_layout.setContentsMargins(10, 8, 10, 8)
+        brand_layout.setContentsMargins(4, 2, 4, 10)
         brand_layout.setSpacing(10)
 
         # 美好智能品牌 Flower Logo (色卡花朵衍生变体)
@@ -1933,12 +1945,7 @@ class MainWindow(QMainWindow):
         brand_layout.addStretch()
 
         side_layout.addWidget(self.brand_card)
-        side_layout.addSpacing(12)
-
-        # 导航分类标题
-        self.brand_nav_label = QLabel("WORKSPACE")
-        self.brand_nav_label.setStyleSheet("font-size: 10px; font-weight: bold; color: #64748B; letter-spacing: 0.8px; padding-left: 6px;")
-        side_layout.addWidget(self.brand_nav_label)
+        side_layout.addSpacing(6)
 
         # 1. 对讲与检索常驻主菜单项
         self.nav_btns = []
@@ -2066,11 +2073,11 @@ class MainWindow(QMainWindow):
 
         # 切换顶栏模式：Page 0 显示简洁面包屑，Page 1/2/3/4 显示设置分段子导航
         if index == 0:
-            self.breadcrumb_lbl.setText("DeskEcho / 对讲与即时检索")
+            self.breadcrumb_lbl.setText("对讲与即时检索")
             if hasattr(self, 'settings_tab_bar'):
                 self.settings_tab_bar.setVisible(False)
         else:
-            self.breadcrumb_lbl.setText(f"DeskEcho / 设置中心 · {titles[index]}")
+            self.breadcrumb_lbl.setText(f"设置中心 · {titles[index]}")
             if hasattr(self, 'settings_tab_bar'):
                 self.settings_tab_bar.setVisible(True)
             self._update_settings_sub_tab_styles(index)
@@ -2161,9 +2168,9 @@ class MainWindow(QMainWindow):
         top_bar = QHBoxLayout()
         top_bar.setSpacing(12)
 
-        # 面包屑
-        self.breadcrumb_lbl = QLabel("DeskEcho / 对讲与即时检索")
-        self.breadcrumb_lbl.setStyleSheet("font-size: 13px; font-weight: 600; color: #94A3B8;")
+        # 面包屑 (自然清晰，去除机械冗余前缀)
+        self.breadcrumb_lbl = QLabel("对讲与即时检索")
+        self.breadcrumb_lbl.setStyleSheet("font-size: 13.5px; font-weight: 700; color: #94A3B8;")
         top_bar.addWidget(self.breadcrumb_lbl)
 
         # 设置中心分段子导航栏 (在 Page 1, 2, 3, 4 时呈现)
@@ -2289,19 +2296,19 @@ class MainWindow(QMainWindow):
         cmd_layout.addWidget(self.search_status_lbl)
 
         # 快捷键标签
-        shortcut_chip = QLabel("↵ Enter 检索")
+        shortcut_chip = QLabel("Enter 检索")
         shortcut_chip.setStyleSheet("""
-            background-color: rgba(255, 255, 255, 0.08);
-            color: #94A3B8;
+            background-color: rgba(148, 163, 184, 0.12);
+            color: #64748B;
             border: none;
             border-radius: 4px;
-            padding: 3px 7px;
-            font-size: 10px;
-            font-weight: bold;
+            padding: 3px 8px;
+            font-size: 10.5px;
+            font-weight: 600;
         """)
         cmd_layout.addWidget(shortcut_chip)
 
-        search_btn = QPushButton("检索记忆")
+        search_btn = QPushButton("检索知识库")
         search_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         search_btn.setStyleSheet("""
             QPushButton {
@@ -2359,6 +2366,8 @@ class MainWindow(QMainWindow):
         self.answer_browser = StreamTextDisplay()
         self.answer_browser.setOpenExternalLinks(True)
         self.answer_browser.clear_history()
+        self.answer_browser.streaming_started.connect(self.ans_card.start_beam)
+        self.answer_browser.streaming_finished.connect(self._on_output_finished)
         ans_layout.addWidget(self.answer_browser, 1)
 
         page_layout.addWidget(self.ans_card, 1)
@@ -4328,6 +4337,8 @@ class MainWindow(QMainWindow):
 
     def _on_playback_state_changed(self, state):
         if state == QMediaPlayer.PlaybackState.StoppedState:
+            if hasattr(self, "ans_card") and not getattr(self.answer_browser, '_is_streaming', False):
+                self.ans_card.stop_beam()
             if hasattr(self, "intercom_banner") and "播报" in self.intercom_banner.badge_lbl.text():
                 self.intercom_banner.set_completed(
                     focal_topic=getattr(self, '_last_focal_topic', ''),
@@ -4336,10 +4347,16 @@ class MainWindow(QMainWindow):
                 )
             self.tts_playback_finished.emit()
 
+    def _on_output_finished(self):
+        if hasattr(self, "ans_card") and not self.is_playing():
+            self.ans_card.stop_beam()
+
     def is_playing(self) -> bool:
         return self.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState
 
     def stop_speaking(self) -> bool:
+        if hasattr(self, "ans_card"):
+            self.ans_card.stop_beam()
         if self.is_playing():
             self.player.stop()
             self.intercom_banner.set_interrupted()
@@ -4526,36 +4543,17 @@ class MainWindow(QMainWindow):
         # 1. 全局窗口 QSS
         self.setStyleSheet(tm.get_global_qss())
 
-        # 2. 品牌卡与侧边栏
+        # 2. 品牌卡与侧边栏 (通透无多余边框)
         if hasattr(self, 'brand_card'):
+            self.brand_card.setStyleSheet("background: transparent; border: none; padding: 0;")
             if is_light:
-                self.brand_card.setStyleSheet("""
-                    QFrame#brand_card {
-                        background-color: #FFFFFF;
-                        border: 1px solid #E2E8F0;
-                        border-radius: 10px;
-                        padding: 4px;
-                    }
-                """)
                 self.brand_title_lbl.setStyleSheet("font-size: 13.5px; font-weight: 800; color: #0F172A; letter-spacing: 0.5px;")
                 self.brand_sub_lbl.setStyleSheet("font-size: 10px; font-weight: 600; color: #0284C7; letter-spacing: 0.5px;")
-                if hasattr(self, 'brand_nav_label'):
-                    self.brand_nav_label.setStyleSheet("font-size: 10px; font-weight: bold; color: #94A3B8; letter-spacing: 0.8px; padding-left: 6px;")
                 if hasattr(self, 'hotkey_tag'):
                     self.hotkey_tag.setStyleSheet("color: #64748B; font-size: 10.5px;")
             else:
-                self.brand_card.setStyleSheet("""
-                    QFrame#brand_card {
-                        background-color: rgba(255, 255, 255, 0.03);
-                        border: 1px solid rgba(255, 255, 255, 0.06);
-                        border-radius: 10px;
-                        padding: 4px;
-                    }
-                """)
                 self.brand_title_lbl.setStyleSheet("font-size: 13.5px; font-weight: 800; color: #FFFFFF; letter-spacing: 0.5px;")
                 self.brand_sub_lbl.setStyleSheet("font-size: 10px; font-weight: 600; color: #26B0E4; letter-spacing: 0.5px;")
-                if hasattr(self, 'brand_nav_label'):
-                    self.brand_nav_label.setStyleSheet("font-size: 10px; font-weight: bold; color: #64748B; letter-spacing: 0.8px; padding-left: 6px;")
                 if hasattr(self, 'hotkey_tag'):
                     self.hotkey_tag.setStyleSheet("color: #64748B; font-size: 10.5px;")
 
@@ -5116,6 +5114,8 @@ class MainWindow(QMainWindow):
 
     def clear_answer_session(self):
         """清空当前问答界面和会话上下文，开启新会话"""
+        if hasattr(self, 'ans_card'):
+            self.ans_card.stop_beam()
         if self.stack.currentIndex() != 0:
             self._switch_nav(0)
         self._set_ans_card_style("MEETING")
@@ -5131,6 +5131,8 @@ class MainWindow(QMainWindow):
         self.new_session_requested.emit()
 
     def display_answer(self, markdown_text: str, audio_path: str = "", is_followup: bool = False, focal_topic: str = "", response_mode: str = "MEETING"):
+        if hasattr(self, 'ans_card'):
+            self.ans_card.start_beam()
         self._last_focal_topic = focal_topic
         self._last_is_followup = is_followup
         self._last_response_mode = response_mode

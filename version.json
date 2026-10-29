@@ -1,16 +1,15 @@
 {
-  "version": "0.2.5",
+  "version": "0.2.6",
   "release_date": "2026-10-29",
-  "title": "DeskEcho v0.2.5 全新双主题视觉重构与质感轻量化升级",
+  "title": "DeskEcho v0.2.6 基于 frontend-design 规范的前端视觉架构重塑与层级扁平化",
   "changelog": [
-    "全新双主题支持：默认提供高清晰舒适的浅色主题 (Light)，并完美兼容深色主题 (Dark)，右上角太阳/月亮一键秒级切换",
-    "美好智能品牌花朵微标：侧边栏、窗口图标及系统托盘全套融入色卡玻璃拟态花朵微标变体",
-    "解答框微动效光效：输出生成与打字过程中触发 Border Beam 呼吸流光边框，回答就绪后优雅定格，输出完毕即刻停止",
-    "视觉层级深度减负：重构冗余嵌套边框，剔除多层套盒杂音，大幅提升长文本与会议切片阅读呼吸感",
-    "现代化统一高对比弹窗：采用定制 ModernDialog 彻底替代原生简陋灰底弹窗，切片恢复与删除操作层次分明、对比鲜明",
-    "极简程序状态栏：去除系统默认立体边框，采用主题自适应的高质感极简状态栏，拒绝过度设计与浮夸喧宾夺主"
+    "前端架构去模版化：全面践行 frontend-design 指导规范，彻底剔除冗余嵌套卡片与套盒边框，界面层次通透自然",
+    "侧边栏与顶栏减负：去除 WORKSPACE 占位标签与机械路径前缀，品牌微标通透融入侧边，呼吸感显著增强",
+    "精准交互动效：解答卡集成动态 Border Beam 边框流光，在 AI 流式输出与语音播报时灵动流转，输出完毕优雅定格静止",
+    "用户视角导引与留白重构：重塑空状态为自然行动邀请，以实际会议问题作为引导示例，告别后端术语说教",
+    "全场景高对比度双主题：精调 Light/Dark 调色盘与字体层级，高对比度防眩光，文字清晰锐利"
   ],
-  "download_url": "https://github.com/bababoyibibilabu/DeskEcho/releases/download/v0.2.5/DeskEcho.exe",
-  "zip_url": "https://github.com/bababoyibibilabu/DeskEcho/archive/refs/tags/v0.2.5.zip",
+  "download_url": "https://github.com/bababoyibibilabu/DeskEcho/releases/download/v0.2.6/DeskEcho.exe",
+  "zip_url": "https://github.com/bababoyibibilabu/DeskEcho/archive/refs/tags/v0.2.6.zip",
   "min_version": "0.1.0"
 }
