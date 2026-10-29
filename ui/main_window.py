@@ -1911,7 +1911,10 @@ class MainWindow(QMainWindow):
         active_emps = [e for e in EMPLOYEES if e.get("status") != "departed"]
         departed_emps = [e for e in EMPLOYEES if e.get("status") == "departed"]
 
-        self.roster_stat_lbl = QLabel(f"👥 在职成员 {len(active_emps)} 位 · 归档离职 {len(departed_emps)} 位 · 会议画像全量留存")
+        if len(departed_emps) > 0:
+            self.roster_stat_lbl = QLabel(f"👥 在职成员 {len(active_emps)} 位 · 归档离职 {len(departed_emps)} 位 · 会议画像全量留存")
+        else:
+            self.roster_stat_lbl = QLabel(f"👥 共收录 {len(active_emps)} 位组织核心成员 · 实时关联中台会议动态画像")
         self.roster_stat_lbl.setStyleSheet("color: #8AC657; font-size: 11px; font-weight: 600; padding: 0 4px;")
         filter_bar.addWidget(self.roster_stat_lbl)
 
@@ -2017,6 +2020,7 @@ class MainWindow(QMainWindow):
             }
         """)
         self.departed_toggle_btn.clicked.connect(self._toggle_departed_section)
+        self.departed_toggle_btn.setVisible(len(departed_emps) > 0)
         cards_vbox.addWidget(self.departed_toggle_btn)
 
         # 4. 已离职成员卡片容器 (默认折叠隐藏)
@@ -2137,7 +2141,12 @@ class MainWindow(QMainWindow):
                 self.departed_expanded = False
                 self.departed_toggle_btn.setText(f"📁 已离职成员归档 ({dep_total} 人)  ▾ 点击展开历史沉淀档案")
         else:
-            self.roster_stat_lbl.setText(f"👥 在职成员 {active_count} 位 · 归档离职 {dep_total} 位 · 会议画像全量留存")
+            if dep_total > 0:
+                self.roster_stat_lbl.setText(f"👥 在职成员 {active_count} 位 · 归档离职 {dep_total} 位 · 会议画像全量留存")
+                self.departed_toggle_btn.setVisible(True)
+            else:
+                self.roster_stat_lbl.setText(f"👥 共收录 {active_count} 位组织核心成员 · 实时关联中台会议动态画像")
+                self.departed_toggle_btn.setVisible(False)
             self.departed_container.setVisible(False)
             self.departed_expanded = False
             self.departed_toggle_btn.setText(f"📁 已离职成员归档 ({dep_total} 人)  ▾ 点击展开历史沉淀档案")

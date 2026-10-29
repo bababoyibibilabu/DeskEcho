@@ -1,6 +1,6 @@
 from typing import List, Dict, Any, Optional
 
-# 企业实体与组织架构知识库 (示例模板，可根据企业实际组织架构自定义)
+# 企业实体与组织架构知识库 (企业实际组织架构)
 COMPANY_INFO = {
     "name": "未来智能",
     "aliases": ["公司", "咱们公司", "团队", "研发部"],
@@ -20,100 +20,79 @@ EMPLOYEES: List[Dict[str, Any]] = [
         "aliases": ["张总", "董事长", "老板"],
         "duties": "公司董事长，统筹公司全局方向、长期发展战略与关键资本规划",
         "tech_stack": "战略规划 / 资本运作 / 商业决策",
-        "current_focus": "2026年度AI创新专项预算批复，要求严把采购招标关"
+        "current_focus": "公司中长期战略规划与重大业务决策"
     },
     {
-        "name": "李志成",
-        "title": "核心算法团队负责人",
+        "name": "李建国",
+        "title": "总经理 / 业务总监",
         "status": "active",
-        "aliases": ["李工", "算法李", "志成"],
-        "duties": "负责自适应学习系统、知识追踪模型（BKT）与算法工程落地",
-        "tech_stack": "Python / PyTorch / BKT / 深度学习",
-        "current_focus": "自适应学习知识点掌握度动态追踪算法与0.85阈值研发"
+        "aliases": ["李总", "建国总", "总经理", "发言人1"],
+        "duties": "公司日常运营与业务推进总负责人，统筹多端产品交付及跨部门战略协同",
+        "tech_stack": "运营管理 / 跨部门协作 / 业务推进",
+        "current_focus": "产品落地交付、运营保障与团队协作"
     },
     {
         "name": "王程",
         "title": "产品总监 / 架构协调",
         "status": "active",
         "aliases": ["王总", "程哥", "产品王"],
-        "duties": "负责 DeskEcho 客户端体验、上线排期与跨部门研发试点推进",
-        "tech_stack": "产品规划 / 敏捷交付 / 系统架构",
-        "current_focus": "DeskEcho 11月15日全员内测与研发部先行试点落地"
+        "duties": "产品总监，负责桌面助手与知识库产品功能规划、技术协调及业务模式落地",
+        "tech_stack": "Python / 系统架构 / 产品规划",
+        "current_focus": "DeskEcho 核心交互设计、端侧体验调优与技术对接"
     },
     {
         "name": "陈佳",
-        "title": "供应链与采购总监",
+        "title": "行政人事与组织文化负责人",
         "status": "active",
-        "aliases": ["陈总监", "佳姐", "陈经理"],
-        "duties": "负责硬件设备采购、算力集群设备招标及供应链把关",
-        "tech_stack": "采购供应链 / 招投标 / 成本控制",
-        "current_focus": "2026年度AI专项GPU算力集群设备采购招标严格把关"
-    },
-    {
-        "name": "赵文",
-        "title": "人力资源与组织发展总监",
-        "status": "active",
-        "aliases": ["赵总监", "文姐", "赵主管"],
-        "duties": "统筹全公司职级晋升、薪酬绩效考核及组织人才发展",
-        "tech_stack": "HRBP / 绩效激励体系 / 组织发展",
-        "current_focus": "年终P5-P8职级晋升答辩组织与S/A/B档绩效考核宣贯"
-    },
-    {
-        "name": "周工",
-        "title": "系统架构师 / 运维容灾专家",
-        "status": "active",
-        "aliases": ["老周", "周工", "架构师"],
-        "duties": "负责公司高可用服务器架构、双活灾备网络及专线容灾系统",
-        "tech_stack": "高可用架构 / BGP多线容灾 / 故障应急",
-        "current_focus": "华东客户双活灾备光纤中断复盘与BGP多线冗余改造"
-    },
-    {
-        "name": "刘晓",
-        "title": "市场公关与商业合作经理",
-        "status": "active",
-        "aliases": ["刘经理", "刘总", "市场公关"],
-        "duties": "负责全球科技峰会参展布展、特装展位搭建及媒体公关合作",
-        "tech_stack": "公关传播 / 展会统筹 / 商务合作",
-        "current_focus": "2026 Q4全球AI峰会特装展台搭建与王总主题演讲安排"
-    },
-    {
-        "name": "林浩",
-        "title": "质量监控与数据埋点工程师",
-        "status": "active",
-        "aliases": ["林经理", "小林", "质量监控"],
-        "duties": "负责客户端稳定性监控、核心用户行为埋点收集与故障告警",
-        "tech_stack": "数据埋点 / APM 监控 / 日志分析",
-        "current_focus": "DeskEcho 研发部首期试点数据监控与全链路埋点分析"
+        "aliases": ["佳姐", "陈经理", "行政", "人事", "陈佳彤"],
+        "duties": "负责团队行政人事、日常办公保障、组织文化建设及流程规范",
+        "tech_stack": "行政人事 / 流程管理 / 团队文化",
+        "current_focus": "日常运营保障与跨团队高效沟通"
     },
     {
         "name": "李华",
         "title": "产品 UI / UE 视觉与交互专家",
         "status": "active",
-        "aliases": ["华哥", "李设计师", "UI", "设计"],
-        "duties": "负责产品全链路视觉系统、Alma 美学黑曜石科技风格沉淀",
-        "tech_stack": "UI/UE 设计 / 动效交互 / 视觉传达",
-        "current_focus": "桌面回响三色渐变极光微交互与通讯录动态卡片体验"
-    },
-    # 过往确认离职成员 (折叠归档，信息暂时留存并支持溯源)
-    {
-        "name": "孙伟",
-        "title": "原前端与客户端架构负责人 (已离职)",
-        "status": "departed",
-        "departure_date": "2026-08-31",
-        "aliases": ["孙工", "老孙", "前端孙", "架构孙"],
-        "duties": "原前端架构与跨平台客户端研发负责人，主导了早期客户端技术选型与跨进程通信协议方案制定",
-        "tech_stack": "C++ / Qt / Electron / 跨平台架构",
-        "current_focus": "已于2026年8月离职移交；历史基础架构方案由王程与林浩承接演进"
+        "aliases": ["华哥", "李设计师", "UI", "UE", "设计"],
+        "duties": "负责产品 UI / UE 视觉与交互设计、设计规范沉淀及用户体验全链路把控",
+        "tech_stack": "UI/UE 设计 / 视觉传达 / 交互原型",
+        "current_focus": "Alma 风格黑曜石美学界面与动效体验优化"
     },
     {
-        "name": "钱敏",
-        "title": "原算法预研专家 (已离职)",
-        "status": "departed",
-        "departure_date": "2026-07-20",
-        "aliases": ["钱工", "小钱", "算法钱"],
-        "duties": "原知识追踪模型选型预研负责人，早期主导了 DKT 与 BKT 的理论对比与基准评测",
-        "tech_stack": "Python / 贝叶斯网络 / DKT / 预研评估",
-        "current_focus": "已于2026年7月离职移交；算法工程落地由李志成全面负责推进"
+        "name": "赵文",
+        "title": "数据工程师 / 结构化处理主管",
+        "status": "active",
+        "aliases": ["文姐", "赵主管", "数据分析"],
+        "duties": "负责非结构化会议语音与文档的格式解析、向量化管线及知识图谱构建",
+        "tech_stack": "ETL 数据工程 / 知识抽取 / 自动化管线",
+        "current_focus": "会议数据清洗、切片优化与知识对齐"
+    },
+    {
+        "name": "郎工",
+        "title": "全栈技术专家 / AI工作流开发",
+        "status": "active",
+        "aliases": ["小郎", "郎老师", "全栈"],
+        "duties": "负责全栈技术支撑、AI 算法工程化落地、音视频处理与系统集成",
+        "tech_stack": "Python / C++ / WebSockets / AI工程化",
+        "current_focus": "多模态语音管道、低延迟 ASR/TTS 调优与端侧部署"
+    },
+    {
+        "name": "周工",
+        "title": "系统架构师 / 后端服务专家",
+        "status": "active",
+        "aliases": ["老周", "周工", "架构师"],
+        "duties": "负责高可用云端与局域网服务架构、分布式缓存与安全认证设计",
+        "tech_stack": "微服务架构 / 向量数据库 / 容器化",
+        "current_focus": "向量检索性能调优与本地数据存储安全"
+    },
+    {
+        "name": "刘工",
+        "title": "客户端与系统层开发工程师",
+        "status": "active",
+        "aliases": ["小刘", "刘工", "客户端"],
+        "duties": "负责 Windows 原生客户端调优、系统热键拦截、音频硬件流适配与托盘守护",
+        "tech_stack": "PyQt6 / Windows API / 音频底层驱动",
+        "current_focus": "全局无冲突热键拦截与开机自启稳定性保障"
     }
 ]
 
@@ -131,10 +110,10 @@ def extract_action_summary(emp_name: str, aliases: List[str], slices: List[Dict[
         conclusion = ""
         for line in summary_text.split("\n"):
             line = line.strip()
-            if "【核心议题】" in line or "【议题】" in line:
-                topic = line.replace("【核心议题】", "").replace("【议题】", "").strip()
+            if "【核心议题】" in line or "【议题】" in line or "1. 核心议题" in line:
+                topic = line.replace("【核心议题】", "").replace("【议题】", "").replace("1. 核心议题（Topic）：", "").strip()
             if any(k in line for k in keywords):
-                conclusion = line.replace("【关键结论】", "").replace("【结论】", "").strip()
+                conclusion = line.replace("【关键结论】", "").replace("【结论】", "").replace("2. 决策与结论（Key Decisions）：", "").strip()
 
         if not conclusion:
             for sent in raw_text.split("。"):
@@ -202,6 +181,6 @@ def query_entity_by_keyword(keyword: str) -> List[Dict[str, Any]]:
             kw in emp["title"].lower() or 
             kw in emp["duties"].lower() or 
             kw in emp["tech_stack"].lower() or
-            any(kw in a.lower() for a in emp["aliases"])):
+            any(kw in a.lower() for a in emp.get("aliases", []))):
             matched.append(emp)
     return matched
