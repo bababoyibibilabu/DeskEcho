@@ -10,13 +10,14 @@ from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QLineEdit, QTextBrowser, QFrame, QSplitter,
     QListWidget, QListWidgetItem, QGraphicsDropShadowEffect,
-    QStackedWidget, QScrollArea, QGridLayout, QSizePolicy, QMenu
+    QStackedWidget, QScrollArea, QGridLayout, QSizePolicy, QMenu,
+    QMessageBox
 )
 from PyQt6.QtGui import QColor, QFont, QIcon, QPainter, QBrush, QPen, QLinearGradient
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
 
 from config import Config
-from core.knowledge_engine import MeetingStore
+from core.knowledge_engine import MeetingStore, assess_slice_utility
 from core.entity_dict import EMPLOYEES, COMPANY_INFO, get_dynamic_employee_profile
 from ui.audio_visualizer import AudioWaveVisualizer
 
@@ -1863,22 +1864,49 @@ class MainWindow(QMainWindow):
         page = QWidget()
         page_layout = QVBoxLayout(page)
         page_layout.setContentsMargins(0, 0, 0, 0)
-        page_layout.setSpacing(12)
+        page_layout.setSpacing(10)
 
-        # 顶部搜索与统计条
+        self.current_mem_mode = "normal"  # "normal" 或 "trash"
+        self.cached_normal_records = []
+        self.cached_trash_records = []
+        self.current_selected_record = None
+
+        # 1. 顶部模式切换与搜索条
         header_card = QFrame()
         header_card.setObjectName("card")
+        header_card.setStyleSheet("""
+            QFrame#card {
+                background-color: #11141D;
+                border: 1px solid rgba(255, 255, 255, 0.07);
+                border-radius: 10px;
+            }
+        """)
         h_layout = QHBoxLayout(header_card)
         h_layout.setContentsMargins(14, 10, 14, 10)
+        h_layout.setSpacing(10)
+
+        # 两个菜单入口：正式切片 vs 或许没用
+        self.btn_mem_normal = QPushButton("📑 正式会议切片 (0)")
+        self.btn_mem_trash = QPushButton("🗑️ 或许没用 (0)")
+
+        for b in (self.btn_mem_normal, self.btn_mem_trash):
+            b.setCursor(Qt.CursorShape.PointingHandCursor)
+
+        self.btn_mem_normal.clicked.connect(lambda: self._switch_mem_mode("normal"))
+        self.btn_mem_trash.clicked.connect(lambda: self._switch_mem_mode("trash"))
+
+        h_layout.addWidget(self.btn_mem_normal)
+        h_layout.addWidget(self.btn_mem_trash)
+        h_layout.addSpacing(10)
 
         self.mem_search_input = QLineEdit()
-        self.mem_search_input.setPlaceholderText("在沉淀的切片纪要中快速搜索关键词 (如: 预算, Logo, 机器人)...")
+        self.mem_search_input.setPlaceholderText("在当前切片纪要中快速搜索关键词 (如: 预算, Logo, 机器人)...")
         self.mem_search_input.setStyleSheet("""
             QLineEdit {
                 background-color: #0A0C10;
                 border: 1px solid rgba(255, 255, 255, 0.08);
                 border-radius: 8px;
-                padding: 8px 12px;
+                padding: 7px 12px;
                 font-size: 12px;
                 color: #FFFFFF;
             }
@@ -1897,7 +1925,7 @@ class MainWindow(QMainWindow):
                 color: #26B0E4;
                 border: 1px solid rgba(38, 176, 228, 0.45);
                 border-radius: 8px;
-                padding: 8px 16px;
+                padding: 7px 16px;
                 font-size: 12px;
                 font-weight: 600;
             }
@@ -1911,12 +1939,56 @@ class MainWindow(QMainWindow):
 
         page_layout.addWidget(header_card)
 
-        # 双栏切片检查器 (左：所有切片列表，右：结构化四象限卡片详情)
+        # 2. “或许没用”次要切片 AI 研判提醒与一键清理横幅 (默认隐藏，仅在 trash 模式显示)
+        self.trash_banner = QFrame()
+        self.trash_banner.setVisible(False)
+        self.trash_banner.setStyleSheet("""
+            QFrame {
+                background: rgba(245, 158, 11, 0.08);
+                border: 1px solid rgba(245, 158, 11, 0.3);
+                border-left: 4px solid #F59E0B;
+                border-radius: 8px;
+                padding: 6px 12px;
+            }
+        """)
+        trash_b_layout = QHBoxLayout(self.trash_banner)
+        trash_b_layout.setContentsMargins(10, 6, 10, 6)
+        trash_b_layout.setSpacing(10)
+
+        trash_tip_lbl = QLabel("🤖 经 AI 语义诊断：以下切片多为开场问候、测试试音、会议暂停或无关键决议/待办的次要内容，可安全清理以释放检索空间与提升问答命中率。")
+        trash_tip_lbl.setWordWrap(True)
+        trash_tip_lbl.setStyleSheet("color: #FCD34D; font-size: 11px; font-weight: 500;")
+        trash_b_layout.addWidget(trash_tip_lbl, 1)
+
+        self.btn_clean_all_trash = QPushButton("💥 一键清空所有次要切片")
+        self.btn_clean_all_trash.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_clean_all_trash.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(239, 68, 68, 0.18);
+                color: #FCA5A5;
+                border: 1px solid rgba(239, 68, 68, 0.45);
+                border-radius: 6px;
+                padding: 6px 14px;
+                font-size: 11px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #EF4444;
+                color: #FFFFFF;
+                border-color: #DC2626;
+            }
+        """)
+        self.btn_clean_all_trash.clicked.connect(self._clean_all_trash_slices)
+        trash_b_layout.addWidget(self.btn_clean_all_trash)
+
+        page_layout.addWidget(self.trash_banner)
+
+        # 3. 双栏切片检查器 (左：切片列表，右：结构化四象限卡片详情与专属删除操作)
         splitter = QSplitter(Qt.Orientation.Horizontal)
         splitter.setHandleWidth(6)
         splitter.setStyleSheet("QSplitter::handle { background: transparent; }")
 
-        # 列表
+        # 左栏：列表
         self.mem_list = QListWidget()
         self.mem_list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.mem_list.setVerticalScrollMode(QListWidget.ScrollMode.ScrollPerPixel)
@@ -1925,7 +1997,7 @@ class MainWindow(QMainWindow):
                 background-color: #11141D;
                 border: 1px solid rgba(255, 255, 255, 0.07);
                 border-radius: 12px;
-                padding: 10px;
+                padding: 8px;
                 font-size: 12px;
                 outline: none;
             }
@@ -1948,9 +2020,56 @@ class MainWindow(QMainWindow):
             }
         """)
         self.mem_list.currentRowChanged.connect(self._on_mem_item_selected)
+        self.mem_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.mem_list.customContextMenuRequested.connect(self._show_mem_list_context_menu)
         splitter.addWidget(self.mem_list)
 
-        # 详情卡
+        # 右栏容器：详情卡 + 顶部专属操作栏 (次要切片专属删除按钮)
+        right_detail_container = QWidget()
+        right_layout = QVBoxLayout(right_detail_container)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+        right_layout.setSpacing(8)
+
+        # 次要切片详情顶部的删除与原因栏 (仅 trash 模式显示)
+        self.trash_detail_action_bar = QFrame()
+        self.trash_detail_action_bar.setVisible(False)
+        self.trash_detail_action_bar.setStyleSheet("""
+            QFrame {
+                background-color: #11141D;
+                border: 1px solid rgba(239, 68, 68, 0.25);
+                border-radius: 8px;
+                padding: 6px 10px;
+            }
+        """)
+        t_action_layout = QHBoxLayout(self.trash_detail_action_bar)
+        t_action_layout.setContentsMargins(8, 4, 8, 4)
+
+        self.trash_reason_lbl = QLabel("💡 AI 研判理由：无实质性决策且无落地待办推进")
+        self.trash_reason_lbl.setStyleSheet("color: #F87171; font-size: 11px; font-weight: 600;")
+        t_action_layout.addWidget(self.trash_reason_lbl, 1)
+
+        self.btn_delete_curr_slice = QPushButton("🗑️ 确认删除此段次要切片")
+        self.btn_delete_curr_slice.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_delete_curr_slice.setStyleSheet("""
+            QPushButton {
+                background: rgba(239, 68, 68, 0.2);
+                color: #FCA5A5;
+                border: 1px solid #EF4444;
+                border-radius: 6px;
+                padding: 5px 12px;
+                font-size: 11px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background: #EF4444;
+                color: #FFFFFF;
+            }
+        """)
+        self.btn_delete_curr_slice.clicked.connect(self._delete_current_selected_slice)
+        t_action_layout.addWidget(self.btn_delete_curr_slice)
+        right_layout.addWidget(self.trash_detail_action_bar)
+
+        # 详情文本区
         self.mem_detail_browser = QTextBrowser()
         self.mem_detail_browser.setOpenExternalLinks(True)
         self.mem_detail_browser.setStyleSheet("""
@@ -1965,11 +2084,80 @@ class MainWindow(QMainWindow):
             }
         """)
         self.mem_detail_browser.setHtml("<p style='color:#64748B; text-align:center; padding-top:120px;'>请在左侧选择一段会议切片查看完整结构化提取与原始语音转录。</p>")
-        splitter.addWidget(self.mem_detail_browser)
+        right_layout.addWidget(self.mem_detail_browser, 1)
+
+        splitter.addWidget(right_detail_container)
         splitter.setSizes([340, 600])
 
         page_layout.addWidget(splitter, 1)
         stack.addWidget(page)
+        self._update_mem_tab_styles()
+
+    def _switch_mem_mode(self, mode: str):
+        """切换正式切片资产 vs 或许没用次要切片"""
+        self.current_mem_mode = mode
+        self._update_mem_tab_styles()
+        self.trash_banner.setVisible(mode == "trash")
+        self.trash_detail_action_bar.setVisible(mode == "trash" and self.current_selected_record is not None)
+        self._render_mem_list()
+
+    def _update_mem_tab_styles(self):
+        if not hasattr(self, 'btn_mem_normal'):
+            return
+        if self.current_mem_mode == "normal":
+            self.btn_mem_normal.setStyleSheet("""
+                QPushButton {
+                    background-color: rgba(38, 176, 228, 0.22);
+                    color: #FFFFFF;
+                    border: 1px solid #26B0E4;
+                    border-radius: 8px;
+                    padding: 7px 14px;
+                    font-size: 12px;
+                    font-weight: bold;
+                }
+            """)
+            self.btn_mem_trash.setStyleSheet("""
+                QPushButton {
+                    background-color: rgba(255, 255, 255, 0.04);
+                    color: #94A3B8;
+                    border: 1px solid rgba(255, 255, 255, 0.08);
+                    border-radius: 8px;
+                    padding: 7px 14px;
+                    font-size: 12px;
+                }
+                QPushButton:hover {
+                    background-color: rgba(239, 68, 68, 0.15);
+                    border-color: rgba(239, 68, 68, 0.35);
+                    color: #FCA5A5;
+                }
+            """)
+        else:
+            self.btn_mem_normal.setStyleSheet("""
+                QPushButton {
+                    background-color: rgba(255, 255, 255, 0.04);
+                    color: #94A3B8;
+                    border: 1px solid rgba(255, 255, 255, 0.08);
+                    border-radius: 8px;
+                    padding: 7px 14px;
+                    font-size: 12px;
+                }
+                QPushButton:hover {
+                    background-color: rgba(38, 176, 228, 0.15);
+                    border-color: #26B0E4;
+                    color: #38BDF8;
+                }
+            """)
+            self.btn_mem_trash.setStyleSheet("""
+                QPushButton {
+                    background-color: rgba(239, 68, 68, 0.22);
+                    color: #FECACA;
+                    border: 1px solid #EF4444;
+                    border-radius: 8px;
+                    padding: 7px 14px;
+                    font-size: 12px;
+                    font-weight: bold;
+                }
+            """)
 
     # ---------------- Page 2: 企业通讯录 (Org Directory) ----------------
     def _build_page_roster(self, stack: QStackedWidget):
@@ -2324,49 +2512,34 @@ class MainWindow(QMainWindow):
 
     def refresh_records(self):
         try:
-            total_count = self.store.get_total_count() if hasattr(self.store, "get_total_count") else 0
-            records = self.store.query_recent(limit=100)
-            if total_count == 0:
-                total_count = len(records)
-
-            self.slice_list.clear()
-            self.mem_list.clear()
+            records = self.store.query_recent(limit=200)
             self.cached_records = records
 
-            count_str = f"共 {total_count} 段切片"
-            self.slice_count_badge.setText(count_str)
-            if hasattr(self, 'sub_btn_memory'):
-                self.sub_btn_memory.setText(f"🧠 会议记忆库 ({total_count})")
-            if hasattr(self, 'btn_memory'):
-                self.btn_memory.set_badge(str(total_count))
-
+            normal_recs = []
+            trash_recs = []
             for rec in records:
-                time_str = rec.get("start_time", "")
-                if " " in time_str:
-                    time_short = time_str.split(" ")[1][:5]
+                summ = rec.get("summary", "")
+                raw = rec.get("raw_text", "")
+                is_low, reason = assess_slice_utility(summ, raw)
+                rec_copy = dict(rec)
+                rec_copy["is_low_utility"] = is_low
+                rec_copy["trash_reason"] = reason
+                if is_low:
+                    trash_recs.append(rec_copy)
                 else:
-                    time_short = time_str[:5]
+                    normal_recs.append(rec_copy)
 
-                summary = rec.get("summary", "")
-                first_line = summary.split("\n")[0] if summary else "常驻录音切片"
-                first_line = re.sub(r'^[\s\d\.\-、*#]*(?:核心议题|议题|Topic|【核心议题】|主题)(?:[（\(].*?[）\)])?[：:\s]*', '', first_line).strip()
-                if not first_line:
-                    first_line = "常规会议沟通讨论"
+            self.cached_normal_records = normal_recs
+            self.cached_trash_records = trash_recs
 
-                # 动态流条目 (纯净时间 + 核心事件，超出自动省略)
-                item = QListWidgetItem(f"⏱️ {time_short}  {first_line[:24]}")
-                item.setToolTip(f"{time_str}\n{first_line}")
-                item.setData(Qt.ItemDataRole.UserRole, rec)
-                self.slice_list.addItem(item)
+            if hasattr(self, 'btn_mem_normal'):
+                self.btn_mem_normal.setText(f"📑 正式会议切片 ({len(normal_recs)})")
+            if hasattr(self, 'btn_mem_trash'):
+                self.btn_mem_trash.setText(f"🗑️ 或许没用 ({len(trash_recs)})")
+            if hasattr(self, 'sub_btn_memory'):
+                self.sub_btn_memory.setText(f"🧠 会议记忆库 ({len(normal_recs)})")
 
-                # 记忆库条目
-                mem_item = QListWidgetItem(f"📅 {time_str}\n   {first_line[:28]}")
-                mem_item.setToolTip(f"{time_str}\n{first_line}")
-                mem_item.setData(Qt.ItemDataRole.UserRole, rec)
-                self.mem_list.addItem(mem_item)
-
-            if records and self.mem_list.count() > 0:
-                self.mem_list.setCurrentRow(0)
+            self._render_mem_list()
 
             if hasattr(self, "refresh_roster"):
                 self.refresh_roster()
@@ -2374,25 +2547,88 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(f"[MainWindow] 刷新记录失败: {e}")
 
+    def _render_mem_list(self):
+        self.mem_list.clear()
+        target_records = self.cached_trash_records if self.current_mem_mode == "trash" else self.cached_normal_records
+
+        # 兼容备用 dummy slice_list
+        if hasattr(self, "slice_list"):
+            self.slice_list.clear()
+
+        if not target_records:
+            empty_msg = "🎉 暂无低价值次要切片，会议记忆库非常健康！" if self.current_mem_mode == "trash" else "暂无沉淀正式切片数据"
+            empty_item = QListWidgetItem(empty_msg)
+            empty_item.setFlags(Qt.ItemFlag.NoItemFlags)
+            empty_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.mem_list.addItem(empty_item)
+            self.mem_detail_browser.setHtml(f"<p style='color:#64748B; text-align:center; padding-top:120px;'>{empty_msg}</p>")
+            if hasattr(self, "trash_detail_action_bar"):
+                self.trash_detail_action_bar.setVisible(False)
+            self.current_selected_record = None
+            return
+
+        for rec in target_records:
+            time_str = rec.get("start_time", "")
+            summary = rec.get("summary", "")
+            first_line = summary.split("\n")[0] if summary else "常驻录音切片"
+            first_line = re.sub(r'^[\s\d\.\-、*#]*(?:核心议题|议题|Topic|【核心议题】|主题)(?:[（\(].*?[）\)])?[：:\s]*', '', first_line).strip()
+            if not first_line:
+                first_line = "常规会议沟通讨论"
+
+            if self.current_mem_mode == "trash":
+                reason = rec.get("trash_reason", "次要碎片")
+                item = QListWidgetItem(f"🗑️ {time_str}\n   ⚠️ [{reason}]\n   {first_line[:24]}")
+            else:
+                item = QListWidgetItem(f"📅 {time_str}\n   {first_line[:28]}")
+
+            item.setToolTip(f"{time_str}\n{first_line}")
+            item.setData(Qt.ItemDataRole.UserRole, rec)
+            self.mem_list.addItem(item)
+
+        if self.mem_list.count() > 0:
+            self.mem_list.setCurrentRow(0)
+
     def _on_slice_clicked(self, item: QListWidgetItem):
         rec = item.data(Qt.ItemDataRole.UserRole)
         if rec:
             self._render_record_to_detail(rec, self.answer_browser)
 
     def _on_mem_item_selected(self, row: int):
-        if row < 0 or not hasattr(self, "cached_records") or row >= len(self.cached_records):
+        target_records = self.cached_trash_records if self.current_mem_mode == "trash" else self.cached_normal_records
+        if row < 0 or row >= len(target_records):
+            self.current_selected_record = None
+            if hasattr(self, "trash_detail_action_bar"):
+                self.trash_detail_action_bar.setVisible(False)
             return
-        rec = self.cached_records[row]
+        rec = target_records[row]
+        self.current_selected_record = rec
         self._render_record_to_detail(rec, self.mem_detail_browser)
+
+        if self.current_mem_mode == "trash":
+            reason = rec.get("trash_reason", "无实质性决策且无落地待办推进")
+            self.trash_reason_lbl.setText(f"💡 AI 研判理由：{reason}")
+            self.trash_detail_action_bar.setVisible(True)
+        else:
+            self.trash_detail_action_bar.setVisible(False)
 
     def _render_record_to_detail(self, rec: dict, browser: QTextBrowser):
         start_t = rec.get("start_time", "")
         end_t = rec.get("end_time", "")
         summary = rec.get("summary", "")
         raw_text = rec.get("raw_text", "")
+        is_trash = rec.get("is_low_utility", False)
+        reason = rec.get("trash_reason", "")
+
+        trash_badge_html = f"""
+        <div style="background-color: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.35); border-left: 4px solid #EF4444; padding: 8px 12px; border-radius: 6px; margin-bottom: 12px;">
+            <span style="color: #F87171; font-weight: bold; font-size: 11px;">⚠️ AI 价值分级：次要级切片 (或许没用)</span><br>
+            <span style="color: #FECACA; font-size: 12px;">诊断原因：{reason}</span>
+        </div>
+        """ if is_trash else ""
 
         detail_html = f"""
         <div style="font-family: 'Segoe UI', sans-serif; line-height: 1.6;">
+            {trash_badge_html}
             <div style="background-color: rgba(19, 69, 157, 0.22); border-left: 3px solid #26B0E4; padding: 10px 14px; border-radius: 6px; margin-bottom: 14px;">
                 <span style="color: #26B0E4; font-weight: bold; font-size: 11px;">会议切片区间</span><br>
                 <span style="color: #FFFFFF; font-size: 13px; font-weight: 600;">{start_t} 至 {end_t}</span>
@@ -2411,27 +2647,108 @@ class MainWindow(QMainWindow):
         """
         browser.setHtml(detail_html)
 
+    def _delete_current_selected_slice(self):
+        """选择性删除当前选中的次要切片 (仅在'或许没用'生效)"""
+        if self.current_mem_mode != "trash" or not self.current_selected_record:
+            return
+        rec = self.current_selected_record
+        sid = rec.get("id", "")
+        time_str = rec.get("start_time", "")
+        reason = rec.get("trash_reason", "次要碎片")
+
+        reply = QMessageBox.question(
+            self,
+            "确认删除次要切片",
+            f"确定彻底删除此段次要切片吗？\n\n切片标识: {sid}\n会议时间: {time_str}\n研判原因: {reason}\n\n该操作将同步从 SQLite 数据库及 ChromaDB 向量集合中彻底清除，不可恢复。",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            success = self.store.delete_slice(sid)
+            if success:
+                self.search_status_lbl.setText("✓ 次要切片已删除")
+                self.refresh_records()
+            else:
+                QMessageBox.warning(self, "删除失败", f"删除切片 {sid} 遇到错误，请检查日志。")
+
+    def _clean_all_trash_slices(self):
+        """一键清空所有次要切片 (仅在'或许没用'生效)"""
+        if self.current_mem_mode != "trash" or not self.cached_trash_records:
+            QMessageBox.information(self, "暂无数据", "当前没有识别出的次要切片。")
+            return
+
+        trash_ids = [r.get("id") for r in self.cached_trash_records if r.get("id")]
+        count = len(trash_ids)
+        reply = QMessageBox.warning(
+            self,
+            "一键清空次要切片",
+            f"确定要一键清理当前识别出的全部 {count} 段次要切片吗？\n\n这些切片经 AI 研判为闲聊、试音或无决议/无待办碎片。删除后将彻底释放空间并优化检索效率，操作不可逆！",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            deleted_count = self.store.delete_slices(trash_ids)
+            self.search_status_lbl.setText(f"✓ 已一键清理 {deleted_count} 段次要切片")
+            self.refresh_records()
+
+    def _show_mem_list_context_menu(self, pos):
+        """切片列表右键菜单 (仅在'或许没用'显示删除功能，正常切片无删除)"""
+        if self.current_mem_mode != "trash":
+            return
+        item = self.mem_list.itemAt(pos)
+        if not item:
+            return
+        rec = item.data(Qt.ItemDataRole.UserRole)
+        if not rec:
+            return
+
+        menu = QMenu(self)
+        menu.setStyleSheet("""
+            QMenu {
+                background-color: #121724;
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                color: #E2E8F0;
+                font-size: 11px;
+                padding: 4px;
+            }
+            QMenu::item:selected {
+                background-color: #EF4444;
+                color: #FFFFFF;
+                border-radius: 4px;
+            }
+        """)
+        del_action = menu.addAction("🗑️ 删除此段次要切片")
+        action = menu.exec(self.mem_list.mapToGlobal(pos))
+        if action == del_action:
+            self._delete_current_selected_slice()
+
     def _search_memory_slices(self):
         kw = self.mem_search_input.text().strip()
         if not kw:
-            self.refresh_records()
+            self._render_mem_list()
             return
 
-        matched = self.store.query_by_keywords([kw], limit=100)
+        target_records = self.cached_trash_records if self.current_mem_mode == "trash" else self.cached_normal_records
+        filtered = [
+            r for r in target_records
+            if kw.lower() in (r.get("summary", "") + " " + r.get("raw_text", "")).lower()
+        ]
         self.mem_list.clear()
-        self.cached_records = matched
-        for rec in matched:
+        for rec in filtered:
             time_str = rec.get("start_time", "")
             summary = rec.get("summary", "")
             first_line = summary.split("\n")[0] if summary else "匹配切片"
-            item = QListWidgetItem(f"📅 {time_str}\n   🔍 {first_line[:28]}")
+            prefix = "🗑️ " if self.current_mem_mode == "trash" else "📅 "
+            item = QListWidgetItem(f"{prefix}{time_str}\n   🔍 {first_line[:26]}")
             item.setData(Qt.ItemDataRole.UserRole, rec)
             self.mem_list.addItem(item)
 
-        if matched:
+        if filtered:
             self.mem_list.setCurrentRow(0)
         else:
-            self.mem_detail_browser.setHtml(f"<p style='color:#64748B; text-align:center; padding-top:100px;'>未检索到与 <b>“{kw}”</b> 相关的会议切片。</p>")
+            self.mem_detail_browser.setHtml(f"<p style='color:#64748B; text-align:center; padding-top:100px;'>在当前分类下未检索到与 <b>“{kw}”</b> 相关的会议切片。</p>")
+            if hasattr(self, "trash_detail_action_bar"):
+                self.trash_detail_action_bar.setVisible(False)
 
     def _handle_query(self):
         text = self.query_input.text().strip()

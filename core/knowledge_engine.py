@@ -2,7 +2,7 @@ import sqlite3
 import datetime
 import jieba
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 import chromadb
 from chromadb.utils import embedding_functions
 from config import Config
@@ -279,3 +279,102 @@ class MeetingStore:
         with self.conn:
             self.conn.execute("DELETE FROM chat_turns WHERE session_id = ?", (session_id,))
             self.conn.execute("DELETE FROM chat_sessions WHERE id = ?", (session_id,))
+
+    def delete_slice(self, slice_id: str) -> bool:
+        """删除单个会议切片 (同步清理 SQLite 与 ChromaDB 向量集合)"""
+        try:
+            with self.conn:
+                self.conn.execute("DELETE FROM meeting_slices WHERE id = ?", (slice_id,))
+            if hasattr(self, "collection") and self.collection is not None:
+                try:
+                    self.collection.delete(ids=[slice_id])
+                except Exception as ce:
+                    print(f"[MeetingStore] ChromaDB 删除切片 {slice_id} 提示: {ce}")
+            return True
+        except Exception as e:
+            print(f"[MeetingStore] 删除切片 {slice_id} 失败: {e}")
+            return False
+
+    def delete_slices(self, slice_ids: List[str]) -> int:
+        """批量删除会议切片 (同步清理 SQLite 与 ChromaDB 向量集合)"""
+        if not slice_ids:
+            return 0
+        deleted_count = 0
+        try:
+            with self.conn:
+                for sid in slice_ids:
+                    self.conn.execute("DELETE FROM meeting_slices WHERE id = ?", (sid,))
+                    deleted_count += 1
+            if hasattr(self, "collection") and self.collection is not None:
+                try:
+                    self.collection.delete(ids=slice_ids)
+                except Exception as ce:
+                    print(f"[MeetingStore] ChromaDB 批量删除切片提示: {ce}")
+            return deleted_count
+        except Exception as e:
+            print(f"[MeetingStore] 批量删除切片失败: {e}")
+            return deleted_count
+
+
+def assess_slice_utility(summary: str, raw_text: str) -> Tuple[bool, str]:
+    """
+    AI 研判会议切片价值分级：识别闲聊、试音、暂停或缺乏实质性决议与推进的次要级切片
+    返回: (is_low_utility: bool, reason: str)
+    """
+    s = (summary or "").strip()
+    r = (raw_text or "").strip()
+    
+    # 1. 极短文本与明显无意义的试音碎片
+    if len(r) < 60:
+        return True, "转录文本过短或为偶发试音碎片"
+        
+    # 2. 核心议题中明确标示无议题、暂停或开场问候
+    first_line = s.split("\n")[0] if s else ""
+    if any(k in first_line for k in ["无实质议题", "无明确议题", "会议暂停", "仅为开场问候", "仅为打招呼", "闲聊"]):
+        return True, "开场寒暄、会议暂停或无实际议题"
+        
+    # 3. 提取决策与待办段落
+    lines = s.split("\n")
+    decision_text = ""
+    action_text = ""
+    current_sec = None
+    for line in lines:
+        line_s = line.strip()
+        if "2. 决策与结论" in line_s or "【关键结论】" in line_s or "【结论】" in line_s:
+            current_sec = "decision"
+            decision_text += line_s
+        elif "3. 待办事项" in line_s or "【待办事项】" in line_s or "【待办】" in line_s:
+            current_sec = "action"
+            action_text += line_s
+        elif "4. 事实备忘" in line_s or "【事实备忘】" in line_s or "1. 核心议题" in line_s:
+            current_sec = None
+        else:
+            if current_sec == "decision":
+                decision_text += " " + line_s
+            elif current_sec == "action":
+                action_text += " " + line_s
+                
+    no_decision = (
+        not decision_text 
+        or "无（" in decision_text 
+        or "：无" in decision_text 
+        or ": 无" in decision_text
+        or "未形成明确决策" in decision_text
+        or "暂无决策" in decision_text
+    )
+    no_action = (
+        not action_text 
+        or "无（" in action_text 
+        or "：无" in action_text 
+        or ": 无" in action_text
+        or "无待办" in action_text
+        or "未明确具体待办" in action_text
+        or "无明确待办" in action_text
+    )
+    if no_decision and no_action:
+        return True, "无实质性决策且无落地待办推进"
+        
+    if any(k in s for k in ["闲聊", "开玩笑", "寒暄", "测试音频"]):
+        return True, "非正式商业沟通，偏寒暄闲聊"
+        
+    return False, "正常正式业务资产"
