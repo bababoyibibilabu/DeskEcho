@@ -61,33 +61,38 @@ def fetch_all_tasks() -> List[Dict[str, Any]]:
 
 def update_remote_task_status(task_id: str, new_status: str = "COMPLETED", commit_sha: str = "", remote_host: str = REMOTE_SSH):
     """更新远程与本地任务状态"""
-    # 1. 尝试更新远程
-    for rpath in REMOTE_QUEUE_PATHS:
-        ps_script = f"""
-$p = '{rpath}'
-if (Test-Path $p) {{
-    $content = Get-Content $p -Raw -Encoding UTF8 | ConvertFrom-Json
-    foreach ($item in $content) {{
-        if ($item.id -eq '{task_id}') {{
-            $item.status = '{new_status}'
-            $item.updated_at = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
-            if ('{commit_sha}') {{ $item.commit_sha = '{commit_sha}' }}
-        }}
-    }}
-    $content | ConvertTo-Json -Depth 10 | Set-Content $p -Encoding UTF8
-    Write-Output 'UPDATED'
-}}
-"""
-        try:
-            res = subprocess.run(['ssh', remote_host, 'powershell', '-Command', ps_script], capture_output=True, text=True, timeout=10)
-            if "UPDATED" in res.stdout:
-                print(f"[Loop] 远程任务 {task_id} 状态已更新为 {new_status}")
-                break
-        except Exception:
-            pass
+    # 1. 更新远程文件
+    remote_tasks = fetch_remote_tasks(remote_host)
+    if remote_tasks:
+        updated = False
+        for t in remote_tasks:
+            if t.get("id") == task_id:
+                t["status"] = new_status
+                t["updated_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
+                if commit_sha:
+                    t["commit_sha"] = commit_sha
+                updated = True
+        if updated:
+            import tempfile
+            tmp = Path(tempfile.gettempdir()) / "remote_queue_update.json"
+            tmp.write_text(json.dumps(remote_tasks, ensure_ascii=False, indent=2), encoding="utf-8")
+            subprocess.run(["scp", str(tmp), f"{remote_host}:D:/DeskEcho_Data/iteration_queue.json"], capture_output=True)
+            print(f"[Loop] 远程任务 {task_id} 状态已更新为 {new_status}")
 
     # 2. 同步更新本地
     loc = get_local_queue_path()
+    if loc.exists():
+        try:
+            tasks = json.loads(loc.read_text(encoding="utf-8"))
+            for t in tasks:
+                if t.get("id") == task_id:
+                    t["status"] = new_status
+                    t["updated_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
+                    if commit_sha:
+                        t["commit_sha"] = commit_sha
+            loc.write_text(json.dumps(tasks, ensure_ascii=False, indent=2), encoding="utf-8")
+        except Exception:
+            pass
     if loc.exists():
         try:
             tasks = json.loads(loc.read_text(encoding="utf-8"))
