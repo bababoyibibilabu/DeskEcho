@@ -140,7 +140,7 @@ class QueryRewriter:
                 "cost_time": cost
             }
             action_tag = f" [{result['action_type']}]" if has_history else ""
-            print(f"[QueryRewriter]{action_tag} 改写完成 ({cost:.2f}s): “{raw_query}” ➔ “{result['search_query']}” | 话题: {result['focal_topic']} | 关键词: {result['keywords'][:5]}")
+            print(f"[QueryRewriter]{action_tag} 改写完成 ({cost:.2f}s): “{raw_query}” -> “{result['search_query']}” | 话题: {result['focal_topic']} | 关键词: {result['keywords'][:5]}")
             return result
         except Exception as e:
             print(f"[QueryRewriter] 大模型重写异常，平滑降级到本地规则: {e}")

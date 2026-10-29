@@ -87,18 +87,23 @@ def main():
                 import time
                 time.sleep(2)
 
-    print(f"[*] 正在上传 {dist_exe.name} ({dist_exe.stat().st_size / (1024*1024):.1f} MB) 至 GitHub Release...", flush=True)
-    with open(dist_exe, "rb") as f:
-        up_headers = {
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/octet-stream"
-        }
-        ur = requests.post(upload_url, headers=up_headers, data=f, timeout=300)
-        if ur.status_code in (200, 201):
-            print(f"[SUCCESS] 成功上传发布资产 DeskEcho.exe！下载链接: {ur.json().get('browser_download_url')}", flush=True)
-        else:
-            print(f"[ERROR] 上传发布资产失败: {ur.status_code} - {ur.text}", flush=True)
-            sys.exit(1)
+    print(f"[*] 正在通过 curl.exe 上传 {dist_exe.name} ({dist_exe.stat().st_size / (1024*1024):.1f} MB) 至 GitHub Release...", flush=True)
+    cmd = [
+        "curl.exe",
+        "-s",
+        "-L",
+        "-X", "POST",
+        "-H", f"Authorization: Bearer {token}",
+        "-H", "Content-Type: application/octet-stream",
+        "--data-binary", f"@{dist_exe}",
+        upload_url
+    ]
+    res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    if '"browser_download_url"' in res.stdout:
+        print(f"[SUCCESS] 成功上传发布资产 DeskEcho.exe！", flush=True)
+    else:
+        print(f"[ERROR] 上传发布资产失败: {res.stderr}\n{res.stdout[:500]}", flush=True)
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
