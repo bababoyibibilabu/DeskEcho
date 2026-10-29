@@ -122,45 +122,68 @@ class UpdateChecker:
                 raise RuntimeError("无法从远端下载有效的发版安装包")
 
             if on_progress:
-                on_progress("解压并校验升级包完整性...")
+                on_progress("校验升级包完整性并应用更新...")
 
-            # 2. 解压到临时目录
-            extract_folder = temp_dir / "extracted"
-            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                zip_ref.extractall(extract_folder)
+            # 判断是否为 Windows 独立可执行程序 (.exe)
+            is_exe = download_url.lower().endswith(".exe") or (zip_path.exists() and zip_path.read_bytes()[:2] == b'MZ')
+            if is_exe:
+                target_exe = self.app_dir / "DeskEcho.exe"
+                if getattr(sys, 'frozen', False):
+                    # 运行在已打包的 EXE 模式下，利用批处理脚本避开 Windows 文件写锁定并重启
+                    bat_path = temp_dir / "apply_update.bat"
+                    bat_content = f"""@echo off
+chcp 65001 >nul
+timeout /t 2 /nobreak >nul
+copy /y "{zip_path}" "{sys.executable}" >nul
+start "" "{sys.executable}"
+"""
+                    bat_path.write_text(bat_content, encoding='utf-8')
+                    import subprocess
+                    subprocess.Popen(["cmd.exe", "/c", str(bat_path)], creationflags=0x08000000 if os.name == 'nt' else 0)
+                    return True
+                else:
+                    # 运行在 Python 源码模式下：复制 DeskEcho.exe 到根目录
+                    shutil.copy2(zip_path, target_exe)
+                    print(f"[UpdateChecker] 已下载独立绿色可执行程序至 {target_exe}")
 
-            # GitHub 打包 zip 通常内嵌一层根目录 (如 DeskEcho-main 或 DeskEcho-0.2.0)
-            inner_dirs = [p for p in extract_folder.iterdir() if p.is_dir()]
-            source_root = inner_dirs[0] if inner_dirs else extract_folder
+            # 2. 如果是 zip 归档包，解压到临时目录并热替换源码
+            if not is_exe:
+                extract_folder = temp_dir / "extracted"
+                with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                    zip_ref.extractall(extract_folder)
 
-            if on_progress:
-                on_progress("正在安全应用最新代码与组件...")
+                # GitHub 打包 zip 通常内嵌一层根目录 (如 DeskEcho-main 或 DeskEcho-0.2.0)
+                inner_dirs = [p for p in extract_folder.iterdir() if p.is_dir()]
+                source_root = inner_dirs[0] if inner_dirs else extract_folder
 
-            # 3. 白名单热替换保护策略
-            # 允许更新的目录与文件：
-            updatable_items = ["core", "ui", "config.py", "main.py", "version.py", "version.json", "README.md", "requirements.txt", "run.bat", "run_background.bat"]
-            # 绝对保护的目录与文件 (绝不覆盖！)：
-            protected_patterns = [".env", "omni_data", "records.db", "chroma", "local_data", "temp", "assets"]
+                if on_progress:
+                    on_progress("正在安全应用最新代码与组件...")
 
-            for item_name in updatable_items:
-                src_item = source_root / item_name
-                dst_item = self.app_dir / item_name
-                if not src_item.exists():
-                    continue
+                # 3. 白名单热替换保护策略
+                # 允许更新的目录与文件：
+                updatable_items = ["core", "ui", "config.py", "main.py", "version.py", "version.json", "README.md", "requirements.txt", "run.bat", "run_background.bat"]
+                # 绝对保护的目录与文件 (绝不覆盖！)：
+                protected_patterns = [".env", "omni_data", "records.db", "chroma", "local_data", "temp", "assets"]
 
-                if src_item.is_file():
-                    shutil.copy2(src_item, dst_item)
-                elif src_item.is_dir():
-                    # 递归安全复制目录
-                    dst_item.mkdir(parents=True, exist_ok=True)
-                    for root, dirs, files in os.walk(src_item):
-                        rel_path = Path(root).relative_to(src_item)
-                        dest_dir = dst_item / rel_path
-                        dest_dir.mkdir(parents=True, exist_ok=True)
-                        for f in files:
-                            if any(p in f for p in protected_patterns):
-                                continue
-                            shutil.copy2(Path(root) / f, dest_dir / f)
+                for item_name in updatable_items:
+                    src_item = source_root / item_name
+                    dst_item = self.app_dir / item_name
+                    if not src_item.exists():
+                        continue
+
+                    if src_item.is_file():
+                        shutil.copy2(src_item, dst_item)
+                    elif src_item.is_dir():
+                        # 递归安全复制目录
+                        dst_item.mkdir(parents=True, exist_ok=True)
+                        for root, dirs, files in os.walk(src_item):
+                            rel_path = Path(root).relative_to(src_item)
+                            dest_dir = dst_item / rel_path
+                            dest_dir.mkdir(parents=True, exist_ok=True)
+                            for f in files:
+                                if any(p in f for p in protected_patterns):
+                                    continue
+                                shutil.copy2(Path(root) / f, dest_dir / f)
 
             print(f"[UpdateChecker] DeskEcho 成功升级至 v{target_version}！")
             return True
@@ -174,9 +197,12 @@ class UpdateChecker:
     def restart_app(self):
         """重启应用客户端"""
         try:
-            main_py = self.app_dir / "main.py"
             import subprocess
-            subprocess.Popen([sys.executable, str(main_py)], cwd=str(self.app_dir))
+            if getattr(sys, 'frozen', False):
+                subprocess.Popen([sys.executable] + sys.argv[1:], cwd=str(self.app_dir))
+            else:
+                main_py = self.app_dir / "main.py"
+                subprocess.Popen([sys.executable, str(main_py)] + sys.argv[1:], cwd=str(self.app_dir))
             sys.exit(0)
         except Exception as e:
             print(f"[UpdateChecker] 重启应用失败: {e}")

@@ -2,9 +2,12 @@ from PyQt6.QtWidgets import QSystemTrayIcon, QMenu
 from PyQt6.QtGui import QIcon, QPixmap, QPainter, QColor, QBrush, QPen
 from PyQt6.QtCore import Qt, pyqtSignal, QObject
 
+from version import APP_VERSION
+
 class TrayManager(QObject):
     toggle_record_signal = pyqtSignal(bool)
     show_main_signal = pyqtSignal()
+    open_update_signal = pyqtSignal()
     inject_demo_signal = pyqtSignal()
     quit_signal = pyqtSignal()
 
@@ -74,6 +77,9 @@ class TrayManager(QObject):
         
         main_action = menu.addAction("🖥 打开控制台主界面")
         main_action.triggered.connect(self.show_main_signal.emit)
+
+        update_action = menu.addAction(f"🚀 软件发版与更新 (v{APP_VERSION})")
+        update_action.triggered.connect(self.open_update_signal.emit)
 
         menu.addSeparator()
 

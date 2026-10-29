@@ -86,6 +86,7 @@ class DeskEchoApp:
         self.main_window.tts_playback_finished.connect(self._on_tts_finished)
         self.tray.toggle_record_signal.connect(self._on_tray_record_toggled)
         self.tray.show_main_signal.connect(self._show_main_window)
+        self.tray.open_update_signal.connect(self._open_update_page)
         self.tray.inject_demo_signal.connect(self._inject_demo_record)
         self.tray.quit_signal.connect(self.quit)
 
@@ -356,28 +357,44 @@ class DeskEchoApp:
         self.main_window.refresh_records()
         self.tray.tray_icon.showMessage("演示数据已注入", "已成功写入一段模拟会议记录，可直接在控制台检索或长按【右 Alt】提问！", self.tray.tray_icon.MessageIcon.Information, 2500)
 
+    def _open_update_page(self):
+        self._show_main_window()
+        self.main_window._switch_nav(4)
+
     def _start_auto_update_daemon(self):
-        """后台静默启动自动更新检测 (方便高频迭代测试，有新发布自动下载就绪)"""
+        """后台静默启动自动更新检测 (周期轮询 GitHub Releases，收到推送自动静默下载并自动重启)"""
         try:
             from core.updater import AutoUpdateWorker
             from version import APP_VERSION
-            self.auto_updater = AutoUpdateWorker(current_version=APP_VERSION, auto_apply=True, parent=self.main_window)
-            
+            from PyQt6.QtCore import QTimer
+
             def _on_finished(new_v, info):
-                print(f"[AutoUpdater] 客户端已成功后台自动升级至 v{new_v}！")
+                print(f"[AutoUpdater] 收到新版本推送并成功更新至 v{new_v}！")
                 if hasattr(self, "tray") and hasattr(self.tray, "tray_icon"):
                     self.tray.tray_icon.showMessage(
-                        "DeskEcho 自动更新完成",
-                        f"已全自动升级至最新版本 v{new_v}！\n重启客户端即可体验最新功能。",
+                        "DeskEcho 收到新版本更新推送",
+                        f"已全自动完成升级至 v{new_v}！\n客户端将在 3 秒后自动重启生效最新功能...",
                         self.tray.tray_icon.MessageIcon.Information,
-                        5000
+                        4000
                     )
                 if hasattr(self, "main_window"):
                     self.main_window._on_update_finished(new_v, info)
 
-            self.auto_updater.update_finished.connect(_on_finished)
-            # 延时 2.5 秒触发，避开应用启动期的音频硬件与 UI 争抢
-            threading.Timer(2.5, self.auto_updater.start).start()
+            def _do_check():
+                if hasattr(self, "auto_updater") and self.auto_updater.isRunning():
+                    return
+                self.auto_updater = AutoUpdateWorker(current_version=APP_VERSION, auto_apply=True, parent=self.main_window)
+                self.auto_updater.update_finished.connect(_on_finished)
+                self.auto_updater.start()
+
+            # 首次延时 3 秒触发，避开启动期的硬件与 UI 初始化
+            threading.Timer(3.0, _do_check).start()
+
+            # 开启每隔 15 分钟的后台静默巡检定时器
+            self.auto_check_timer = QTimer(self.main_window)
+            self.auto_check_timer.setInterval(15 * 60 * 1000)
+            self.auto_check_timer.timeout.connect(_do_check)
+            self.auto_check_timer.start()
         except Exception as e:
             print(f"[AutoUpdater] 启动自动更新守护失败: {e}")
 

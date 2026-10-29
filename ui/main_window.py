@@ -1273,8 +1273,10 @@ class ExpandableEmployeeCard(QFrame):
 class TrashSliceItemWidget(QWidget):
     """
     或许没用切片列表单项组件
-    左侧：时间戳、AI 研判理由与截取的议题第一行
-    右侧：“✨ 有用”按钮，点击可直接将误判切片恢复为正式会议资产
+    采用三行清晰纵向布局与自动折行，彻底消除文字截断：
+    第 1 行：🗑️ 时间戳 + 右侧【✨ 有用】恢复按钮
+    第 2 行：⚠️ 判定原因（红底标签，支持长文本换行）
+    第 3 行：💬 议题/纪要提炼内容（完整展示，支持自动折行）
     """
     def __init__(self, rec: dict, list_item: QListWidgetItem, list_widget: QListWidget, on_restore_callback, parent=None):
         super().__init__(parent)
@@ -1284,41 +1286,36 @@ class TrashSliceItemWidget(QWidget):
         self.on_restore_callback = on_restore_callback
         self.setStyleSheet("background: transparent;")
 
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(8, 5, 8, 5)
-        layout.setSpacing(6)
-
-        v_box = QVBoxLayout()
-        v_box.setSpacing(2)
-
         time_str = rec.get("start_time", "")
         summary = rec.get("summary", "")
         first_line = summary.split("\n")[0] if summary else "常驻录音切片"
         first_line = re.sub(r'^[\s\d\.\-、*#]*(?:核心议题|议题|Topic|【核心议题】|主题)(?:[（\(].*?[）\)])?[：:\s]*', '', first_line).strip() or "常规沟通"
         reason = rec.get("trash_reason", "次要碎片")
 
-        lbl_head = QLabel(f"🗑️ {time_str} · [{reason}]")
-        lbl_head.setStyleSheet("color: #F87171; font-size: 10px; font-weight: bold;")
-        lbl_head.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self.setToolTip(f"【AI 研判理由】: {reason}\n【切片时间】: {time_str}\n【切片完整纪要】:\n{summary}")
 
-        lbl_title = QLabel(first_line[:19] + ("..." if len(first_line) > 19 else ""))
-        lbl_title.setStyleSheet("color: #CBD5E1; font-size: 11.5px;")
-        lbl_title.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        root_layout = QVBoxLayout(self)
+        root_layout.setContentsMargins(8, 6, 8, 6)
+        root_layout.setSpacing(4)
 
-        v_box.addWidget(lbl_head)
-        v_box.addWidget(lbl_title)
-        layout.addLayout(v_box, 1)
+        # 第 1 行：时间戳 + 恢复按钮
+        row1 = QHBoxLayout()
+        row1.setSpacing(6)
+        lbl_time = QLabel(f"🗑️ {time_str}")
+        lbl_time.setStyleSheet("color: #F87171; font-size: 11px; font-weight: bold;")
+        lbl_time.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        row1.addWidget(lbl_time, 1)
 
         self.btn_useful = QPushButton("✨ 有用")
         self.btn_useful.setToolTip("将此切片判定为有用并恢复为正式会议资产 (消除误判)")
         self.btn_useful.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_useful.setFixedSize(58, 25)
+        self.btn_useful.setFixedSize(56, 22)
         self.btn_useful.setStyleSheet("""
             QPushButton {
                 background: rgba(38, 176, 228, 0.16);
                 color: #26B0E4;
                 border: 1px solid rgba(38, 176, 228, 0.45);
-                border-radius: 5px;
+                border-radius: 4px;
                 font-size: 11px;
                 font-weight: bold;
                 padding: 0;
@@ -1330,7 +1327,22 @@ class TrashSliceItemWidget(QWidget):
             }
         """)
         self.btn_useful.clicked.connect(self._handle_restore)
-        layout.addWidget(self.btn_useful, 0, Qt.AlignmentFlag.AlignVCenter)
+        row1.addWidget(self.btn_useful, 0)
+        root_layout.addLayout(row1)
+
+        # 第 2 行：AI 研判理由
+        lbl_reason = QLabel(f"⚠️ 研判原因：{reason}")
+        lbl_reason.setStyleSheet("color: #FCA5A5; font-size: 10px; background: rgba(239, 68, 68, 0.12); border-radius: 3px; padding: 1px 5px;")
+        lbl_reason.setWordWrap(True)
+        lbl_reason.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        root_layout.addWidget(lbl_reason)
+
+        # 第 3 行：切片提炼文本 (完全展示，自适应折行)
+        lbl_title = QLabel(f"💬 {first_line}")
+        lbl_title.setStyleSheet("color: #CBD5E1; font-size: 11px; line-height: 1.3;")
+        lbl_title.setWordWrap(True)
+        lbl_title.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        root_layout.addWidget(lbl_title)
 
     def _handle_restore(self):
         if self.on_restore_callback:
@@ -1338,6 +1350,12 @@ class TrashSliceItemWidget(QWidget):
 
     def mousePressEvent(self, event):
         child = self.childAt(event.pos())
+        if child == self.btn_useful:
+            super().mousePressEvent(event)
+            return
+        if self.list_widget and self.list_item:
+            self.list_widget.setCurrentItem(self.list_item)
+            super().mousePressEvent(event)
         if child == self.btn_useful:
             super().mousePressEvent(event)
             return
@@ -1508,6 +1526,7 @@ class MainWindow(QMainWindow):
         self._build_page_memory(self.stack)    # Page 1: 会议记忆切片库
         self._build_page_roster(self.stack)    # Page 2: 企业通讯录与岗位
         self._build_page_settings(self.stack)  # Page 3: 引擎配置与硬件
+        self._build_page_update(self.stack)    # Page 4: 软件发版与自动更新
 
         content_layout.addWidget(self.stack, 1)
         main_h_layout.addWidget(content_container, 1)
@@ -1663,14 +1682,14 @@ class MainWindow(QMainWindow):
 
     def _switch_nav(self, index: int):
         self.btn_ask.set_active(index == 0)
-        self._update_gear_button_style(active=(index in (1, 2, 3)))
-        if index in (1, 2, 3):
+        self._update_gear_button_style(active=(index in (1, 2, 3, 4)))
+        if index in (1, 2, 3, 4):
             self._last_settings_tab = index
 
         self.stack.setCurrentIndex(index)
-        titles = ["对讲与即时检索", "会议记忆切片库", "企业组织通讯录", "系统引擎与状态"]
+        titles = ["对讲与即时检索", "会议记忆切片库", "企业组织通讯录", "系统引擎与状态", "软件发版与自动更新"]
 
-        # 切换顶栏模式：Page 0 显示简洁面包屑，Page 1/2/3 显示设置分段子导航
+        # 切换顶栏模式：Page 0 显示简洁面包屑，Page 1/2/3/4 显示设置分段子导航
         if index == 0:
             self.breadcrumb_lbl.setText("DeskEcho / 对讲与即时检索")
             if hasattr(self, 'settings_tab_bar'):
@@ -1691,7 +1710,12 @@ class MainWindow(QMainWindow):
     def _update_settings_sub_tab_styles(self, active_index: int):
         if not hasattr(self, 'sub_btn_roster'):
             return
-        idx_map = {2: self.sub_btn_roster, 1: self.sub_btn_memory, 3: self.sub_btn_engine}
+        idx_map = {
+            2: self.sub_btn_roster,
+            1: self.sub_btn_memory,
+            3: self.sub_btn_engine,
+            4: self.sub_btn_update
+        }
         for idx, btn in idx_map.items():
             if idx == active_index:
                 btn.setStyleSheet("""
@@ -1732,7 +1756,7 @@ class MainWindow(QMainWindow):
         self.breadcrumb_lbl.setStyleSheet("font-size: 13px; font-weight: 600; color: #94A3B8;")
         top_bar.addWidget(self.breadcrumb_lbl)
 
-        # 设置中心分段子导航栏 (在 Page 1, 2, 3 时呈现)
+        # 设置中心分段子导航栏 (在 Page 1, 2, 3, 4 时呈现)
         self.settings_tab_bar = QWidget()
         self.settings_tab_bar.setVisible(False)
         tab_layout = QHBoxLayout(self.settings_tab_bar)
@@ -1742,9 +1766,10 @@ class MainWindow(QMainWindow):
         self.sub_btn_roster = QPushButton(f"👥 企业通讯录 ({len(EMPLOYEES)}人)")
         self.sub_btn_memory = QPushButton("🧠 会议记忆库")
         self.sub_btn_engine = QPushButton("⚙️ 系统引擎状态")
+        self.sub_btn_update = QPushButton("🚀 软件更新")
         self.sub_btn_back = QPushButton("← 返回对讲与检索")
 
-        for btn in (self.sub_btn_roster, self.sub_btn_memory, self.sub_btn_engine):
+        for btn in (self.sub_btn_roster, self.sub_btn_memory, self.sub_btn_engine, self.sub_btn_update):
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
 
         self.sub_btn_back.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -1768,16 +1793,41 @@ class MainWindow(QMainWindow):
         self.sub_btn_roster.clicked.connect(lambda: self._switch_nav(2))
         self.sub_btn_memory.clicked.connect(lambda: self._switch_nav(1))
         self.sub_btn_engine.clicked.connect(lambda: self._switch_nav(3))
+        self.sub_btn_update.clicked.connect(lambda: self._switch_nav(4))
         self.sub_btn_back.clicked.connect(lambda: self._switch_nav(0))
 
         tab_layout.addWidget(self.sub_btn_roster)
         tab_layout.addWidget(self.sub_btn_memory)
         tab_layout.addWidget(self.sub_btn_engine)
+        tab_layout.addWidget(self.sub_btn_update)
         tab_layout.addSpacing(8)
         tab_layout.addWidget(self.sub_btn_back)
 
         top_bar.addWidget(self.settings_tab_bar)
         top_bar.addStretch()
+
+        # 常驻版本与更新入口 (任何页面均可点击查看发版详情)
+        self.top_version_btn = QPushButton(f"🚀 v{APP_VERSION}")
+        self.top_version_btn.setToolTip(f"当前版本 v{APP_VERSION} · 点击打开软件更新与发版管理中心")
+        self.top_version_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.top_version_btn.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(38, 176, 228, 0.12);
+                color: #38BDF8;
+                border: 1px solid rgba(38, 176, 228, 0.35);
+                border-radius: 6px;
+                padding: 6px 12px;
+                font-size: 11px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: rgba(38, 176, 228, 0.25);
+                color: #FFFFFF;
+                border-color: #26B0E4;
+            }
+        """)
+        self.top_version_btn.clicked.connect(lambda: self._switch_nav(4))
+        top_bar.addWidget(self.top_version_btn)
 
         # 快捷刷新操作按钮
         self.refresh_btn = QPushButton("🔄 刷新列表")
@@ -2601,7 +2651,53 @@ class MainWindow(QMainWindow):
         e_layout.addLayout(grid)
         v_layout.addWidget(engine_card)
 
-        # 2. 版本发布与自动升级控制台卡片 (GitHub Releases)
+        # 发版管理快速跳转
+        goto_update_box = QHBoxLayout()
+        goto_update_box.setContentsMargins(4, 4, 4, 4)
+        goto_lbl = QLabel("🚀 DeskEcho 现已接入 GitHub Releases 官方发版通道与单一 Windows EXE 自动更新")
+        goto_lbl.setStyleSheet("color: #64748B; font-size: 11px;")
+        goto_update_box.addWidget(goto_lbl, 1)
+
+        btn_goto_update = QPushButton("打开软件更新中心 →")
+        btn_goto_update.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_goto_update.setStyleSheet("""
+            QPushButton {
+                background: rgba(38, 176, 228, 0.12);
+                color: #38BDF8;
+                border: 1px solid rgba(38, 176, 228, 0.3);
+                border-radius: 5px;
+                padding: 4px 10px;
+                font-size: 11px;
+            }
+            QPushButton:hover {
+                background: rgba(38, 176, 228, 0.25);
+                color: #FFFFFF;
+            }
+        """)
+        btn_goto_update.clicked.connect(lambda: self._switch_nav(4))
+        goto_update_box.addWidget(btn_goto_update)
+        v_layout.addLayout(goto_update_box)
+
+        v_layout.addStretch()
+
+        scroll.setWidget(container)
+        stack.addWidget(scroll)
+
+    # ---------------- Page 4: 软件发版与版本更新 ----------------
+    def _build_page_update(self, stack: QStackedWidget):
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.viewport().setStyleSheet("background: transparent;")
+        scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
+
+        container = QWidget()
+        container.setStyleSheet("background: transparent;")
+        v_layout = QVBoxLayout(container)
+        v_layout.setContentsMargins(4, 4, 12, 36)
+        v_layout.setSpacing(14)
+
+        # 1. 软件更新控制台主卡片
         version_card = QFrame()
         version_card.setObjectName("card")
         version_card.setStyleSheet("""
@@ -2613,15 +2709,15 @@ class MainWindow(QMainWindow):
             }
         """)
         v_card_layout = QVBoxLayout(version_card)
-        v_card_layout.setContentsMargins(16, 14, 16, 14)
-        v_card_layout.setSpacing(10)
+        v_card_layout.setContentsMargins(18, 16, 18, 16)
+        v_card_layout.setSpacing(12)
 
         v_head_layout = QHBoxLayout()
-        v_title = QLabel("🚀 发版与版本自动更新管理 (GitHub Release)")
-        v_title.setStyleSheet("font-size: 14px; font-weight: bold; color: #FFFFFF;")
+        v_title = QLabel("🚀 发版与版本自动更新管理 (GitHub Release 官方发版通道)")
+        v_title.setStyleSheet("font-size: 15px; font-weight: bold; color: #FFFFFF;")
         v_head_layout.addWidget(v_title, 1)
 
-        self.ver_badge = QLabel(f"v{APP_VERSION} (当前版本)")
+        self.ver_badge = QLabel(f"v{APP_VERSION} (当前运行版本)")
         self.ver_badge.setStyleSheet("color: #26B0E4; font-size: 11px; background: rgba(38,176,228,0.15); border: 1px solid rgba(38,176,228,0.4); padding: 3px 8px; border-radius: 5px; font-weight: bold;")
         v_head_layout.addWidget(self.ver_badge)
 
@@ -2633,7 +2729,7 @@ class MainWindow(QMainWindow):
                 color: #26B0E4;
                 border: 1px solid rgba(38, 176, 228, 0.5);
                 border-radius: 6px;
-                padding: 5px 14px;
+                padding: 6px 16px;
                 font-size: 11.5px;
                 font-weight: bold;
             }
@@ -2654,7 +2750,7 @@ class MainWindow(QMainWindow):
                 color: #FFFFFF;
                 border: 1px solid #059669;
                 border-radius: 6px;
-                padding: 5px 14px;
+                padding: 6px 16px;
                 font-size: 11.5px;
                 font-weight: bold;
             }
@@ -2665,16 +2761,58 @@ class MainWindow(QMainWindow):
         self.btn_restart_app.clicked.connect(self._restart_app)
         v_head_layout.addWidget(self.btn_restart_app)
 
+        self.btn_cancel_restart = QPushButton("⏸ 暂缓重启")
+        self.btn_cancel_restart.setVisible(False)
+        self.btn_cancel_restart.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_cancel_restart.setStyleSheet("""
+            QPushButton {
+                background: rgba(255, 255, 255, 0.08);
+                color: #CBD5E1;
+                border: 1px solid rgba(255, 255, 255, 0.15);
+                border-radius: 6px;
+                padding: 6px 14px;
+                font-size: 11.5px;
+            }
+            QPushButton:hover {
+                background: rgba(255, 255, 255, 0.15);
+                color: #FFFFFF;
+            }
+        """)
+        self.btn_cancel_restart.clicked.connect(self._cancel_restart_countdown)
+        v_head_layout.addWidget(self.btn_cancel_restart)
+
         v_card_layout.addLayout(v_head_layout)
 
         self.update_info_lbl = QLabel(f"当前构建日期：{RELEASE_DATE} · 采用 GitHub Releases 官方云端发版通道，客户端已开启后台静默自检。")
-        self.update_info_lbl.setStyleSheet("color: #94A3B8; font-size: 11.5px; line-height: 1.4;")
+        self.update_info_lbl.setStyleSheet("color: #CBD5E1; font-size: 12px; line-height: 1.6; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 12px 14px;")
         self.update_info_lbl.setWordWrap(True)
         v_card_layout.addWidget(self.update_info_lbl)
 
         v_layout.addWidget(version_card)
-        v_layout.addStretch()
 
+        # 2. 发版规格与自动化通道机制卡片
+        spec_card = QFrame()
+        spec_card.setObjectName("card")
+        spec_card.setStyleSheet("QFrame#card { background-color: #11141D; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 16px; }")
+        s_layout = QVBoxLayout(spec_card)
+        s_layout.setContentsMargins(18, 16, 18, 16)
+        s_layout.setSpacing(10)
+
+        s_title = QLabel("📦 发版规格与自动化通道机制")
+        s_title.setStyleSheet("font-size: 13.5px; font-weight: bold; color: #FFFFFF;")
+        s_layout.addWidget(s_title)
+
+        s_desc = QLabel(
+            "• 发版标准：DeskEcho 后续版本统一以单一 Windows 可执行程序 (DeskEcho.exe) 在 GitHub Releases 官方页面正规发版。\n"
+            "• 客户端自愈：后台静默轮询 GitHub Releases，当检测到最新发版推送时，自动下载并在 3 秒内自动重启生效。\n"
+            "• 数据安全隔离：自动更新全程保留本地密钥 (.env)、本地会议知识库 (omni_data/records.db) 与向量索引，无感平滑升级。"
+        )
+        s_desc.setStyleSheet("color: #94A3B8; font-size: 11.5px; line-height: 1.7;")
+        s_desc.setWordWrap(True)
+        s_layout.addWidget(s_desc)
+        v_layout.addWidget(spec_card)
+
+        v_layout.addStretch()
         scroll.setWidget(container)
         stack.addWidget(scroll)
 
@@ -2701,9 +2839,47 @@ class MainWindow(QMainWindow):
         self.ver_badge.setText(f"v{new_v} (已就绪)")
         self.ver_badge.setStyleSheet("color: #10B981; font-size: 11px; background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.4); padding: 3px 8px; border-radius: 5px; font-weight: bold;")
         self.btn_restart_app.setVisible(True)
+        self.btn_cancel_restart.setVisible(True)
+        
         changelog_str = "；".join(info.get("changelog", [])[:3])
-        self.update_info_lbl.setText(f"🎉 升级成功！DeskEcho 已自动更新至 v{new_v}。\n更新内容：{changelog_str}\n请点击右侧【立即重启客户端】使新版本生效。")
-        self.search_status_lbl.setText(f"🎉 已自动升级至 v{new_v}，点击重启生效")
+        self.search_status_lbl.setText(f"🎉 已自动升级至 v{new_v}，即将重启")
+
+        # 启动 3 秒自动重启倒计时
+        self._countdown_seconds = 3
+        self.update_info_lbl.setText(
+            f"🎉 升级成功！DeskEcho 已自动更新至 v{new_v}。\n"
+            f"更新内容：{changelog_str}\n"
+            f"⚡ 收到最新版本推送，客户端将在 {self._countdown_seconds} 秒后自动重启生效..."
+        )
+        self.btn_restart_app.setText(f"🚀 立即重启 ({self._countdown_seconds}s)")
+
+        if hasattr(self, "_countdown_timer") and self._countdown_timer.isActive():
+            self._countdown_timer.stop()
+        self._countdown_timer = QTimer(self)
+        self._countdown_timer.setInterval(1000)
+
+        def _tick():
+            self._countdown_seconds -= 1
+            if self._countdown_seconds <= 0:
+                self._countdown_timer.stop()
+                self._restart_app()
+            else:
+                self.btn_restart_app.setText(f"🚀 立即重启 ({self._countdown_seconds}s)")
+                self.update_info_lbl.setText(
+                    f"🎉 升级成功！DeskEcho 已自动更新至 v{new_v}。\n"
+                    f"更新内容：{changelog_str}\n"
+                    f"⚡ 收到最新版本推送，客户端将在 {self._countdown_seconds} 秒后自动重启生效..."
+                )
+
+        self._countdown_timer.timeout.connect(_tick)
+        self._countdown_timer.start()
+
+    def _cancel_restart_countdown(self):
+        if hasattr(self, "_countdown_timer") and self._countdown_timer.isActive():
+            self._countdown_timer.stop()
+        self.btn_cancel_restart.setVisible(False)
+        self.btn_restart_app.setText("🚀 立即重启客户端")
+        self.update_info_lbl.setText("✓ 已取消自动重启。您可以随时点击【立即重启客户端】使新版本生效。")
 
     def _on_update_failed(self, err_msg: str):
         self.btn_check_update.setEnabled(True)
@@ -2818,7 +2994,7 @@ class MainWindow(QMainWindow):
 
             if self.current_mem_mode == "trash":
                 item = QListWidgetItem()
-                item.setSizeHint(QSize(280, 54))
+                item.setSizeHint(QSize(280, 82))
                 item.setData(Qt.ItemDataRole.UserRole, rec)
                 self.mem_list.addItem(item)
                 widget = TrashSliceItemWidget(
@@ -3058,7 +3234,7 @@ class MainWindow(QMainWindow):
 
             if self.current_mem_mode == "trash":
                 item = QListWidgetItem()
-                item.setSizeHint(QSize(280, 54))
+                item.setSizeHint(QSize(280, 82))
                 item.setData(Qt.ItemDataRole.UserRole, rec)
                 self.mem_list.addItem(item)
                 widget = TrashSliceItemWidget(
