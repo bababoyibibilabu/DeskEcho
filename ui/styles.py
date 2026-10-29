@@ -115,7 +115,7 @@ def get_top_version_style(is_light: bool) -> str:
                 color: #0284C7;
                 border: 1px solid rgba(2, 132, 199, 0.25);
                 border-radius: 6px;
-                padding: 5px 10px;
+                padding: 0px 10px;
                 font-size: 11px;
                 font-weight: 700;
             }
@@ -131,7 +131,7 @@ def get_top_version_style(is_light: bool) -> str:
                 color: #38BDF8;
                 border: 1px solid rgba(38, 176, 228, 0.35);
                 border-radius: 6px;
-                padding: 5px 10px;
+                padding: 0px 10px;
                 font-size: 11px;
                 font-weight: 700;
             }
@@ -148,7 +148,7 @@ def get_theme_btn_style(is_light: bool) -> str:
                 background-color: #F1F5F9;
                 border: 1px solid #CBD5E1;
                 border-radius: 6px;
-                padding: 4px;
+                padding: 0px;
             }
             QPushButton:hover {
                 background-color: #E2E8F0;
@@ -161,7 +161,7 @@ def get_theme_btn_style(is_light: bool) -> str:
                 background-color: rgba(255, 255, 255, 0.06);
                 border: 1px solid rgba(255, 255, 255, 0.12);
                 border-radius: 6px;
-                padding: 4px;
+                padding: 0px;
             }
             QPushButton:hover {
                 background-color: rgba(38, 176, 228, 0.2);

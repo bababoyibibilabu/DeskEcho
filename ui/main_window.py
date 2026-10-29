@@ -28,6 +28,7 @@ from ui.theme_manager import ThemeManager, ThemeType
 from ui.components.icons import get_symbol_icon, get_symbol_pixmap, get_flower_logo_icon, get_flower_logo_pixmap
 from ui.components.modern_dialog import ModernDialog
 from ui.components.border_beam import BorderBeamContainer
+from ui.components.modern_combobox import ModernComboBox, get_modern_combobox_style
 from ui.styles import (
     get_cmd_card_style, get_ans_card_style, get_answer_browser_style,
     get_top_version_style, get_theme_btn_style, get_intercom_banner_style,
@@ -1764,6 +1765,7 @@ class TrashSliceItemWidget(QWidget):
         # 第 1 行：时间戳 + 恢复按钮
         row1 = QHBoxLayout()
         row1.setSpacing(6)
+        row1.setAlignment(Qt.AlignmentFlag.AlignVCenter)
         lbl_time = QLabel(time_str)
         lbl_time.setStyleSheet("color: #EF4444; font-size: 11px; font-weight: bold;")
         lbl_time.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
@@ -1771,7 +1773,8 @@ class TrashSliceItemWidget(QWidget):
 
         is_light = ThemeManager.get_instance().is_light()
         self.btn_useful = QPushButton("恢复")
-        self.btn_useful.setIcon(get_symbol_icon("check_circle", color="#0284C7" if is_light else "#38BDF8", size=11))
+        self.btn_useful.setIcon(get_symbol_icon("check_circle", color="#0284C7" if is_light else "#38BDF8", size=12))
+        self.btn_useful.setIconSize(QSize(12, 12))
         self.btn_useful.setToolTip("将此切片判定为有用并恢复为正式会议资产 (消除误判)")
         self.btn_useful.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_useful.setFixedSize(58, 22)
@@ -2078,7 +2081,7 @@ class MainWindow(QMainWindow):
             if hasattr(self, 'settings_tab_bar'):
                 self.settings_tab_bar.setVisible(False)
         else:
-            self.breadcrumb_lbl.setText(f"设置中心 · {titles[index]}")
+            self.breadcrumb_lbl.setText("设置中心")
             if hasattr(self, 'settings_tab_bar'):
                 self.settings_tab_bar.setVisible(True)
             self._update_settings_sub_tab_styles(index)
@@ -2101,43 +2104,45 @@ class MainWindow(QMainWindow):
             4: (self.sub_btn_update, "rocket_launch")
         }
         for idx, (btn, icon_name) in idx_map.items():
+            btn.setFixedHeight(30)
+            btn.setIconSize(QSize(14, 14))
             if idx == active_index:
                 if is_light:
-                    btn.setIcon(get_symbol_icon(icon_name, color="#0284C7", size=13))
+                    btn.setIcon(get_symbol_icon(icon_name, color="#0284C7", size=14))
                     btn.setStyleSheet("""
                         QPushButton {
                             background-color: rgba(2, 132, 199, 0.12);
                             color: #0284C7;
                             border: 1px solid #0284C7;
                             border-radius: 6px;
-                            padding: 5px 12px;
+                            padding: 0px 12px;
                             font-size: 11px;
                             font-weight: bold;
                         }
                     """)
                 else:
-                    btn.setIcon(get_symbol_icon(icon_name, color="#38BDF8", size=13))
+                    btn.setIcon(get_symbol_icon(icon_name, color="#38BDF8", size=14))
                     btn.setStyleSheet("""
                         QPushButton {
                             background-color: rgba(38, 176, 228, 0.22);
                             color: #FFFFFF;
                             border: 1px solid #26B0E4;
                             border-radius: 6px;
-                            padding: 5px 12px;
+                            padding: 0px 12px;
                             font-size: 11px;
                             font-weight: bold;
                         }
                     """)
             else:
                 if is_light:
-                    btn.setIcon(get_symbol_icon(icon_name, color="#475569", size=13))
+                    btn.setIcon(get_symbol_icon(icon_name, color="#475569", size=14))
                     btn.setStyleSheet("""
                         QPushButton {
                             background-color: #FFFFFF;
                             color: #475569;
                             border: 1px solid #CBD5E1;
                             border-radius: 6px;
-                            padding: 5px 12px;
+                            padding: 0px 12px;
                             font-size: 11px;
                         }
                         QPushButton:hover {
@@ -2147,14 +2152,14 @@ class MainWindow(QMainWindow):
                         }
                     """)
                 else:
-                    btn.setIcon(get_symbol_icon(icon_name, color="#94A3B8", size=13))
+                    btn.setIcon(get_symbol_icon(icon_name, color="#94A3B8", size=14))
                     btn.setStyleSheet("""
                         QPushButton {
                             background-color: rgba(255, 255, 255, 0.04);
                             color: #94A3B8;
                             border: 1px solid rgba(255, 255, 255, 0.08);
                             border-radius: 6px;
-                            padding: 5px 12px;
+                            padding: 0px 12px;
                             font-size: 11px;
                         }
                         QPushButton:hover {
@@ -2164,72 +2169,84 @@ class MainWindow(QMainWindow):
                         }
                     """)
 
+        if hasattr(self, 'sub_btn_back'):
+            self.sub_btn_back.setFixedHeight(30)
+            self.sub_btn_back.setIcon(get_symbol_icon("arrow_back", color="#0284C7" if is_light else "#38BDF8", size=14))
+            self.sub_btn_back.setIconSize(QSize(14, 14))
+            if is_light:
+                self.sub_btn_back.setStyleSheet("""
+                    QPushButton {
+                        background: rgba(2, 132, 199, 0.08);
+                        color: #0284C7;
+                        border: 1px solid rgba(2, 132, 199, 0.3);
+                        border-radius: 6px;
+                        padding: 0px 12px;
+                        font-size: 11px;
+                        font-weight: 600;
+                    }
+                    QPushButton:hover {
+                        background: rgba(2, 132, 199, 0.16);
+                        color: #0369A1;
+                        border-color: #0284C7;
+                    }
+                """)
+            else:
+                self.sub_btn_back.setStyleSheet("""
+                    QPushButton {
+                        background: rgba(38, 176, 228, 0.15);
+                        color: #38BDF8;
+                        border: 1px solid rgba(38, 176, 228, 0.4);
+                        border-radius: 6px;
+                        padding: 0px 12px;
+                        font-size: 11px;
+                        font-weight: 600;
+                    }
+                    QPushButton:hover {
+                        background: rgba(38, 176, 228, 0.3);
+                        color: #FFFFFF;
+                        border-color: #26B0E4;
+                    }
+                """)
+
     # ---------------- 顶部栏构建 ----------------
     def _build_top_bar(self, parent_layout: QVBoxLayout):
         top_bar = QHBoxLayout()
         top_bar.setSpacing(12)
+        top_bar.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
         # 面包屑 (自然清晰，去除机械冗余前缀)
         self.breadcrumb_lbl = QLabel("对讲与即时检索")
-        self.breadcrumb_lbl.setStyleSheet("font-size: 13.5px; font-weight: 700; color: #94A3B8;")
+        self.breadcrumb_lbl.setStyleSheet("font-size: 13px; font-weight: 700; color: #94A3B8;")
+        self.breadcrumb_lbl.setFixedHeight(30)
+        self.breadcrumb_lbl.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
         top_bar.addWidget(self.breadcrumb_lbl)
 
         # 设置中心分段子导航栏 (在 Page 1, 2, 3, 4 时呈现)
         self.settings_tab_bar = QWidget()
         self.settings_tab_bar.setVisible(False)
+        self.settings_tab_bar.setFixedHeight(30)
         tab_layout = QHBoxLayout(self.settings_tab_bar)
         tab_layout.setContentsMargins(0, 0, 0, 0)
         tab_layout.setSpacing(6)
+        tab_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
         is_light = ThemeManager.get_instance().is_light()
         self.sub_btn_roster = QPushButton(f"企业通讯录 ({len(EMPLOYEES)}人)")
-        self.sub_btn_roster.setIcon(get_symbol_icon("group", color="#0284C7" if is_light else "#38BDF8", size=14))
         self.sub_btn_memory = QPushButton("会议记忆库")
-        self.sub_btn_memory.setIcon(get_symbol_icon("article", color="#0284C7" if is_light else "#38BDF8", size=14))
         self.sub_btn_engine = QPushButton("系统引擎状态")
-        self.sub_btn_engine.setIcon(get_symbol_icon("tune", color="#0284C7" if is_light else "#38BDF8", size=14))
         self.sub_btn_update = QPushButton("软件更新")
-        self.sub_btn_update.setIcon(get_symbol_icon("rocket_launch", color="#0284C7" if is_light else "#38BDF8", size=14))
-        self.sub_btn_back = QPushButton("返回对讲与检索")
+        self.sub_btn_back = QPushButton("返回对讲")
 
-        for btn in (self.sub_btn_roster, self.sub_btn_memory, self.sub_btn_engine, self.sub_btn_update):
+        for btn in (self.sub_btn_roster, self.sub_btn_memory, self.sub_btn_engine, self.sub_btn_update, self.sub_btn_back):
+            btn.setFixedHeight(30)
+            btn.setIconSize(QSize(14, 14))
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
 
-        self.sub_btn_back.setCursor(Qt.CursorShape.PointingHandCursor)
-        if is_light:
-            self.sub_btn_back.setStyleSheet("""
-                QPushButton {
-                    background: rgba(2, 132, 199, 0.08);
-                    color: #0284C7;
-                    border: 1px solid rgba(2, 132, 199, 0.3);
-                    border-radius: 6px;
-                    padding: 5px 12px;
-                    font-size: 11px;
-                    font-weight: 600;
-                }
-                QPushButton:hover {
-                    background: rgba(2, 132, 199, 0.16);
-                    color: #0369A1;
-                    border-color: #0284C7;
-                }
-            """)
-        else:
-            self.sub_btn_back.setStyleSheet("""
-                QPushButton {
-                    background: rgba(38, 176, 228, 0.15);
-                    color: #38BDF8;
-                    border: 1px solid rgba(38, 176, 228, 0.4);
-                    border-radius: 6px;
-                    padding: 5px 12px;
-                    font-size: 11px;
-                    font-weight: 600;
-                }
-                QPushButton:hover {
-                    background: rgba(38, 176, 228, 0.3);
-                    color: #FFFFFF;
-                    border-color: #26B0E4;
-                }
-            """)
+        self.sub_btn_roster.setIcon(get_symbol_icon("group", color="#0284C7" if is_light else "#38BDF8", size=14))
+        self.sub_btn_memory.setIcon(get_symbol_icon("article", color="#0284C7" if is_light else "#38BDF8", size=14))
+        self.sub_btn_engine.setIcon(get_symbol_icon("tune", color="#0284C7" if is_light else "#38BDF8", size=14))
+        self.sub_btn_update.setIcon(get_symbol_icon("rocket_launch", color="#0284C7" if is_light else "#38BDF8", size=14))
+        self.sub_btn_back.setIcon(get_symbol_icon("arrow_back", color="#0284C7" if is_light else "#38BDF8", size=14))
 
         self.sub_btn_roster.clicked.connect(lambda: self._switch_nav(2))
         self.sub_btn_memory.clicked.connect(lambda: self._switch_nav(1))
@@ -2241,7 +2258,7 @@ class MainWindow(QMainWindow):
         tab_layout.addWidget(self.sub_btn_memory)
         tab_layout.addWidget(self.sub_btn_engine)
         tab_layout.addWidget(self.sub_btn_update)
-        tab_layout.addSpacing(8)
+        tab_layout.addSpacing(6)
         tab_layout.addWidget(self.sub_btn_back)
 
         top_bar.addWidget(self.settings_tab_bar)
@@ -2249,7 +2266,8 @@ class MainWindow(QMainWindow):
 
         # 主题切换按钮 (月亮/太阳小图标，置于版本号左侧一点点)
         self.theme_btn = QPushButton()
-        self.theme_btn.setFixedSize(30, 28)
+        self.theme_btn.setFixedSize(30, 30)
+        self.theme_btn.setIconSize(QSize(16, 16))
         self.theme_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.theme_btn.clicked.connect(self._on_toggle_theme)
         top_bar.addWidget(self.theme_btn)
@@ -2257,6 +2275,8 @@ class MainWindow(QMainWindow):
 
         # 常驻版本与更新入口 (任何页面均可点击查看发版详情)
         self.top_version_btn = QPushButton(f"v{APP_VERSION}")
+        self.top_version_btn.setFixedHeight(30)
+        self.top_version_btn.setIconSize(QSize(13, 13))
         self.top_version_btn.setIcon(get_symbol_icon("rocket_launch", color="#0284C7" if is_light else "#38BDF8", size=13))
         self.top_version_btn.setToolTip(f"当前版本 v{APP_VERSION} · 点击打开软件更新与发版管理中心")
         self.top_version_btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -2413,11 +2433,17 @@ class MainWindow(QMainWindow):
         h_layout = QHBoxLayout(self.mem_header_card)
         h_layout.setContentsMargins(14, 10, 14, 10)
         h_layout.setSpacing(10)
+        h_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
         # 两个菜单入口：正式切片 vs 或许没用 (矢量图标，无 Emoji)
         self.btn_mem_normal = QPushButton("正式会议切片 (0)")
+        self.btn_mem_normal.setFixedHeight(32)
+        self.btn_mem_normal.setIconSize(QSize(14, 14))
         self.btn_mem_normal.setIcon(get_symbol_icon("article", color="#0284C7" if is_light else "#38BDF8", size=14))
+
         self.btn_mem_trash = QPushButton("或许没用 (0)")
+        self.btn_mem_trash.setFixedHeight(32)
+        self.btn_mem_trash.setIconSize(QSize(14, 14))
         self.btn_mem_trash.setIcon(get_symbol_icon("delete", color="#64748B" if is_light else "#94A3B8", size=14))
 
         for b in (self.btn_mem_normal, self.btn_mem_trash):
@@ -2431,6 +2457,7 @@ class MainWindow(QMainWindow):
         h_layout.addSpacing(10)
 
         self.mem_search_input = QLineEdit()
+        self.mem_search_input.setFixedHeight(32)
         self.mem_search_input.setPlaceholderText("在当前切片纪要中快速搜索关键词 (如: 预算, Logo, 机器人)...")
         if is_light:
             self.mem_search_input.setStyleSheet("""
@@ -2438,7 +2465,7 @@ class MainWindow(QMainWindow):
                     background-color: #FFFFFF;
                     border: 1px solid #CBD5E1;
                     border-radius: 8px;
-                    padding: 7px 12px;
+                    padding: 0px 12px;
                     font-size: 12px;
                     color: #0F172A;
                 }
@@ -2452,7 +2479,7 @@ class MainWindow(QMainWindow):
                     background-color: #0A0C10;
                     border: 1px solid rgba(255, 255, 255, 0.08);
                     border-radius: 8px;
-                    padding: 7px 12px;
+                    padding: 0px 12px;
                     font-size: 12px;
                     color: #FFFFFF;
                 }
@@ -2464,7 +2491,9 @@ class MainWindow(QMainWindow):
         h_layout.addWidget(self.mem_search_input, 1)
 
         self.mem_search_btn = QPushButton("筛选切片")
-        self.mem_search_btn.setIcon(get_symbol_icon("search", color="#0284C7" if is_light else "#26B0E4", size=13))
+        self.mem_search_btn.setFixedHeight(32)
+        self.mem_search_btn.setIconSize(QSize(14, 14))
+        self.mem_search_btn.setIcon(get_symbol_icon("search", color="#0284C7" if is_light else "#26B0E4", size=14))
         self.mem_search_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         if is_light:
             self.mem_search_btn.setStyleSheet("""
@@ -2473,7 +2502,7 @@ class MainWindow(QMainWindow):
                     color: #0284C7;
                     border: 1px solid rgba(2, 132, 199, 0.35);
                     border-radius: 8px;
-                    padding: 7px 16px;
+                    padding: 0px 16px;
                     font-size: 12px;
                     font-weight: 600;
                 }
@@ -2489,7 +2518,7 @@ class MainWindow(QMainWindow):
                     color: #26B0E4;
                     border: 1px solid rgba(38, 176, 228, 0.45);
                     border-radius: 8px;
-                    padding: 7px 16px;
+                    padding: 0px 16px;
                     font-size: 12px;
                     font-weight: 600;
                 }
@@ -2526,6 +2555,7 @@ class MainWindow(QMainWindow):
         trash_b_layout = QHBoxLayout(self.trash_banner)
         trash_b_layout.setContentsMargins(12, 8, 12, 8)
         trash_b_layout.setSpacing(12)
+        trash_b_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
         self.trash_tip_lbl = QLabel("AI 研判：以下切片多为开场寒暄、试音或无决议的次要内容，可安全清理以释放检索空间。")
         self.trash_tip_lbl.setWordWrap(True)
@@ -2533,7 +2563,9 @@ class MainWindow(QMainWindow):
         trash_b_layout.addWidget(self.trash_tip_lbl, 1)
 
         self.btn_clean_all_trash = QPushButton("清空次要切片")
-        self.btn_clean_all_trash.setIcon(get_symbol_icon("delete_sweep", color="#64748B" if is_light else "#94A3B8", size=13))
+        self.btn_clean_all_trash.setFixedHeight(30)
+        self.btn_clean_all_trash.setIconSize(QSize(14, 14))
+        self.btn_clean_all_trash.setIcon(get_symbol_icon("delete_sweep", color="#64748B" if is_light else "#94A3B8", size=14))
         self.btn_clean_all_trash.setCursor(Qt.CursorShape.PointingHandCursor)
         if is_light:
             self.btn_clean_all_trash.setStyleSheet("""
@@ -2542,7 +2574,7 @@ class MainWindow(QMainWindow):
                     color: #475569;
                     border: 1px solid #CBD5E1;
                     border-radius: 6px;
-                    padding: 5px 12px;
+                    padding: 0px 12px;
                     font-size: 11px;
                     font-weight: 500;
                 }
@@ -2559,7 +2591,7 @@ class MainWindow(QMainWindow):
                     color: #94A3B8;
                     border: 1px solid rgba(255, 255, 255, 0.12);
                     border-radius: 6px;
-                    padding: 5px 12px;
+                    padding: 0px 12px;
                     font-size: 11px;
                     font-weight: 500;
                 }
@@ -2670,13 +2702,16 @@ class MainWindow(QMainWindow):
             """)
         t_action_layout = QHBoxLayout(self.trash_detail_action_bar)
         t_action_layout.setContentsMargins(8, 4, 8, 4)
+        t_action_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
         self.trash_reason_lbl = QLabel("AI 研判理由：无实质性决策且无落地待办推进")
         self.trash_reason_lbl.setStyleSheet(f"color: {'#64748B' if is_light else '#94A3B8'}; font-size: 11px; font-weight: 500;")
         t_action_layout.addWidget(self.trash_reason_lbl, 1)
 
         self.btn_restore_curr_slice = QPushButton("恢复为正式资产")
-        self.btn_restore_curr_slice.setIcon(get_symbol_icon("check_circle", color="#0284C7" if is_light else "#38BDF8", size=13))
+        self.btn_restore_curr_slice.setFixedHeight(30)
+        self.btn_restore_curr_slice.setIconSize(QSize(14, 14))
+        self.btn_restore_curr_slice.setIcon(get_symbol_icon("check_circle", color="#0284C7" if is_light else "#38BDF8", size=14))
         self.btn_restore_curr_slice.setToolTip("将此切片恢复为正式会议资产，杜绝 AI 误判")
         self.btn_restore_curr_slice.setCursor(Qt.CursorShape.PointingHandCursor)
         if is_light:
@@ -2686,7 +2721,7 @@ class MainWindow(QMainWindow):
                     color: #0284C7;
                     border: 1px solid #CBD5E1;
                     border-radius: 6px;
-                    padding: 5px 12px;
+                    padding: 0px 12px;
                     font-size: 11px;
                     font-weight: 500;
                 }
@@ -2702,7 +2737,7 @@ class MainWindow(QMainWindow):
                     color: #38BDF8;
                     border: 1px solid rgba(255, 255, 255, 0.12);
                     border-radius: 6px;
-                    padding: 5px 12px;
+                    padding: 0px 12px;
                     font-size: 11px;
                     font-weight: 500;
                 }
@@ -2715,7 +2750,9 @@ class MainWindow(QMainWindow):
         t_action_layout.addWidget(self.btn_restore_curr_slice)
 
         self.btn_delete_curr_slice = QPushButton("删除此切片")
-        self.btn_delete_curr_slice.setIcon(get_symbol_icon("delete", color="#64748B" if is_light else "#94A3B8", size=13))
+        self.btn_delete_curr_slice.setFixedHeight(30)
+        self.btn_delete_curr_slice.setIconSize(QSize(14, 14))
+        self.btn_delete_curr_slice.setIcon(get_symbol_icon("delete", color="#64748B" if is_light else "#94A3B8", size=14))
         self.btn_delete_curr_slice.setCursor(Qt.CursorShape.PointingHandCursor)
         if is_light:
             self.btn_delete_curr_slice.setStyleSheet("""
@@ -2724,7 +2761,7 @@ class MainWindow(QMainWindow):
                     color: #64748B;
                     border: 1px solid #CBD5E1;
                     border-radius: 6px;
-                    padding: 5px 12px;
+                    padding: 0px 12px;
                     font-size: 11px;
                     font-weight: 500;
                 }
@@ -2741,7 +2778,7 @@ class MainWindow(QMainWindow):
                     color: #94A3B8;
                     border: 1px solid rgba(255, 255, 255, 0.12);
                     border-radius: 6px;
-                    padding: 5px 12px;
+                    padding: 0px 12px;
                     font-size: 11px;
                     font-weight: 500;
                 }
@@ -2813,6 +2850,11 @@ class MainWindow(QMainWindow):
     def _update_mem_tab_styles(self):
         if not hasattr(self, 'btn_mem_normal'):
             return
+        self.btn_mem_normal.setFixedHeight(32)
+        self.btn_mem_normal.setIconSize(QSize(14, 14))
+        self.btn_mem_trash.setFixedHeight(32)
+        self.btn_mem_trash.setIconSize(QSize(14, 14))
+
         is_light = ThemeManager.get_instance().is_light()
         if is_light:
             if self.current_mem_mode == "normal":
@@ -2822,7 +2864,7 @@ class MainWindow(QMainWindow):
                         color: #0284C7;
                         border: 1px solid #0284C7;
                         border-radius: 8px;
-                        padding: 7px 14px;
+                        padding: 0px 14px;
                         font-size: 12px;
                         font-weight: bold;
                     }
@@ -2833,7 +2875,7 @@ class MainWindow(QMainWindow):
                         color: #64748B;
                         border: 1px solid #CBD5E1;
                         border-radius: 8px;
-                        padding: 7px 14px;
+                        padding: 0px 14px;
                         font-size: 12px;
                     }
                     QPushButton:hover {
@@ -2849,7 +2891,7 @@ class MainWindow(QMainWindow):
                         color: #64748B;
                         border: 1px solid #CBD5E1;
                         border-radius: 8px;
-                        padding: 7px 14px;
+                        padding: 0px 14px;
                         font-size: 12px;
                     }
                     QPushButton:hover {
@@ -2864,7 +2906,7 @@ class MainWindow(QMainWindow):
                         color: #DC2626;
                         border: 1px solid #EF4444;
                         border-radius: 8px;
-                        padding: 7px 14px;
+                        padding: 0px 14px;
                         font-size: 12px;
                         font-weight: bold;
                     }
@@ -2877,7 +2919,7 @@ class MainWindow(QMainWindow):
                         color: #FFFFFF;
                         border: 1px solid #26B0E4;
                         border-radius: 8px;
-                        padding: 7px 14px;
+                        padding: 0px 14px;
                         font-size: 12px;
                         font-weight: bold;
                     }
@@ -2888,7 +2930,7 @@ class MainWindow(QMainWindow):
                         color: #94A3B8;
                         border: 1px solid rgba(255, 255, 255, 0.08);
                         border-radius: 8px;
-                        padding: 7px 14px;
+                        padding: 0px 14px;
                         font-size: 12px;
                     }
                     QPushButton:hover {
@@ -2904,7 +2946,7 @@ class MainWindow(QMainWindow):
                         color: #94A3B8;
                         border: 1px solid rgba(255, 255, 255, 0.08);
                         border-radius: 8px;
-                        padding: 7px 14px;
+                        padding: 0px 14px;
                         font-size: 12px;
                     }
                     QPushButton:hover {
@@ -2935,10 +2977,12 @@ class MainWindow(QMainWindow):
         # 1. 顶部操作与筛选栏
         filter_bar = QHBoxLayout()
         filter_bar.setSpacing(10)
+        filter_bar.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
         is_light = ThemeManager.get_instance().is_light()
 
         self.roster_search_input = QLineEdit()
+        self.roster_search_input.setFixedHeight(32)
         self.roster_search_input.setPlaceholderText("快速筛选成员姓名、职务、职责或技能关键词...")
         if is_light:
             self.roster_search_input.setStyleSheet("""
@@ -2947,7 +2991,7 @@ class MainWindow(QMainWindow):
                     color: #0F172A;
                     border: 1px solid #CBD5E1;
                     border-radius: 8px;
-                    padding: 7px 14px;
+                    padding: 0px 14px;
                     font-size: 12px;
                 }
                 QLineEdit:focus {
@@ -2961,7 +3005,7 @@ class MainWindow(QMainWindow):
                     color: #FFFFFF;
                     border: 1px solid rgba(255, 255, 255, 0.08);
                     border-radius: 8px;
-                    padding: 7px 14px;
+                    padding: 0px 14px;
                     font-size: 12px;
                 }
                 QLineEdit:focus {
@@ -2979,11 +3023,15 @@ class MainWindow(QMainWindow):
             self.roster_stat_lbl = QLabel(f"在职成员 {len(active_emps)} 位 · 归档离职 {len(departed_emps)} 位 · 会议画像全量留存")
         else:
             self.roster_stat_lbl = QLabel(f"共收录 {len(active_emps)} 位组织核心成员 · 实时关联中台会议动态画像")
+        self.roster_stat_lbl.setFixedHeight(32)
+        self.roster_stat_lbl.setAlignment(Qt.AlignmentFlag.AlignVCenter)
         self.roster_stat_lbl.setStyleSheet(f"color: {'#16A34A' if is_light else '#8AC657'}; font-size: 11px; font-weight: 600; padding: 0 4px;")
         filter_bar.addWidget(self.roster_stat_lbl)
 
         self.refresh_roster_btn = QPushButton("刷新画像")
-        self.refresh_roster_btn.setIcon(get_symbol_icon("history", color="#0284C7" if is_light else "#CBD5E1", size=13))
+        self.refresh_roster_btn.setFixedHeight(32)
+        self.refresh_roster_btn.setIconSize(QSize(14, 14))
+        self.refresh_roster_btn.setIcon(get_symbol_icon("history", color="#0284C7" if is_light else "#CBD5E1", size=14))
         self.refresh_roster_btn.setToolTip("重新从会议记忆中台反查提取最新的成员参与决议与动态")
         self.refresh_roster_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         if is_light:
@@ -2993,7 +3041,7 @@ class MainWindow(QMainWindow):
                     color: #334155;
                     border: 1px solid #CBD5E1;
                     border-radius: 6px;
-                    padding: 6px 12px;
+                    padding: 0px 12px;
                     font-size: 11px;
                 }
                 QPushButton:hover {
@@ -3009,7 +3057,7 @@ class MainWindow(QMainWindow):
                     color: #CBD5E1;
                     border: 1px solid rgba(255, 255, 255, 0.08);
                     border-radius: 6px;
-                    padding: 6px 12px;
+                    padding: 0px 12px;
                     font-size: 11px;
                 }
                 QPushButton:hover {
@@ -3323,12 +3371,12 @@ class MainWindow(QMainWindow):
         tts_layout.setSpacing(10)
 
         tts_title_row = QHBoxLayout()
-        tts_icon = QLabel()
-        tts_icon.setPixmap(get_symbol_pixmap("volume_up", color="#0284C7" if is_light else "#38BDF8", size=16))
-        tts_lbl = QLabel("语音合成 (TTS) 与角色播报")
-        tts_lbl.setStyleSheet(f"font-size: 13.5px; font-weight: bold; color: {'#0F172A' if is_light else '#FFFFFF'};")
-        tts_title_row.addWidget(tts_icon)
-        tts_title_row.addWidget(tts_lbl)
+        self.tts_icon = QLabel()
+        self.tts_icon.setPixmap(get_symbol_pixmap("volume_up", color="#0284C7" if is_light else "#38BDF8", size=16))
+        self.tts_lbl = QLabel("语音合成 (TTS) 与角色播报")
+        self.tts_lbl.setStyleSheet(f"font-size: 13.5px; font-weight: bold; color: {'#0F172A' if is_light else '#FFFFFF'};")
+        tts_title_row.addWidget(self.tts_icon)
+        tts_title_row.addWidget(self.tts_lbl)
         tts_title_row.addStretch()
 
         self.chk_enable_tts = QCheckBox("启用即时语音合成朗读")
@@ -3340,7 +3388,7 @@ class MainWindow(QMainWindow):
         tts_grid.setSpacing(10)
 
         tts_grid.addWidget(QLabel("TTS 引擎提供商:"), 0, 0)
-        self.combo_tts_provider = QComboBox()
+        self.combo_tts_provider = ModernComboBox()
         self.combo_tts_provider.addItem("微软 Edge-TTS (云原生免 Key 高音质)", "edge-tts")
         self.combo_tts_provider.addItem("火山引擎豆包语音大模型 (拟真拟态)", "volcengine")
         if Config.TTS_PROVIDER == "volcengine":
@@ -3350,7 +3398,7 @@ class MainWindow(QMainWindow):
         tts_grid.addWidget(self.combo_tts_provider, 0, 1)
 
         tts_grid.addWidget(QLabel("会议结论播报角色:"), 1, 0)
-        self.combo_voice_meeting = QComboBox()
+        self.combo_voice_meeting = ModernComboBox()
         meeting_voices = [
             ("云希 (自然男声 · 严肃严谨 · 默认)", "zh-CN-YunxiNeural"),
             ("晓晓 (知性女声 · 温暖亲和)", "zh-CN-XiaoxiaoNeural"),
@@ -3365,7 +3413,7 @@ class MainWindow(QMainWindow):
         tts_grid.addWidget(self.combo_voice_meeting, 1, 1)
 
         tts_grid.addWidget(QLabel("全网科普通识角色:"), 2, 0)
-        self.combo_voice_general = QComboBox()
+        self.combo_voice_general = ModernComboBox()
         general_voices = [
             ("晓晓 (知性女声 · 温暖亲和 · 默认)", "zh-CN-XiaoxiaoNeural"),
             ("云希 (自然男声 · 严肃严谨)", "zh-CN-YunxiNeural"),
@@ -3380,7 +3428,7 @@ class MainWindow(QMainWindow):
         tts_grid.addWidget(self.combo_voice_general, 2, 1)
 
         tts_grid.addWidget(QLabel("敏捷指令架构角色:"), 3, 0)
-        self.combo_voice_instruction = QComboBox()
+        self.combo_voice_instruction = ModernComboBox()
         instruction_voices = [
             ("云健 (干练男声 · 敏捷有力 · 默认)", "zh-CN-YunjianNeural"),
             ("云扬 (播音男声 · 沉稳专业)", "zh-CN-YunyangNeural"),
@@ -3397,8 +3445,11 @@ class MainWindow(QMainWindow):
         tts_layout.addLayout(tts_grid)
 
         preview_row = QHBoxLayout()
+        preview_row.setAlignment(Qt.AlignmentFlag.AlignVCenter)
         self.btn_preview_tts = QPushButton("试听当前会议音色")
-        self.btn_preview_tts.setIcon(get_symbol_icon("play_arrow", color="#0284C7" if is_light else "#38BDF8", size=13))
+        self.btn_preview_tts.setFixedHeight(32)
+        self.btn_preview_tts.setIconSize(QSize(14, 14))
+        self.btn_preview_tts.setIcon(get_symbol_icon("play_arrow", color="#0284C7" if is_light else "#38BDF8", size=14))
         self.btn_preview_tts.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_preview_tts.clicked.connect(self._preview_tts)
         preview_row.addWidget(self.btn_preview_tts)
@@ -3415,12 +3466,12 @@ class MainWindow(QMainWindow):
         llm_layout.setSpacing(10)
 
         llm_title_row = QHBoxLayout()
-        llm_icon = QLabel()
-        llm_icon.setPixmap(get_symbol_pixmap("psychology", color="#0284C7" if is_light else "#38BDF8", size=16))
-        llm_lbl = QLabel("大模型 (LLM / RAG) 密钥与接口配置")
-        llm_lbl.setStyleSheet(f"font-size: 13.5px; font-weight: bold; color: {'#0F172A' if is_light else '#FFFFFF'};")
-        llm_title_row.addWidget(llm_icon)
-        llm_title_row.addWidget(llm_lbl)
+        self.llm_icon = QLabel()
+        self.llm_icon.setPixmap(get_symbol_pixmap("psychology", color="#0284C7" if is_light else "#38BDF8", size=16))
+        self.llm_lbl = QLabel("大模型 (LLM / RAG) 密钥与接口配置")
+        self.llm_lbl.setStyleSheet(f"font-size: 13.5px; font-weight: bold; color: {'#0F172A' if is_light else '#FFFFFF'};")
+        llm_title_row.addWidget(self.llm_icon)
+        llm_title_row.addWidget(self.llm_lbl)
         llm_title_row.addStretch()
         llm_layout.addLayout(llm_title_row)
 
@@ -3466,12 +3517,12 @@ class MainWindow(QMainWindow):
         asr_layout.setSpacing(10)
 
         asr_title_row = QHBoxLayout()
-        asr_icon = QLabel()
-        asr_icon.setPixmap(get_symbol_pixmap("graphic_eq", color="#0284C7" if is_light else "#38BDF8", size=16))
-        asr_lbl = QLabel("语音识别 (ASR) 与采集设置")
-        asr_lbl.setStyleSheet(f"font-size: 13.5px; font-weight: bold; color: {'#0F172A' if is_light else '#FFFFFF'};")
-        asr_title_row.addWidget(asr_icon)
-        asr_title_row.addWidget(asr_lbl)
+        self.asr_icon = QLabel()
+        self.asr_icon.setPixmap(get_symbol_pixmap("graphic_eq", color="#0284C7" if is_light else "#38BDF8", size=16))
+        self.asr_lbl = QLabel("语音识别 (ASR) 与采集设置")
+        self.asr_lbl.setStyleSheet(f"font-size: 13.5px; font-weight: bold; color: {'#0F172A' if is_light else '#FFFFFF'};")
+        asr_title_row.addWidget(self.asr_icon)
+        asr_title_row.addWidget(self.asr_lbl)
         asr_title_row.addStretch()
         asr_layout.addLayout(asr_title_row)
 
@@ -3479,7 +3530,7 @@ class MainWindow(QMainWindow):
         asr_grid.setSpacing(10)
 
         asr_grid.addWidget(QLabel("ASR 引擎提供商:"), 0, 0)
-        self.combo_asr_provider = QComboBox()
+        self.combo_asr_provider = ModernComboBox()
         self.combo_asr_provider.addItem("火山引擎 (Volcengine 豆包流式 ASR 2.0)", "volcengine")
         self.combo_asr_provider.addItem("阿里通义听悟 (DashScope SenseVoice)", "dashscope")
         if Config.ASR_PROVIDER == "dashscope":
@@ -3518,12 +3569,12 @@ class MainWindow(QMainWindow):
         intercom_layout.setSpacing(10)
 
         intercom_title_row = QHBoxLayout()
-        intercom_icon = QLabel()
-        intercom_icon.setPixmap(get_symbol_pixmap("keyboard", color="#0284C7" if is_light else "#38BDF8", size=16))
-        intercom_lbl = QLabel("全局对讲热键与静音探测")
-        intercom_lbl.setStyleSheet(f"font-size: 13.5px; font-weight: bold; color: {'#0F172A' if is_light else '#FFFFFF'};")
-        intercom_title_row.addWidget(intercom_icon)
-        intercom_title_row.addWidget(intercom_lbl)
+        self.intercom_icon = QLabel()
+        self.intercom_icon.setPixmap(get_symbol_pixmap("keyboard", color="#0284C7" if is_light else "#38BDF8", size=16))
+        self.intercom_lbl = QLabel("全局对讲热键与静音探测")
+        self.intercom_lbl.setStyleSheet(f"font-size: 13.5px; font-weight: bold; color: {'#0F172A' if is_light else '#FFFFFF'};")
+        intercom_title_row.addWidget(self.intercom_icon)
+        intercom_title_row.addWidget(self.intercom_lbl)
         intercom_title_row.addStretch()
         intercom_layout.addLayout(intercom_title_row)
 
@@ -3531,7 +3582,7 @@ class MainWindow(QMainWindow):
         intercom_grid.setSpacing(10)
 
         intercom_grid.addWidget(QLabel("对讲全局热键:"), 0, 0)
-        self.combo_intercom_key = QComboBox()
+        self.combo_intercom_key = ModernComboBox()
         hotkeys = [
             ("右 Alt (Alt_R · 推荐，单键免组合，高频最顺手)", "Alt_R"),
             ("左 Alt (Alt_L)", "Alt_L"),
@@ -3561,18 +3612,18 @@ class MainWindow(QMainWindow):
         ext_layout.setSpacing(10)
 
         ext_title_row = QHBoxLayout()
-        ext_icon = QLabel()
-        ext_icon.setPixmap(get_symbol_pixmap("extension", color="#0284C7" if is_light else "#38BDF8", size=16))
-        ext_lbl = QLabel("自定义扩展插槽 (预留生态空间)")
-        ext_lbl.setStyleSheet(f"font-size: 13.5px; font-weight: bold; color: {'#0F172A' if is_light else '#FFFFFF'};")
-        ext_title_row.addWidget(ext_icon)
-        ext_title_row.addWidget(ext_lbl)
+        self.ext_icon = QLabel()
+        self.ext_icon.setPixmap(get_symbol_pixmap("extension", color="#0284C7" if is_light else "#38BDF8", size=16))
+        self.ext_lbl = QLabel("自定义扩展插槽 (预留生态空间)")
+        self.ext_lbl.setStyleSheet(f"font-size: 13.5px; font-weight: bold; color: {'#0F172A' if is_light else '#FFFFFF'};")
+        ext_title_row.addWidget(self.ext_icon)
+        ext_title_row.addWidget(self.ext_lbl)
         ext_title_row.addStretch()
         ext_layout.addLayout(ext_title_row)
 
-        ext_desc = QLabel("预留模块化插件与企业系统连接器，后续可直接在此配置外接业务协同与私有模型")
-        ext_desc.setStyleSheet(f"color: {'#64748B' if is_light else '#94A3B8'}; font-size: 11px;")
-        ext_layout.addWidget(ext_desc)
+        self.ext_desc = QLabel("预留模块化插件与企业系统连接器，后续可直接在此配置外接业务协同与私有模型")
+        self.ext_desc.setStyleSheet(f"color: {'#64748B' if is_light else '#94A3B8'}; font-size: 11px;")
+        ext_layout.addWidget(self.ext_desc)
 
         ext_grid = QGridLayout()
         ext_grid.setSpacing(8)
@@ -3602,17 +3653,23 @@ class MainWindow(QMainWindow):
         save_action_bar = QHBoxLayout()
         save_action_bar.setContentsMargins(4, 8, 4, 8)
         save_action_bar.setSpacing(12)
+        save_action_bar.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
         self.btn_save_settings = QPushButton("保存全部配置并立即生效")
+        self.btn_save_settings.setFixedHeight(34)
+        self.btn_save_settings.setIconSize(QSize(14, 14))
         self.btn_save_settings.setIcon(get_symbol_icon("save", color="#FFFFFF", size=14))
         self.btn_save_settings.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_save_settings.clicked.connect(self._save_all_settings)
         save_action_bar.addWidget(self.btn_save_settings)
 
         self.settings_status_lbl = QLabel("")
+        self.settings_status_lbl.setFixedHeight(34)
+        self.settings_status_lbl.setAlignment(Qt.AlignmentFlag.AlignVCenter)
         save_action_bar.addWidget(self.settings_status_lbl, 1)
 
         self.btn_goto_update = QPushButton("打开软件更新中心 →")
+        self.btn_goto_update.setFixedHeight(34)
         self.btn_goto_update.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_goto_update.clicked.connect(lambda: self._switch_nav(4))
         save_action_bar.addWidget(self.btn_goto_update)
@@ -3734,19 +3791,24 @@ class MainWindow(QMainWindow):
         v_card_layout.setSpacing(12)
 
         v_head_layout = QHBoxLayout()
+        v_head_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
         self.version_title = QLabel("发版与版本自动更新管理 (GitHub Release 官方发版通道)")
         self.version_title.setStyleSheet(f"font-size: 15px; font-weight: bold; color: {'#0F172A' if is_light else '#FFFFFF'};")
         v_head_layout.addWidget(self.version_title, 1)
 
         self.ver_badge = QLabel(f"v{APP_VERSION} (当前运行版本)")
+        self.ver_badge.setFixedHeight(24)
+        self.ver_badge.setAlignment(Qt.AlignmentFlag.AlignVCenter)
         if is_light:
-            self.ver_badge.setStyleSheet("color: #0284C7; font-size: 11px; background: rgba(2,132,199,0.10); border: 1px solid rgba(2,132,199,0.3); padding: 3px 8px; border-radius: 5px; font-weight: bold;")
+            self.ver_badge.setStyleSheet("color: #0284C7; font-size: 11px; background: rgba(2,132,199,0.10); border: 1px solid rgba(2,132,199,0.3); padding: 0px 8px; border-radius: 5px; font-weight: bold;")
         else:
-            self.ver_badge.setStyleSheet("color: #26B0E4; font-size: 11px; background: rgba(38,176,228,0.15); border: 1px solid rgba(38,176,228,0.4); padding: 3px 8px; border-radius: 5px; font-weight: bold;")
+            self.ver_badge.setStyleSheet("color: #26B0E4; font-size: 11px; background: rgba(38,176,228,0.15); border: 1px solid rgba(38,176,228,0.4); padding: 0px 8px; border-radius: 5px; font-weight: bold;")
         v_head_layout.addWidget(self.ver_badge)
 
         self.btn_check_update = QPushButton("检查新版本")
-        self.btn_check_update.setIcon(get_symbol_icon("search", color="#0284C7" if is_light else "#26B0E4", size=13))
+        self.btn_check_update.setFixedHeight(32)
+        self.btn_check_update.setIconSize(QSize(14, 14))
+        self.btn_check_update.setIcon(get_symbol_icon("search", color="#0284C7" if is_light else "#26B0E4", size=14))
         self.btn_check_update.setCursor(Qt.CursorShape.PointingHandCursor)
         if is_light:
             self.btn_check_update.setStyleSheet("""
@@ -3755,7 +3817,7 @@ class MainWindow(QMainWindow):
                     color: #0284C7;
                     border: 1px solid rgba(2, 132, 199, 0.35);
                     border-radius: 6px;
-                    padding: 6px 16px;
+                    padding: 0px 16px;
                     font-size: 11.5px;
                     font-weight: bold;
                 }
@@ -3771,7 +3833,7 @@ class MainWindow(QMainWindow):
                     color: #26B0E4;
                     border: 1px solid rgba(38, 176, 228, 0.5);
                     border-radius: 6px;
-                    padding: 6px 16px;
+                    padding: 0px 16px;
                     font-size: 11.5px;
                     font-weight: bold;
                 }
@@ -3784,7 +3846,9 @@ class MainWindow(QMainWindow):
         v_head_layout.addWidget(self.btn_check_update)
 
         self.btn_restart_app = QPushButton("立即重启客户端")
-        self.btn_restart_app.setIcon(get_symbol_icon("rocket_launch", color="#FFFFFF", size=13))
+        self.btn_restart_app.setFixedHeight(32)
+        self.btn_restart_app.setIconSize(QSize(14, 14))
+        self.btn_restart_app.setIcon(get_symbol_icon("rocket_launch", color="#FFFFFF", size=14))
         self.btn_restart_app.setVisible(False)
         self.btn_restart_app.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_restart_app.setStyleSheet("""
@@ -3793,7 +3857,7 @@ class MainWindow(QMainWindow):
                 color: #FFFFFF;
                 border: 1px solid #059669;
                 border-radius: 6px;
-                padding: 6px 16px;
+                padding: 0px 16px;
                 font-size: 11.5px;
                 font-weight: bold;
             }
@@ -3805,17 +3869,18 @@ class MainWindow(QMainWindow):
         v_head_layout.addWidget(self.btn_restart_app)
 
         self.btn_cancel_restart = QPushButton("暂缓重启")
+        self.btn_cancel_restart.setFixedHeight(32)
         self.btn_cancel_restart.setVisible(False)
         self.btn_cancel_restart.setCursor(Qt.CursorShape.PointingHandCursor)
         if is_light:
             self.btn_cancel_restart.setStyleSheet("""
                 QPushButton {
                     background: #F1F5F9;
-                    color: #475569;
+                    color: #64748B;
                     border: 1px solid #CBD5E1;
                     border-radius: 6px;
-                    padding: 6px 14px;
-                    font-size: 11.5px;
+                    padding: 0px 14px;
+                    font-size: 11px;
                 }
                 QPushButton:hover {
                     background: #E2E8F0;
@@ -3825,15 +3890,15 @@ class MainWindow(QMainWindow):
         else:
             self.btn_cancel_restart.setStyleSheet("""
                 QPushButton {
-                    background: rgba(255, 255, 255, 0.08);
-                    color: #CBD5E1;
-                    border: 1px solid rgba(255, 255, 255, 0.15);
+                    background: rgba(255, 255, 255, 0.05);
+                    color: #94A3B8;
+                    border: 1px solid rgba(255, 255, 255, 0.12);
                     border-radius: 6px;
-                    padding: 6px 14px;
-                    font-size: 11.5px;
+                    padding: 0px 14px;
+                    font-size: 11px;
                 }
                 QPushButton:hover {
-                    background: rgba(255, 255, 255, 0.15);
+                    background: rgba(255, 255, 255, 0.1);
                     color: #FFFFFF;
                 }
             """)
@@ -4838,6 +4903,8 @@ class MainWindow(QMainWindow):
             self.breadcrumb_lbl.setStyleSheet(f"font-size: 13px; font-weight: 600; color: {colors['text_muted']};")
 
         if hasattr(self, 'theme_btn'):
+            self.theme_btn.setFixedSize(30, 30)
+            self.theme_btn.setIconSize(QSize(16, 16))
             self.theme_btn.setStyleSheet(get_theme_btn_style(is_light))
             if is_light:
                 self.theme_btn.setIcon(get_symbol_icon("dark_mode", color="#475569", size=16))
@@ -4847,6 +4914,8 @@ class MainWindow(QMainWindow):
                 self.theme_btn.setToolTip("切换为浅色模式 (Light Mode)")
 
         if hasattr(self, 'top_version_btn'):
+            self.top_version_btn.setFixedHeight(30)
+            self.top_version_btn.setIconSize(QSize(13, 13))
             self.top_version_btn.setStyleSheet(get_top_version_style(is_light))
             self.top_version_btn.setIcon(get_symbol_icon("rocket_launch", color="#0284C7" if is_light else "#38BDF8", size=13))
 
@@ -5243,12 +5312,28 @@ class MainWindow(QMainWindow):
                 border: 1px solid #E2E8F0;
                 border-radius: 10px;
             }
+            QFrame#settings_card QLabel {
+                color: #334155;
+                font-size: 11.5px;
+            }
+            QFrame#settings_card QCheckBox {
+                color: #0F172A;
+                font-size: 11.5px;
+            }
         """
         card_style_dark = """
             QFrame#settings_card {
                 background-color: #11141D;
                 border: 1px solid rgba(255, 255, 255, 0.08);
                 border-radius: 10px;
+            }
+            QFrame#settings_card QLabel {
+                color: #CBD5E1;
+                font-size: 11.5px;
+            }
+            QFrame#settings_card QCheckBox {
+                color: #F1F5F9;
+                font-size: 11.5px;
             }
         """
         for card_attr in ['card_tts', 'card_llm', 'card_asr', 'card_intercom', 'card_ext']:
@@ -5260,49 +5345,76 @@ class MainWindow(QMainWindow):
         if hasattr(self, 'settings_page_desc'):
             self.settings_page_desc.setStyleSheet(f"font-size: 11.5px; color: {'#64748B' if is_light else '#94A3B8'};")
 
+        # 头部标题与图标主题同步
+        card_headers = [
+            ('tts_icon', 'volume_up', 'tts_lbl'),
+            ('llm_icon', 'psychology', 'llm_lbl'),
+            ('asr_icon', 'graphic_eq', 'asr_lbl'),
+            ('intercom_icon', 'keyboard', 'intercom_lbl'),
+            ('ext_icon', 'extension', 'ext_lbl'),
+        ]
+        for icon_attr, sym, lbl_attr in card_headers:
+            if hasattr(self, icon_attr):
+                getattr(self, icon_attr).setPixmap(get_symbol_pixmap(sym, color="#0284C7" if is_light else "#38BDF8", size=16))
+            if hasattr(self, lbl_attr):
+                getattr(self, lbl_attr).setStyleSheet(f"font-size: 13.5px; font-weight: bold; color: {'#0F172A' if is_light else '#FFFFFF'};")
+
+        if hasattr(self, 'vad_hint_lbl'):
+            self.vad_hint_lbl.setStyleSheet(f"color: {'#64748B' if is_light else '#94A3B8'}; font-size: 11.5px;")
+        if hasattr(self, 'ext_desc'):
+            self.ext_desc.setStyleSheet(f"color: {'#64748B' if is_light else '#94A3B8'}; font-size: 11px;")
+        if hasattr(self, 'btn_toggle_llm_key'):
+            self.btn_toggle_llm_key.setIcon(get_symbol_icon("visibility", color="#0284C7" if is_light else "#38BDF8", size=14))
+
         input_style_light = """
-            QLineEdit, QComboBox {
-                background-color: #F8FAFC;
+            QLineEdit {
+                background-color: #FFFFFF;
                 border: 1px solid #CBD5E1;
                 border-radius: 6px;
                 padding: 6px 10px;
-                font-size: 11.5px;
+                font-size: 12px;
                 color: #0F172A;
             }
-            QLineEdit:focus, QComboBox:focus {
+            QLineEdit:focus {
                 border-color: #0284C7;
                 background-color: #FFFFFF;
             }
         """
         input_style_dark = """
-            QLineEdit, QComboBox {
+            QLineEdit {
                 background-color: #0A0C10;
-                border: 1px solid rgba(255, 255, 255, 0.1);
+                border: 1px solid rgba(255, 255, 255, 0.12);
                 border-radius: 6px;
                 padding: 6px 10px;
-                font-size: 11.5px;
+                font-size: 12px;
                 color: #FFFFFF;
             }
-            QLineEdit:focus, QComboBox:focus {
+            QLineEdit:focus {
                 border-color: #26B0E4;
                 background-color: #12151F;
             }
         """
         for inp_attr in ['input_llm_key', 'input_llm_url', 'input_llm_model',
-                         'input_volc_appid', 'input_volc_token', 'input_volc_resource',
-                         'combo_tts_provider', 'combo_voice_meeting', 'combo_voice_general',
-                         'combo_voice_instruction', 'combo_asr_provider', 'combo_intercom_key']:
+                         'input_volc_appid', 'input_volc_token', 'input_volc_resource']:
             if hasattr(self, inp_attr):
                 getattr(self, inp_attr).setStyleSheet(input_style_light if is_light else input_style_dark)
 
+        combo_style = get_modern_combobox_style(is_light)
+        for combo_attr in ['combo_tts_provider', 'combo_voice_meeting', 'combo_voice_general',
+                          'combo_voice_instruction', 'combo_asr_provider', 'combo_intercom_key']:
+            if hasattr(self, combo_attr):
+                getattr(self, combo_attr).setStyleSheet(combo_style)
+
         if hasattr(self, 'btn_save_settings'):
+            self.btn_save_settings.setFixedHeight(34)
+            self.btn_save_settings.setIconSize(QSize(14, 14))
             self.btn_save_settings.setStyleSheet("""
                 QPushButton {
                     background: #0284C7;
                     color: #FFFFFF;
                     border: none;
                     border-radius: 6px;
-                    padding: 8px 18px;
+                    padding: 0px 18px;
                     font-size: 12px;
                     font-weight: 700;
                 }
@@ -5311,13 +5423,15 @@ class MainWindow(QMainWindow):
                 }
             """)
         if hasattr(self, 'btn_preview_tts'):
+            self.btn_preview_tts.setFixedHeight(32)
+            self.btn_preview_tts.setIconSize(QSize(14, 14))
             self.btn_preview_tts.setStyleSheet("""
                 QPushButton {
                     background: #F1F5F9;
                     color: #0284C7;
                     border: 1px solid #CBD5E1;
                     border-radius: 6px;
-                    padding: 5px 12px;
+                    padding: 0px 14px;
                     font-size: 11px;
                     font-weight: 600;
                 }
@@ -5331,7 +5445,7 @@ class MainWindow(QMainWindow):
                     color: #38BDF8;
                     border: 1px solid rgba(255, 255, 255, 0.12);
                     border-radius: 6px;
-                    padding: 5px 12px;
+                    padding: 0px 14px;
                     font-size: 11px;
                     font-weight: 600;
                 }
@@ -5409,9 +5523,13 @@ class MainWindow(QMainWindow):
         if hasattr(self, 'version_title'):
             self.version_title.setStyleSheet(f"font-size: 15px; font-weight: bold; color: {'#0F172A' if is_light else '#FFFFFF'};")
         if hasattr(self, 'ver_badge'):
-            self.ver_badge.setStyleSheet("color: #0284C7; font-size: 11px; background: rgba(2,132,199,0.10); border: 1px solid rgba(2,132,199,0.3); padding: 3px 8px; border-radius: 5px; font-weight: bold;" if is_light else "color: #26B0E4; font-size: 11px; background: rgba(38,176,228,0.15); border: 1px solid rgba(38,176,228,0.4); padding: 3px 8px; border-radius: 5px; font-weight: bold;")
+            self.ver_badge.setFixedHeight(24)
+            self.ver_badge.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+            self.ver_badge.setStyleSheet("color: #0284C7; font-size: 11px; background: rgba(2,132,199,0.10); border: 1px solid rgba(2,132,199,0.3); padding: 0px 8px; border-radius: 5px; font-weight: bold;" if is_light else "color: #26B0E4; font-size: 11px; background: rgba(38,176,228,0.15); border: 1px solid rgba(38,176,228,0.4); padding: 0px 8px; border-radius: 5px; font-weight: bold;")
         if hasattr(self, 'btn_check_update'):
-            self.btn_check_update.setIcon(get_symbol_icon("search", color="#0284C7" if is_light else "#26B0E4", size=13))
+            self.btn_check_update.setFixedHeight(32)
+            self.btn_check_update.setIconSize(QSize(14, 14))
+            self.btn_check_update.setIcon(get_symbol_icon("search", color="#0284C7" if is_light else "#26B0E4", size=14))
             if is_light:
                 self.btn_check_update.setStyleSheet("""
                     QPushButton {
@@ -5419,7 +5537,7 @@ class MainWindow(QMainWindow):
                         color: #0284C7;
                         border: 1px solid rgba(2, 132, 199, 0.35);
                         border-radius: 6px;
-                        padding: 6px 16px;
+                        padding: 0px 16px;
                         font-size: 11.5px;
                         font-weight: bold;
                     }
@@ -5435,7 +5553,7 @@ class MainWindow(QMainWindow):
                         color: #26B0E4;
                         border: 1px solid rgba(38, 176, 228, 0.5);
                         border-radius: 6px;
-                        padding: 6px 16px;
+                        padding: 0px 16px;
                         font-size: 11.5px;
                         font-weight: bold;
                     }
@@ -5445,6 +5563,7 @@ class MainWindow(QMainWindow):
                     }
                 """)
         if hasattr(self, 'btn_cancel_restart'):
+            self.btn_cancel_restart.setFixedHeight(32)
             if is_light:
                 self.btn_cancel_restart.setStyleSheet("""
                     QPushButton {
@@ -5452,7 +5571,7 @@ class MainWindow(QMainWindow):
                         color: #475569;
                         border: 1px solid #CBD5E1;
                         border-radius: 6px;
-                        padding: 6px 14px;
+                        padding: 0px 14px;
                         font-size: 11.5px;
                     }
                     QPushButton:hover {
@@ -5467,7 +5586,7 @@ class MainWindow(QMainWindow):
                         color: #CBD5E1;
                         border: 1px solid rgba(255, 255, 255, 0.15);
                         border-radius: 6px;
-                        padding: 6px 14px;
+                        padding: 0px 14px;
                     }
                 """)
         if hasattr(self, 'spec_card'):

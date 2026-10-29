@@ -148,6 +148,9 @@ class ThemeManager(QObject):
                 color: {c['text_primary']};
                 font-family: 'Segoe UI Variable Text', 'Segoe UI', 'PingFang SC', 'Microsoft YaHei UI', sans-serif;
             }}
+            QPushButton {{
+                text-align: center;
+            }}
             QFrame#card {{
                 background-color: {c['bg_card']};
                 border: 1px solid {c['border_card']};
