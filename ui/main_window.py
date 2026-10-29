@@ -477,7 +477,19 @@ class IntercomBanner(QFrame):
     def set_completed(self, focal_topic: str = "", is_followup: bool = False, response_mode: str = "MEETING"):
         self.stop_btn.hide()
         self.wave_vis.set_active(False)
-        if response_mode == "GENERAL":
+        if response_mode == "INSTRUCTION":
+            self.badge_lbl.setText("🚀 敏捷自进化工单")
+            self.badge_lbl.setStyleSheet("""
+                background-color: rgba(245, 158, 11, 0.22);
+                color: #FBBF24;
+                font-size: 11px;
+                font-weight: bold;
+                padding: 3px 8px;
+                border-radius: 5px;
+            """)
+            self.status_lbl.setText("改进需求已立项归档 · 架构师角色已响应，后台智能体即将自动执行更新")
+            self.status_lbl.setStyleSheet("color: #FDE68A; font-size: 11.5px;")
+        elif response_mode == "GENERAL":
             self.badge_lbl.setText("🌐 全网通用常识")
             self.badge_lbl.setStyleSheet("""
                 background-color: rgba(139, 92, 246, 0.22);
@@ -3469,7 +3481,11 @@ class MainWindow(QMainWindow):
     def _on_playback_state_changed(self, state):
         if state == QMediaPlayer.PlaybackState.StoppedState:
             if hasattr(self, "intercom_banner") and "播报" in self.intercom_banner.badge_lbl.text():
-                self.intercom_banner.set_completed()
+                self.intercom_banner.set_completed(
+                    focal_topic=getattr(self, '_last_focal_topic', ''),
+                    is_followup=getattr(self, '_last_is_followup', False),
+                    response_mode=getattr(self, '_last_response_mode', 'MEETING')
+                )
             self.tts_playback_finished.emit()
 
     def is_playing(self) -> bool:
@@ -3525,10 +3541,18 @@ class MainWindow(QMainWindow):
         self.search_status_lbl.setText("✓ 历史会话已删除")
 
     def _set_ans_card_style(self, mode: str = "MEETING"):
-        """根据当前回答来源动态切换解答卡边框：科技青(内部会议) vs 灵动紫(全网通识)"""
+        """根据当前回答来源动态切换解答卡边框：科技青(内部会议) vs 灵动紫(全网通识) vs 琥珀金(敏捷指令)"""
         if not hasattr(self, 'ans_card'):
             return
-        if mode == "GENERAL":
+        if mode == "INSTRUCTION":
+            self.ans_card.setStyleSheet("""
+                QFrame#ans_card {
+                    background-color: #13100B;
+                    border: 1.5px solid rgba(245, 158, 11, 0.7);
+                    border-radius: 12px;
+                }
+            """)
+        elif mode == "GENERAL":
             self.ans_card.setStyleSheet("""
                 QFrame#ans_card {
                     background-color: #0E1019;
@@ -3558,6 +3582,9 @@ class MainWindow(QMainWindow):
         self.new_session_requested.emit()
 
     def display_answer(self, markdown_text: str, audio_path: str = "", is_followup: bool = False, focal_topic: str = "", response_mode: str = "MEETING"):
+        self._last_focal_topic = focal_topic
+        self._last_is_followup = is_followup
+        self._last_response_mode = response_mode
         self.search_status_lbl.setText("")
         self._set_ans_card_style(response_mode)
         self.answer_browser.start_streaming(markdown_text, is_followup=is_followup)

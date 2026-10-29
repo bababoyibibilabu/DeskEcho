@@ -7,6 +7,7 @@ from core.knowledge_engine import MeetingStore
 from core.entity_dict import get_entity_context_prompt
 from core.query_rewriter import QueryRewriter
 from core.session_manager import SessionManager, ConversationTurn
+from core.instruction_handler import InstructionHandler
 
 QA_SYSTEM_PROMPT = """你是一个常驻企业桌面会议记忆助理 DeskEcho。
 你所服务的企业组织是【未来智能】。
@@ -89,6 +90,7 @@ class RAGEngine:
         self.model = Config.LLM_MODEL
         self.client = None
         self.rewriter = QueryRewriter()
+        self.instruction_handler = InstructionHandler()
         self.session_manager = SessionManager(store=self.store, ttl_seconds=600.0, max_turns=3)
         self.entity_context = get_entity_context_prompt()
         
@@ -115,6 +117,12 @@ class RAGEngine:
         """
         基于多轮上下文感知与 Query Rewriting 的混合检索推导
         """
+        # 0. 敏捷自进化指令拦截 (如以 "改进一下/提个需求" 开头，不污染会议知识库，直通工单入库)
+        if self.instruction_handler.is_instruction(query):
+            if on_progress:
+                on_progress("评估改进指令", "🚀 检测到软件改进指令，架构师角色正在拆解方案并立项...")
+            return self.instruction_handler.handle_instruction(query)
+
         # 1. 获取有效前序历史
         history = self.session_manager.get_valid_history()
         has_history = bool(history and len(history) > 0)

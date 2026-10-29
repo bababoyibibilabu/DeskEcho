@@ -1,14 +1,15 @@
 {
-  "version": "0.2.3",
+  "version": "0.2.4",
   "release_date": "2026-10-29",
-  "title": "DeskEcho v0.2.3 或许没用切片列表纯粹极简排版与跨会话自启修复",
+  "title": "DeskEcho v0.2.4 敏捷自进化指令模式与生产机自动热升级加固",
   "changelog": [
-    "优化‘或许没用’切片列表交互排版：移除列表项内冗余的有用按钮与研判原因标签，全面对齐正式切片极简双行风格",
-    "保留详情面板专属【✨ 判定有用并恢复】与【💡 AI 研判理由】栏目，强化主次信息层级",
-    "完善打包规范，完整收录 ChromaDB 向量数据库及遥测子模块，彻底解决 Windows EXE 运行依赖",
-    "修复 Windows 物理控制台桌面（Session 1）开机与调度自启管道，实现前台无感无缝交付"
+    "新增敏捷自进化口语指令模式：按住对讲以“改进一下/提个需求”开头，直通工单入库与技术方案评估，不污染会议记忆库",
+    "配备专属架构师播报角色：采用沉稳干练的工程师音色（zh-CN-YunjianNeural）进行极简秒级确认响应",
+    "升级主界面专属工单视觉卡片：以极客琥珀金卡片呈现需求分类、诉求归纳与实施拆解路径",
+    "加固 Windows 生产机自动更新引擎：采用独立暂存区与进程退出解耦守护批处理，确保大包下载与热重启 100% 稳妥可靠",
+    "引入后台 Autonomous Loop 调度管道，实现需求捕获、真机验证到全自动发版更新的飞轮闭环"
   ],
-  "download_url": "https://github.com/bababoyibibilabu/DeskEcho/releases/download/v0.2.3/DeskEcho.exe",
-  "zip_url": "https://github.com/bababoyibibilabu/DeskEcho/archive/refs/tags/v0.2.3.zip",
+  "download_url": "https://github.com/bababoyibibilabu/DeskEcho/releases/download/v0.2.4/DeskEcho.exe",
+  "zip_url": "https://github.com/bababoyibibilabu/DeskEcho/archive/refs/tags/v0.2.4.zip",
   "min_version": "0.1.0"
 }

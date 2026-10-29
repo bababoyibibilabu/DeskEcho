@@ -68,9 +68,16 @@ class TTSEngine:
         if not plain_text:
             return
 
-        is_general = (str(mode).upper() == "GENERAL")
-        edge_voice = Config.TTS_VOICE_GENERAL if is_general else Config.TTS_VOICE_MEETING
-        volc_voice = Config.VOLC_TTS_VOICE_GENERAL if is_general else Config.VOLC_TTS_VOICE_MEETING
+        m_upper = str(mode).upper()
+        if m_upper == "INSTRUCTION":
+            edge_voice = Config.TTS_VOICE_INSTRUCTION
+            volc_voice = Config.VOLC_TTS_VOICE_INSTRUCTION
+        elif m_upper == "GENERAL":
+            edge_voice = Config.TTS_VOICE_GENERAL
+            volc_voice = Config.VOLC_TTS_VOICE_GENERAL
+        else:
+            edge_voice = Config.TTS_VOICE_MEETING
+            volc_voice = Config.VOLC_TTS_VOICE_MEETING
 
         def _worker():
             # 1. 若配置了火山引擎 TTS，优先尝试火山豆包 TTS

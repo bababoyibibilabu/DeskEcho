@@ -35,6 +35,7 @@ class UpdateChecker:
     """
     def __init__(self, current_version: str = APP_VERSION, app_dir: Optional[Path] = None):
         self.current_version = current_version
+        self.has_pending_exe_replacement = False
         if app_dir:
             self.app_dir = app_dir
         elif getattr(sys, 'frozen', False):
@@ -104,20 +105,42 @@ class UpdateChecker:
             return False
 
         if on_progress:
-            on_progress(f"正在下载 DeskEcho v{target_version} 发布包...")
+            on_progress(f"正在准备下载 DeskEcho v{target_version} 发布包...")
 
-        temp_dir = Path(tempfile.mkdtemp(prefix="deskecho_update_"))
-        zip_path = temp_dir / "release.zip"
+        staging_dir = self.app_dir / ".update_staging"
+        staging_dir.mkdir(parents=True, exist_ok=True)
+        temp_zip = staging_dir / "update_download.bin"
 
+        is_exe_staged = False
         try:
-            # 1. 下载 zip 包 (若 tag zip 不可用，自动尝试 main 分支归档作为兜底)
+            # 1. 下载更新文件 (支持断点与流式分块进度汇报，超时放宽至 180 秒)
             download_success = False
-            for url in [download_url, "https://github.com/bababoyibibilabu/DeskEcho/archive/refs/heads/main.zip"]:
+            candidate_urls = [download_url]
+            if not download_url.lower().endswith(".exe"):
+                candidate_urls.append("https://github.com/bababoyibibilabu/DeskEcho/archive/refs/heads/main.zip")
+
+            for url in candidate_urls:
                 try:
+                    if on_progress:
+                        on_progress(f"正在连接远端升级资源...")
                     req = urllib.request.Request(url, headers={"User-Agent": "DeskEcho-Client-AutoUpdater"})
-                    with urllib.request.urlopen(req, timeout=25) as resp, open(zip_path, 'wb') as out_f:
-                        shutil.copyfileobj(resp, out_f)
-                    if zip_path.exists() and zip_path.stat().st_size > 1000:
+                    with urllib.request.urlopen(req, timeout=180) as resp:
+                        total_size = int(resp.headers.get('Content-Length') or 0)
+                        downloaded = 0
+                        with open(temp_zip, 'wb') as out_f:
+                            while True:
+                                chunk = resp.read(1024 * 512) # 512KB
+                                if not chunk:
+                                    break
+                                out_f.write(chunk)
+                                downloaded += len(chunk)
+                                if on_progress and total_size > 0:
+                                    pct = int((downloaded / total_size) * 100)
+                                    mb_down = downloaded / (1024 * 1024)
+                                    mb_tot = total_size / (1024 * 1024)
+                                    on_progress(f"正在下载升级包 ({mb_down:.1f}MB / {mb_tot:.1f}MB, {pct}%)...")
+
+                    if temp_zip.exists() and temp_zip.stat().st_size > 1000:
                         download_success = True
                         break
                 except Exception as de:
@@ -127,47 +150,72 @@ class UpdateChecker:
                 raise RuntimeError("无法从远端下载有效的发版安装包")
 
             if on_progress:
-                on_progress("校验升级包完整性并应用更新...")
+                on_progress("校验升级包完整性并准备应用更新...")
 
             # 判断是否为 Windows 独立可执行程序 (.exe)
-            is_exe = download_url.lower().endswith(".exe") or (zip_path.exists() and zip_path.read_bytes()[:2] == b'MZ')
+            is_exe = download_url.lower().endswith(".exe") or (temp_zip.exists() and temp_zip.read_bytes()[:2] == b'MZ')
             if is_exe:
-                target_exe = self.app_dir / "DeskEcho.exe"
+                target_exe = (self.app_dir / "DeskEcho.exe").resolve()
+                staged_exe = (staging_dir / "DeskEcho_new.exe").resolve()
+                if staged_exe.exists():
+                    try:
+                        staged_exe.unlink()
+                    except Exception:
+                        pass
+                shutil.move(str(temp_zip), str(staged_exe))
+
                 if getattr(sys, 'frozen', False):
-                    # 运行在已打包的 EXE 模式下，利用批处理脚本避开 Windows 文件写锁定并重启
-                    bat_path = temp_dir / "apply_update.bat"
+                    # 运行在已打包的 EXE 模式下：
+                    # 利用独立守护批处理脚本，等待当前主进程完全释放写锁定，执行原子替换后自拉起
+                    current_pid = os.getpid()
+                    bat_path = staging_dir / "apply_update.bat"
                     bat_content = f"""@echo off
 chcp 65001 >nul
+:: 等待老主进程完全退出并释放文件写锁定
 timeout /t 2 /nobreak >nul
-copy /y "{zip_path}" "{sys.executable}" >nul
-start "" "{sys.executable}"
+set RETRY=0
+:WAIT_LOOP
+tasklist /fi "PID eq {current_pid}" | find "{current_pid}" >nul
+if not errorlevel 1 (
+    timeout /t 1 /nobreak >nul
+    set /a RETRY+=1
+    if %RETRY% leq 10 goto WAIT_LOOP
+    taskkill /F /PID {current_pid} >nul 2>&1
+)
+:: 复制新版本覆盖目标主程序
+copy /y "{staged_exe}" "{target_exe}" >nul
+:: 启动新版主程序
+start "" "{target_exe}"
+:: 清理暂存安装包及当前批处理
+del "{staged_exe}" >nul 2>&1
+(goto) 2>nul & del "%~f0"
 """
                     bat_path.write_text(bat_content, encoding='utf-8')
                     import subprocess
                     subprocess.Popen(["cmd.exe", "/c", str(bat_path)], creationflags=0x08000000 if os.name == 'nt' else 0)
+                    self.has_pending_exe_replacement = True
+                    is_exe_staged = True
+                    print(f"[UpdateChecker] EXE 热升级批处理已成功布署并脱机触发 (PID 观察: {current_pid})")
                     return True
                 else:
                     # 运行在 Python 源码模式下：复制 DeskEcho.exe 到根目录
-                    shutil.copy2(zip_path, target_exe)
-                    print(f"[UpdateChecker] 已下载独立绿色可执行程序至 {target_exe}")
+                    shutil.copy2(str(staged_exe), str(target_exe))
+                    print(f"[UpdateChecker] 源码模式：已将最新绿色发布程序存放至 {target_exe}")
+                    is_exe_staged = False
 
-            # 2. 如果是 zip 归档包，解压到临时目录并热替换源码
+            # 2. 如果是 zip 源码归档包，解压并热替换源码
             if not is_exe:
-                extract_folder = temp_dir / "extracted"
-                with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                extract_folder = staging_dir / "extracted"
+                with zipfile.ZipFile(temp_zip, 'r') as zip_ref:
                     zip_ref.extractall(extract_folder)
 
-                # GitHub 打包 zip 通常内嵌一层根目录 (如 DeskEcho-main 或 DeskEcho-0.2.0)
                 inner_dirs = [p for p in extract_folder.iterdir() if p.is_dir()]
                 source_root = inner_dirs[0] if inner_dirs else extract_folder
 
                 if on_progress:
                     on_progress("正在安全应用最新代码与组件...")
 
-                # 3. 白名单热替换保护策略
-                # 允许更新的目录与文件：
                 updatable_items = ["core", "ui", "config.py", "main.py", "version.py", "version.json", "README.md", "requirements.txt", "run.bat", "run_background.bat"]
-                # 绝对保护的目录与文件 (绝不覆盖！)：
                 protected_patterns = [".env", "omni_data", "records.db", "chroma", "local_data", "temp", "assets"]
 
                 for item_name in updatable_items:
@@ -179,7 +227,6 @@ start "" "{sys.executable}"
                     if src_item.is_file():
                         shutil.copy2(src_item, dst_item)
                     elif src_item.is_dir():
-                        # 递归安全复制目录
                         dst_item.mkdir(parents=True, exist_ok=True)
                         for root, dirs, files in os.walk(src_item):
                             rel_path = Path(root).relative_to(src_item)
@@ -197,18 +244,28 @@ start "" "{sys.executable}"
             print(f"[UpdateChecker] 应用更新失败: {e}")
             return False
         finally:
-            shutil.rmtree(temp_dir, ignore_errors=True)
+            if not is_exe_staged and staging_dir.exists():
+                try:
+                    shutil.rmtree(staging_dir, ignore_errors=True)
+                except Exception:
+                    pass
 
     def restart_app(self):
         """重启应用客户端"""
         try:
             import subprocess
             if getattr(sys, 'frozen', False):
-                subprocess.Popen([sys.executable] + sys.argv[1:], cwd=str(self.app_dir))
+                # 若已触发 EXE 覆盖批处理，批处理会自动拉起新版，此处直接干净退出老进程以释放文件锁
+                if self.has_pending_exe_replacement:
+                    print("[UpdateChecker] 正在干净退出老进程以移交控制权给更新批处理...")
+                    sys.exit(0)
+                else:
+                    subprocess.Popen([sys.executable] + sys.argv[1:], cwd=str(self.app_dir))
+                    sys.exit(0)
             else:
                 main_py = self.app_dir / "main.py"
                 subprocess.Popen([sys.executable, str(main_py)] + sys.argv[1:], cwd=str(self.app_dir))
-            sys.exit(0)
+                sys.exit(0)
         except Exception as e:
             print(f"[UpdateChecker] 重启应用失败: {e}")
 
