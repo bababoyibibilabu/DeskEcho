@@ -250,6 +250,16 @@ class StreamTextDisplay(QTextBrowser):
                 )
         escaped = re.sub(r'&gt;\s*❓?\s*\*\*(语音提问|连续追问|文字提问)\*\*[：:]\s*(.+?)(?=(?:\n\n|\n&lt;|\n#|$))', format_question, escaped, flags=re.DOTALL)
 
+        # 0.4 重点渲染 > 🚀 **敏捷自进化工单**：
+        def format_instruction_pill(m):
+            info = m.group(1).strip()
+            return (
+                f'<div style="background: rgba(245, 158, 11, 0.18); border: 1px solid rgba(245, 158, 11, 0.45); border-radius: 6px; padding: 6px 12px; margin: 4px 0 8px 0;">'
+                f'<span style="color: #FBBF24; font-weight: bold; font-size: 11px;">🚀 敏捷自进化工单已立项</span>'
+                f'<span style="color: #94A3B8; font-size: 11px; margin-left: 8px;">{info}</span></div>'
+            )
+        escaped = re.sub(r'&gt;\s*🚀?\s*\*\*敏捷自进化工单\*\*[：:]\s*(.+?)(?=(?:\n\n|\n&lt;|\n#|$))', format_instruction_pill, escaped, flags=re.DOTALL)
+
         # 0.5 重点渲染 > 🌐 **全网通用知识解答**：
         def format_general_badge(m):
             content = m.group(1).strip()
@@ -262,11 +272,30 @@ class StreamTextDisplay(QTextBrowser):
             )
         escaped = re.sub(r'&gt;\s*🌐?\s*\*\*全网通用知识解答\*\*[：:]\s*(.+?)(?=(?:\n\n|\n&lt;|\n#|$))', format_general_badge, escaped, flags=re.DOTALL)
 
-        # 1. 重点渲染 > 🎙️ **结论播报**：为 美好智能 VI 风格三色渐变醒目标签卡
+        # 1. 重点渲染 > 🎙️ **结论播报**：或 > 🎙️ **架构师响应**：
         def format_spoken(m):
+            tag = m.group(1).strip()
+            content = m.group(2).strip()
+            if "架构师" in tag:
+                return (
+                    f'<div style="background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 rgba(245, 158, 11, 0.28), stop:1 rgba(217, 119, 6, 0.12)); '
+                    f'border-left: 3px solid #F59E0B; border-radius: 6px; padding: 8px 14px; margin: 6px 0 10px 0;">'
+                    f'<div style="color: #FBBF24; font-weight: bold; font-size: 10px; letter-spacing: 0.5px; margin-bottom: 3px;">🎙️ 架构师响应 (已录入自进化队列)</div>'
+                    f'<div style="color: #FFFFFF; font-size: 13px; font-weight: 600; line-height: 1.45;">{content}</div></div>'
+                )
+            return (
+                f'<div style="background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 rgba(19, 69, 157, 0.28), stop:0.55 rgba(38, 176, 228, 0.16), stop:1 rgba(138, 198, 87, 0.12)); '
+                f'border-left: 3px solid #26B0E4; border-radius: 6px; padding: 8px 14px; margin: 6px 0 10px 0;">'
+                f'<div style="color: #26B0E4; font-weight: bold; font-size: 10px; letter-spacing: 0.5px; margin-bottom: 3px;">🎙️ 结论播报 (TTS 极简朗读)</div>'
+                f'<div style="color: #FFFFFF; font-size: 13px; font-weight: 600; line-height: 1.45;">{content}</div></div>'
+            )
+        escaped = re.sub(r'&gt;\s*🎙️?\s*\*\*(结论播报|架构师响应)\*\*[：:]\s*(.+?)(?=(?:\n\n|\n&lt;|\n#|$))', format_spoken, escaped, flags=re.DOTALL)
+
+        # 1.5 渲染 > 💡 **自动流转**：提示卡
+        def format_tip(m):
             content = m.group(1).strip()
-            return f'<div style="background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 rgba(19, 69, 157, 0.28), stop:0.55 rgba(38, 176, 228, 0.16), stop:1 rgba(138, 198, 87, 0.12)); border-left: 3px solid #26B0E4; border-radius: 6px; padding: 8px 14px; margin: 6px 0 10px 0;"><div style="color: #26B0E4; font-weight: bold; font-size: 10px; letter-spacing: 0.5px; margin-bottom: 3px;">🎙️ 结论播报 (TTS 极简朗读)</div><div style="color: #FFFFFF; font-size: 13px; font-weight: 600; line-height: 1.45;">{content}</div></div>'
-        escaped = re.sub(r'&gt;\s*🎙️?\s*\*\*结论播报\*\*[：:]\s*(.+?)(?=(?:\n\n|\n&lt;|\n#|$))', format_spoken, escaped, flags=re.DOTALL)
+            return f'<div style="background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 6px; padding: 6px 12px; margin: 8px 0; color: #94A3B8; font-size: 11px;">💡 <b>自动流转说明</b>：{content}</div>'
+        escaped = re.sub(r'&gt;\s*💡?\s*\*\*(?:自动流转|提示)\*\*[：:]\s*(.+?)(?=(?:\n\n|\n&lt;|\n#|$))', format_tip, escaped, flags=re.DOTALL)
 
         # 2. Markdown 强调与标题转换
         escaped = re.sub(r'###\s*(.+?)(?=\n|$)', r'<div style="color: #F8FAFC; font-size: 13.5px; font-weight: bold; margin: 12px 0 4px 0; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 3px;">\1</div>', escaped)
@@ -2997,6 +3026,18 @@ class MainWindow(QMainWindow):
                 pix = self.grab()
                 pix.save(out_img)
                 result = {"status": "success", "page": 0, "image_saved": out_img}
+                Path("C:/DeskEcho/action_result.json").write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding='utf-8')
+                trigger_file.unlink()
+                return
+
+            if action == "clear_session":
+                self._switch_nav(0)
+                self.clear_answer_session()
+                from PyQt6.QtWidgets import QApplication
+                QApplication.processEvents()
+                pix = self.grab()
+                pix.save(out_img)
+                result = {"status": "success", "image_saved": out_img}
                 Path("C:/DeskEcho/action_result.json").write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding='utf-8')
                 trigger_file.unlink()
                 return

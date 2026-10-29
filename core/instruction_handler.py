@@ -132,30 +132,34 @@ class InstructionHandler:
         # 任务持久化入库
         self._append_to_queue(task_record)
 
-        # 组装视觉卡片 (琥珀金极客风格 Markdown)
-        modules_str = ", ".join(f"`{m}`" for m in task_record["target_modules"]) if task_record["target_modules"] else "`UI/逻辑模块`"
+        # 规范化执行方案排版 (兼容 list 与 str)
+        exec_plan = task_record["execution_plan"]
+        if isinstance(exec_plan, list):
+            exec_plan_str = "\n".join(f"- {step}" for step in exec_plan)
+        else:
+            exec_plan_str = str(exec_plan)
+
+        # 组装视觉卡片 (标准 Markdown 语法，由 StreamTextDisplay 统一渲染琥珀金极客样式)
+        modules_str = ", ".join(f"`{m}`" for m in task_record["target_modules"]) if task_record["target_modules"] else "`UI/核心模块`"
         clarify_section = ""
         if task_record["clarification_prompt"] and task_record["clarification_prompt"] != "无":
             clarify_section = f"\n> ⚠️ **方案沟通提示**：{task_record['clarification_prompt']}\n"
 
-        markdown_card = f"""<div style="padding: 2px 0;">
-<span style="background: rgba(245, 158, 11, 0.2); color: #FBBF24; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 11px;">🚀 敏捷自进化工单已立项</span>
-<span style="color: #94A3B8; font-size: 11px; margin-left: 8px;">编号: {task_id}</span>
-</div>
+        markdown_card = f"""> 🚀 **敏捷自进化工单**：编号 {task_id}
 
 > 🎙️ **架构师响应**：{task_record['spoken_ack']}
 {clarify_section}
 ### 📋 需求要点与实施拆解
-* **需求议题**：**{task_record['task_title']}**
-* **归属分类**：`{task_record['category']}`（评估结果：**{task_record['feasibility']}**）
-* **诉求归纳**：{task_record['requirement_summary']}
-* **技术方案**：
-{task_record['execution_plan']}
-* **预期模块**：{modules_str}
-* **任务状态**：⏳ `PENDING` (已入库等待后台 Autonomous Loop 自动调度更新)
+- **需求议题**：**{task_record['task_title']}**
+- **归属分类**：`{task_record['category']}`（评估结果：**{task_record['feasibility']}**）
+- **诉求归纳**：{task_record['requirement_summary']}
+- **技术方案**：
+{exec_plan_str}
+- **预期模块**：{modules_str}
+- **任务状态**：⏳ `PENDING` (已入库等待后台 Autonomous Loop 自动调度更新)
 
 ---
-<span style="color: #64748B; font-size: 11px;">💡 提示：后台智能体验证通过并 GitHub 发版后，本客户端将收到推送并自动重启生效。</span>
+> 💡 **自动流转**：后台智能体验证通过并发版后，本客户端将收到推送并自动重启生效。
 """
 
         print(f"[InstructionHandler] 新需求工单已生成: {task_id} | 标题: {task_record['task_title']}")
