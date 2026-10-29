@@ -7,13 +7,13 @@ import html
 import re
 import json
 from pathlib import Path
-from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QSize, QPropertyAnimation, QEasingCurve, QUrl
+from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QSize, QPropertyAnimation, QEasingCurve, QUrl, QMetaObject
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QLineEdit, QTextBrowser, QFrame, QSplitter,
     QListWidget, QListWidgetItem, QGraphicsDropShadowEffect,
     QStackedWidget, QScrollArea, QGridLayout, QSizePolicy, QMenu,
-    QMessageBox
+    QMessageBox, QCheckBox, QComboBox
 )
 from PyQt6.QtGui import QColor, QFont, QIcon, QPainter, QBrush, QPen, QLinearGradient, QFontMetrics
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
@@ -134,7 +134,8 @@ class ModernBreathingSwitch(QPushButton):
             painter.setPen(QColor(colors["text_primary"]))
             painter.drawText(text_rect, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, "实时倾听中 [已开启]")
         else:
-            painter.setPen(QColor(217, 119, 6 if is_light else 251, 191, 36))
+            pause_color = QColor("#D97706" if is_light else "#FBBF24")
+            painter.setPen(pause_color)
             painter.drawText(text_rect, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, "倾听已暂停 [点击恢复]")
 
 
@@ -1933,10 +1934,10 @@ class MainWindow(QMainWindow):
 
         brand_text_box = QVBoxLayout()
         brand_text_box.setSpacing(1)
-        self.brand_title_lbl = QLabel("美好智能")
-        self.brand_title_lbl.setStyleSheet("font-size: 13.5px; font-weight: 800; color: #FFFFFF; letter-spacing: 0.5px;")
-        self.brand_sub_lbl = QLabel("BEAUTIFUL · DeskEcho")
-        self.brand_sub_lbl.setStyleSheet("font-size: 10px; font-weight: 600; color: #26B0E4; letter-spacing: 0.5px;")
+        self.brand_title_lbl = QLabel("DeskEcho")
+        self.brand_title_lbl.setStyleSheet("font-size: 15px; font-weight: 800; color: #FFFFFF; letter-spacing: 0.5px;")
+        self.brand_sub_lbl = QLabel("美好智能")
+        self.brand_sub_lbl.setStyleSheet("font-size: 11px; font-weight: 600; color: #26B0E4; letter-spacing: 0.5px;")
         brand_text_box.addWidget(self.brand_title_lbl)
         brand_text_box.addWidget(self.brand_sub_lbl)
 
@@ -2502,72 +2503,70 @@ class MainWindow(QMainWindow):
 
         page_layout.addWidget(self.mem_header_card)
 
-        # 2. “或许没用”次要切片 AI 研判提醒与一键清理横幅 (默认隐藏，仅在 trash 模式显示，无 Emoji)
+        # 2. “或许没用”次要切片 AI 研判提醒与一键清理横幅 (默认隐藏，仅在 trash 模式显示，克制无视觉污染)
         self.trash_banner = QFrame()
+        self.trash_banner.setObjectName("trash_banner")
         self.trash_banner.setVisible(False)
         if is_light:
             self.trash_banner.setStyleSheet("""
-                QFrame {
-                    background: rgba(245, 158, 11, 0.08);
-                    border: 1px solid rgba(245, 158, 11, 0.35);
-                    border-left: 4px solid #D97706;
+                QFrame#trash_banner {
+                    background: #F8FAFC;
+                    border: 1px solid #E2E8F0;
                     border-radius: 8px;
-                    padding: 6px 12px;
                 }
             """)
         else:
             self.trash_banner.setStyleSheet("""
-                QFrame {
-                    background: rgba(245, 158, 11, 0.08);
-                    border: 1px solid rgba(245, 158, 11, 0.3);
-                    border-left: 4px solid #F59E0B;
+                QFrame#trash_banner {
+                    background: #11141D;
+                    border: 1px solid rgba(255, 255, 255, 0.08);
                     border-radius: 8px;
-                    padding: 6px 12px;
                 }
             """)
         trash_b_layout = QHBoxLayout(self.trash_banner)
-        trash_b_layout.setContentsMargins(10, 6, 10, 6)
-        trash_b_layout.setSpacing(10)
+        trash_b_layout.setContentsMargins(12, 8, 12, 8)
+        trash_b_layout.setSpacing(12)
 
-        self.trash_tip_lbl = QLabel("经 AI 语义诊断：以下切片多为开场问候、测试试音、会议暂停或无关键决议/待办的次要内容，可安全清理以释放检索空间与提升问答命中率。")
+        self.trash_tip_lbl = QLabel("AI 研判：以下切片多为开场寒暄、试音或无决议的次要内容，可安全清理以释放检索空间。")
         self.trash_tip_lbl.setWordWrap(True)
-        self.trash_tip_lbl.setStyleSheet(f"color: {'#92400E' if is_light else '#FCD34D'}; font-size: 11px; font-weight: 500;")
+        self.trash_tip_lbl.setStyleSheet(f"color: {'#64748B' if is_light else '#94A3B8'}; font-size: 11px; font-weight: 500;")
         trash_b_layout.addWidget(self.trash_tip_lbl, 1)
 
-        self.btn_clean_all_trash = QPushButton("一键清空所有次要切片")
-        self.btn_clean_all_trash.setIcon(get_symbol_icon("delete_forever", color="#DC2626" if is_light else "#FCA5A5", size=13))
+        self.btn_clean_all_trash = QPushButton("清空次要切片")
+        self.btn_clean_all_trash.setIcon(get_symbol_icon("delete_sweep", color="#64748B" if is_light else "#94A3B8", size=13))
         self.btn_clean_all_trash.setCursor(Qt.CursorShape.PointingHandCursor)
         if is_light:
             self.btn_clean_all_trash.setStyleSheet("""
                 QPushButton {
-                    background-color: rgba(239, 68, 68, 0.10);
-                    color: #DC2626;
-                    border: 1px solid rgba(239, 68, 68, 0.35);
+                    background-color: #FFFFFF;
+                    color: #475569;
+                    border: 1px solid #CBD5E1;
                     border-radius: 6px;
-                    padding: 6px 14px;
+                    padding: 5px 12px;
                     font-size: 11px;
-                    font-weight: bold;
+                    font-weight: 500;
                 }
                 QPushButton:hover {
-                    background-color: #DC2626;
-                    color: #FFFFFF;
+                    background-color: #FEE2E2;
+                    color: #DC2626;
+                    border-color: #FCA5A5;
                 }
             """)
         else:
             self.btn_clean_all_trash.setStyleSheet("""
                 QPushButton {
-                    background-color: rgba(239, 68, 68, 0.18);
-                    color: #FCA5A5;
-                    border: 1px solid rgba(239, 68, 68, 0.45);
+                    background-color: rgba(255, 255, 255, 0.05);
+                    color: #94A3B8;
+                    border: 1px solid rgba(255, 255, 255, 0.12);
                     border-radius: 6px;
-                    padding: 6px 14px;
+                    padding: 5px 12px;
                     font-size: 11px;
-                    font-weight: bold;
+                    font-weight: 500;
                 }
                 QPushButton:hover {
-                    background-color: #EF4444;
-                    color: #FFFFFF;
-                    border-color: #DC2626;
+                    background-color: rgba(239, 68, 68, 0.2);
+                    color: #FCA5A5;
+                    border-color: #EF4444;
                 }
             """)
         self.btn_clean_all_trash.clicked.connect(self._clean_all_trash_slices)
@@ -2647,23 +2646,24 @@ class MainWindow(QMainWindow):
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(8)
 
-        # 次要切片详情顶部的删除与原因栏 (仅 trash 模式显示)
+        # 次要切片详情顶部的删除与原因栏 (仅 trash 模式显示，克制素雅风格)
         self.trash_detail_action_bar = QFrame()
+        self.trash_detail_action_bar.setObjectName("trash_detail_action_bar")
         self.trash_detail_action_bar.setVisible(False)
         if is_light:
             self.trash_detail_action_bar.setStyleSheet("""
-                QFrame {
-                    background-color: #FFFFFF;
-                    border: 1px solid rgba(239, 68, 68, 0.35);
+                QFrame#trash_detail_action_bar {
+                    background-color: #F8FAFC;
+                    border: 1px solid #E2E8F0;
                     border-radius: 8px;
                     padding: 6px 10px;
                 }
             """)
         else:
             self.trash_detail_action_bar.setStyleSheet("""
-                QFrame {
+                QFrame#trash_detail_action_bar {
                     background-color: #11141D;
-                    border: 1px solid rgba(239, 68, 68, 0.25);
+                    border: 1px solid rgba(255, 255, 255, 0.08);
                     border-radius: 8px;
                     padding: 6px 10px;
                 }
@@ -2672,81 +2672,83 @@ class MainWindow(QMainWindow):
         t_action_layout.setContentsMargins(8, 4, 8, 4)
 
         self.trash_reason_lbl = QLabel("AI 研判理由：无实质性决策且无落地待办推进")
-        self.trash_reason_lbl.setStyleSheet("color: #EF4444; font-size: 11px; font-weight: 600;")
+        self.trash_reason_lbl.setStyleSheet(f"color: {'#64748B' if is_light else '#94A3B8'}; font-size: 11px; font-weight: 500;")
         t_action_layout.addWidget(self.trash_reason_lbl, 1)
 
-        self.btn_restore_curr_slice = QPushButton("判定有用并恢复")
-        self.btn_restore_curr_slice.setIcon(get_symbol_icon("check_circle", color="#0284C7" if is_light else "#26B0E4", size=13))
+        self.btn_restore_curr_slice = QPushButton("恢复为正式资产")
+        self.btn_restore_curr_slice.setIcon(get_symbol_icon("check_circle", color="#0284C7" if is_light else "#38BDF8", size=13))
         self.btn_restore_curr_slice.setToolTip("将此切片恢复为正式会议资产，杜绝 AI 误判")
         self.btn_restore_curr_slice.setCursor(Qt.CursorShape.PointingHandCursor)
         if is_light:
             self.btn_restore_curr_slice.setStyleSheet("""
                 QPushButton {
-                    background: rgba(2, 132, 199, 0.08);
+                    background: #FFFFFF;
                     color: #0284C7;
-                    border: 1px solid #0284C7;
+                    border: 1px solid #CBD5E1;
                     border-radius: 6px;
                     padding: 5px 12px;
                     font-size: 11px;
-                    font-weight: bold;
+                    font-weight: 500;
                 }
                 QPushButton:hover {
-                    background: #0284C7;
-                    color: #FFFFFF;
+                    background: rgba(2, 132, 199, 0.08);
+                    border-color: #0284C7;
                 }
             """)
         else:
             self.btn_restore_curr_slice.setStyleSheet("""
                 QPushButton {
-                    background: rgba(38, 176, 228, 0.2);
-                    color: #26B0E4;
-                    border: 1px solid #26B0E4;
+                    background: rgba(255, 255, 255, 0.05);
+                    color: #38BDF8;
+                    border: 1px solid rgba(255, 255, 255, 0.12);
                     border-radius: 6px;
                     padding: 5px 12px;
                     font-size: 11px;
-                    font-weight: bold;
+                    font-weight: 500;
                 }
                 QPushButton:hover {
-                    background: #26B0E4;
-                    color: #FFFFFF;
+                    background: rgba(56, 189, 248, 0.15);
+                    border-color: #38BDF8;
                 }
             """)
         self.btn_restore_curr_slice.clicked.connect(lambda: self._restore_slice_useful(self.current_selected_record))
         t_action_layout.addWidget(self.btn_restore_curr_slice)
 
-        self.btn_delete_curr_slice = QPushButton("确认删除此段次要切片")
-        self.btn_delete_curr_slice.setIcon(get_symbol_icon("delete_forever", color="#DC2626" if is_light else "#FCA5A5", size=13))
+        self.btn_delete_curr_slice = QPushButton("删除此切片")
+        self.btn_delete_curr_slice.setIcon(get_symbol_icon("delete", color="#64748B" if is_light else "#94A3B8", size=13))
         self.btn_delete_curr_slice.setCursor(Qt.CursorShape.PointingHandCursor)
         if is_light:
             self.btn_delete_curr_slice.setStyleSheet("""
                 QPushButton {
-                    background: rgba(239, 68, 68, 0.10);
-                    color: #DC2626;
-                    border: 1px solid #EF4444;
+                    background: #FFFFFF;
+                    color: #64748B;
+                    border: 1px solid #CBD5E1;
                     border-radius: 6px;
                     padding: 5px 12px;
                     font-size: 11px;
-                    font-weight: bold;
+                    font-weight: 500;
                 }
                 QPushButton:hover {
-                    background: #DC2626;
-                    color: #FFFFFF;
+                    background: #FEE2E2;
+                    color: #DC2626;
+                    border-color: #FCA5A5;
                 }
             """)
         else:
             self.btn_delete_curr_slice.setStyleSheet("""
                 QPushButton {
-                    background: rgba(239, 68, 68, 0.2);
-                    color: #FCA5A5;
-                    border: 1px solid #EF4444;
+                    background: rgba(255, 255, 255, 0.05);
+                    color: #94A3B8;
+                    border: 1px solid rgba(255, 255, 255, 0.12);
                     border-radius: 6px;
                     padding: 5px 12px;
                     font-size: 11px;
-                    font-weight: bold;
+                    font-weight: 500;
                 }
                 QPushButton:hover {
-                    background: #EF4444;
-                    color: #FFFFFF;
+                    background: rgba(239, 68, 68, 0.2);
+                    color: #FCA5A5;
+                    border-color: #EF4444;
                 }
             """)
         self.btn_delete_curr_slice.clicked.connect(self._delete_current_selected_slice)
@@ -3281,7 +3283,7 @@ class MainWindow(QMainWindow):
             for card in self.employee_cards:
                 card.refresh_profile()
 
-    # ---------------- Page 3: 引擎配置与状态 (Settings & Status) ----------------
+    # ---------------- Page 3: 引擎配置与系统设置 (Settings Center) ----------------
     def _build_page_settings(self, stack: QStackedWidget):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -3302,119 +3304,393 @@ class MainWindow(QMainWindow):
 
         is_light = ThemeManager.get_instance().is_light()
 
-        # 引擎矩阵卡
-        self.engine_card = QFrame()
-        self.engine_card.setObjectName("card")
-        if is_light:
-            self.engine_card.setStyleSheet("""
-                QFrame#card {
-                    background-color: #FFFFFF;
-                    border: 1px solid #E2E8F0;
-                    border-radius: 12px;
-                    padding: 16px;
-                }
-            """)
+        # 页面标题区
+        header_box = QVBoxLayout()
+        header_box.setSpacing(3)
+        self.settings_page_title = QLabel("系统设置与引擎配置")
+        self.settings_page_title.setStyleSheet(f"font-size: 16px; font-weight: bold; color: {'#0F172A' if is_light else '#FFFFFF'};")
+        self.settings_page_desc = QLabel("集中管理大模型 API 密钥、语音识别凭据、多角色 TTS 播报音色与系统交互热键")
+        self.settings_page_desc.setStyleSheet(f"font-size: 11.5px; color: {'#64748B' if is_light else '#94A3B8'};")
+        header_box.addWidget(self.settings_page_title)
+        header_box.addWidget(self.settings_page_desc)
+        v_layout.addLayout(header_box)
+
+        # ---------------- 卡片 1: 语音合成 (TTS) 与多角色播报 ----------------
+        self.card_tts = QFrame()
+        self.card_tts.setObjectName("settings_card")
+        tts_layout = QVBoxLayout(self.card_tts)
+        tts_layout.setContentsMargins(18, 16, 18, 16)
+        tts_layout.setSpacing(10)
+
+        tts_title_row = QHBoxLayout()
+        tts_icon = QLabel()
+        tts_icon.setPixmap(get_symbol_pixmap("volume_up", color="#0284C7" if is_light else "#38BDF8", size=16))
+        tts_lbl = QLabel("语音合成 (TTS) 与角色播报")
+        tts_lbl.setStyleSheet(f"font-size: 13.5px; font-weight: bold; color: {'#0F172A' if is_light else '#FFFFFF'};")
+        tts_title_row.addWidget(tts_icon)
+        tts_title_row.addWidget(tts_lbl)
+        tts_title_row.addStretch()
+
+        self.chk_enable_tts = QCheckBox("启用即时语音合成朗读")
+        self.chk_enable_tts.setChecked(Config.ENABLE_TTS)
+        tts_title_row.addWidget(self.chk_enable_tts)
+        tts_layout.addLayout(tts_title_row)
+
+        tts_grid = QGridLayout()
+        tts_grid.setSpacing(10)
+
+        tts_grid.addWidget(QLabel("TTS 引擎提供商:"), 0, 0)
+        self.combo_tts_provider = QComboBox()
+        self.combo_tts_provider.addItem("微软 Edge-TTS (云原生免 Key 高音质)", "edge-tts")
+        self.combo_tts_provider.addItem("火山引擎豆包语音大模型 (拟真拟态)", "volcengine")
+        if Config.TTS_PROVIDER == "volcengine":
+            self.combo_tts_provider.setCurrentIndex(1)
         else:
-            self.engine_card.setStyleSheet("""
-                QFrame#card {
-                    background-color: #11141D;
-                    border: 1px solid rgba(255, 255, 255, 0.08);
-                    border-radius: 12px;
-                    padding: 16px;
-                }
-            """)
-        e_layout = QVBoxLayout(self.engine_card)
-        e_layout.setContentsMargins(20, 18, 20, 18)
-        e_layout.setSpacing(12)
+            self.combo_tts_provider.setCurrentIndex(0)
+        tts_grid.addWidget(self.combo_tts_provider, 0, 1)
 
-        self.engine_title = QLabel("DeskEcho AI 引擎与硬件通信栈 (MVP)")
-        self.engine_title.setStyleSheet(f"font-size: 15px; font-weight: bold; color: {'#0F172A' if is_light else '#FFFFFF'};")
-        e_layout.addWidget(self.engine_title)
-
-        grid = QGridLayout()
-        grid.setSpacing(12)
-
-        items = [
-            ("语音识别 (ASR)", f"火山引擎豆包流式 ASR 2.0 (WebSocket V3)\n资源位: {Config.VOLC_RESOURCE_ID}\n备选: 阿里 DashScope SenseVoice / Whisper", "#10B981"),
-            ("大模型 (LLM / RAG)", f"DeepSeek V3 ({Config.LLM_MODEL})\n二层 Query Rewriting 意图改写\n音视分离极简播报 Prompt 引擎", "#6366F1"),
-            ("语音合成 (TTS)", f"Edge-TTS (微软云原生高质量语音) / 火山豆包\n预加载实时 Ack 音效 (毫秒级响应)", "#06B6D4"),
-            ("向量检索与本地存储", f"ChromaDB 持久化向量库 (HNSW)\nSQLite 结构化时间轴 (omni_data/records.db)\nJieba 中文双向倒排检索加权", "#F59E0B"),
-            ("拾音与静音切片", "PyAudio 16kHz 16-bit Mono\nWebRTC VAD 智能静音探测 (Aggressiveness=2)\n无麦克风硬件自动切换虚拟静默守护", "#EC4899"),
-            ("全局交互与对讲", f"pynput 全局底层热键监听 [{Config.INTERCOM_KEY}]\n支持长按对讲、释放检索 (<0.5s 防抖拦截)\nAlma 风格三态浮窗与动态波形", "#8B5CF6")
+        tts_grid.addWidget(QLabel("会议结论播报角色:"), 1, 0)
+        self.combo_voice_meeting = QComboBox()
+        meeting_voices = [
+            ("云希 (自然男声 · 严肃严谨 · 默认)", "zh-CN-YunxiNeural"),
+            ("晓晓 (知性女声 · 温暖亲和)", "zh-CN-XiaoxiaoNeural"),
+            ("云扬 (播音男声 · 沉稳专业)", "zh-CN-YunyangNeural"),
+            ("云健 (干练男声 · 敏捷有力)", "zh-CN-YunjianNeural"),
         ]
+        for name, vid in meeting_voices:
+            self.combo_voice_meeting.addItem(name, vid)
+        curr_mv = Config.TTS_VOICE_MEETING
+        mv_idx = next((i for i, (_, vid) in enumerate(meeting_voices) if vid == curr_mv), 0)
+        self.combo_voice_meeting.setCurrentIndex(mv_idx)
+        tts_grid.addWidget(self.combo_voice_meeting, 1, 1)
 
-        self.engine_boxes = []
-        self.engine_desc_labels = []
-        for idx, (t, d, c) in enumerate(items):
-            r = idx // 2
-            col = idx % 2
-            box = QFrame()
-            self.engine_boxes.append(box)
-            if is_light:
-                box.setStyleSheet("background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px;")
-            else:
-                box.setStyleSheet("background-color: #0A0C10; border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 12px;")
-            b_layout = QVBoxLayout(box)
-            b_layout.setSpacing(4)
-            lbl_t = QLabel(t)
-            lbl_t.setStyleSheet(f"color: {c}; font-size: 12px; font-weight: bold;")
-            lbl_d = QLabel(d)
-            self.engine_desc_labels.append(lbl_d)
-            lbl_d.setStyleSheet(f"color: {'#475569' if is_light else '#94A3B8'}; font-size: 11px; line-height: 1.4;")
-            lbl_d.setWordWrap(True)
-            b_layout.addWidget(lbl_t)
-            b_layout.addWidget(lbl_d)
-            grid.addWidget(box, r, col)
+        tts_grid.addWidget(QLabel("全网科普通识角色:"), 2, 0)
+        self.combo_voice_general = QComboBox()
+        general_voices = [
+            ("晓晓 (知性女声 · 温暖亲和 · 默认)", "zh-CN-XiaoxiaoNeural"),
+            ("云希 (自然男声 · 严肃严谨)", "zh-CN-YunxiNeural"),
+            ("云扬 (播音男声 · 沉稳专业)", "zh-CN-YunyangNeural"),
+            ("云健 (干练男声 · 敏捷有力)", "zh-CN-YunjianNeural"),
+        ]
+        for name, vid in general_voices:
+            self.combo_voice_general.addItem(name, vid)
+        curr_gv = Config.TTS_VOICE_GENERAL
+        gv_idx = next((i for i, (_, vid) in enumerate(general_voices) if vid == curr_gv), 0)
+        self.combo_voice_general.setCurrentIndex(gv_idx)
+        tts_grid.addWidget(self.combo_voice_general, 2, 1)
 
-        e_layout.addLayout(grid)
-        v_layout.addWidget(self.engine_card)
+        tts_grid.addWidget(QLabel("敏捷指令架构角色:"), 3, 0)
+        self.combo_voice_instruction = QComboBox()
+        instruction_voices = [
+            ("云健 (干练男声 · 敏捷有力 · 默认)", "zh-CN-YunjianNeural"),
+            ("云扬 (播音男声 · 沉稳专业)", "zh-CN-YunyangNeural"),
+            ("云希 (自然男声 · 严肃严谨)", "zh-CN-YunxiNeural"),
+            ("晓晓 (知性女声 · 温暖亲和)", "zh-CN-XiaoxiaoNeural"),
+        ]
+        for name, vid in instruction_voices:
+            self.combo_voice_instruction.addItem(name, vid)
+        curr_iv = Config.TTS_VOICE_INSTRUCTION
+        iv_idx = next((i for i, (_, vid) in enumerate(instruction_voices) if vid == curr_iv), 0)
+        self.combo_voice_instruction.setCurrentIndex(iv_idx)
+        tts_grid.addWidget(self.combo_voice_instruction, 3, 1)
 
-        # 发版管理快速跳转
-        goto_update_box = QHBoxLayout()
-        goto_update_box.setContentsMargins(4, 4, 4, 4)
-        self.goto_lbl = QLabel("DeskEcho 现已接入 GitHub Releases 官方发版通道与单一 Windows EXE 自动更新")
-        self.goto_lbl.setStyleSheet(f"color: {'#64748B' if is_light else '#94A3B8'}; font-size: 11px;")
-        goto_update_box.addWidget(self.goto_lbl, 1)
+        tts_layout.addLayout(tts_grid)
+
+        preview_row = QHBoxLayout()
+        self.btn_preview_tts = QPushButton("试听当前会议音色")
+        self.btn_preview_tts.setIcon(get_symbol_icon("play_arrow", color="#0284C7" if is_light else "#38BDF8", size=13))
+        self.btn_preview_tts.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_preview_tts.clicked.connect(self._preview_tts)
+        preview_row.addWidget(self.btn_preview_tts)
+        preview_row.addStretch()
+        tts_layout.addLayout(preview_row)
+
+        v_layout.addWidget(self.card_tts)
+
+        # ---------------- 卡片 2: 大模型 (LLM / RAG) API 配置 ----------------
+        self.card_llm = QFrame()
+        self.card_llm.setObjectName("settings_card")
+        llm_layout = QVBoxLayout(self.card_llm)
+        llm_layout.setContentsMargins(18, 16, 18, 16)
+        llm_layout.setSpacing(10)
+
+        llm_title_row = QHBoxLayout()
+        llm_icon = QLabel()
+        llm_icon.setPixmap(get_symbol_pixmap("psychology", color="#0284C7" if is_light else "#38BDF8", size=16))
+        llm_lbl = QLabel("大模型 (LLM / RAG) 密钥与接口配置")
+        llm_lbl.setStyleSheet(f"font-size: 13.5px; font-weight: bold; color: {'#0F172A' if is_light else '#FFFFFF'};")
+        llm_title_row.addWidget(llm_icon)
+        llm_title_row.addWidget(llm_lbl)
+        llm_title_row.addStretch()
+        llm_layout.addLayout(llm_title_row)
+
+        llm_grid = QGridLayout()
+        llm_grid.setSpacing(10)
+
+        llm_grid.addWidget(QLabel("API Key (密钥):"), 0, 0)
+        llm_key_box = QHBoxLayout()
+        self.input_llm_key = QLineEdit()
+        self.input_llm_key.setEchoMode(QLineEdit.EchoMode.Password)
+        self.input_llm_key.setText(Config.OPENAI_API_KEY)
+        self.input_llm_key.setPlaceholderText("填入 OpenAI / DeepSeek / 智谱等兼容 API Key...")
+        llm_key_box.addWidget(self.input_llm_key, 1)
+
+        self.btn_toggle_llm_key = QPushButton()
+        self.btn_toggle_llm_key.setIcon(get_symbol_icon("visibility", color="#64748B" if is_light else "#94A3B8", size=14))
+        self.btn_toggle_llm_key.setToolTip("显示/隐藏密钥明文")
+        self.btn_toggle_llm_key.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_toggle_llm_key.clicked.connect(self._toggle_llm_key_visibility)
+        llm_key_box.addWidget(self.btn_toggle_llm_key)
+        llm_grid.addLayout(llm_key_box, 0, 1)
+
+        llm_grid.addWidget(QLabel("接口地址 (Base URL):"), 1, 0)
+        self.input_llm_url = QLineEdit()
+        self.input_llm_url.setText(Config.OPENAI_BASE_URL)
+        self.input_llm_url.setPlaceholderText("https://open.bigmodel.cn/api/coding/paas/v4 或 https://api.deepseek.com/v1")
+        llm_grid.addWidget(self.input_llm_url, 1, 1)
+
+        llm_grid.addWidget(QLabel("模型名称 (Model):"), 2, 0)
+        self.input_llm_model = QLineEdit()
+        self.input_llm_model.setText(Config.LLM_MODEL)
+        self.input_llm_model.setPlaceholderText("glm-4-flash / deepseek-chat / qwen-plus")
+        llm_grid.addWidget(self.input_llm_model, 2, 1)
+
+        llm_layout.addLayout(llm_grid)
+        v_layout.addWidget(self.card_llm)
+
+        # ---------------- 卡片 3: 语音识别 (ASR) 与采集配置 ----------------
+        self.card_asr = QFrame()
+        self.card_asr.setObjectName("settings_card")
+        asr_layout = QVBoxLayout(self.card_asr)
+        asr_layout.setContentsMargins(18, 16, 18, 16)
+        asr_layout.setSpacing(10)
+
+        asr_title_row = QHBoxLayout()
+        asr_icon = QLabel()
+        asr_icon.setPixmap(get_symbol_pixmap("graphic_eq", color="#0284C7" if is_light else "#38BDF8", size=16))
+        asr_lbl = QLabel("语音识别 (ASR) 与采集设置")
+        asr_lbl.setStyleSheet(f"font-size: 13.5px; font-weight: bold; color: {'#0F172A' if is_light else '#FFFFFF'};")
+        asr_title_row.addWidget(asr_icon)
+        asr_title_row.addWidget(asr_lbl)
+        asr_title_row.addStretch()
+        asr_layout.addLayout(asr_title_row)
+
+        asr_grid = QGridLayout()
+        asr_grid.setSpacing(10)
+
+        asr_grid.addWidget(QLabel("ASR 引擎提供商:"), 0, 0)
+        self.combo_asr_provider = QComboBox()
+        self.combo_asr_provider.addItem("火山引擎 (Volcengine 豆包流式 ASR 2.0)", "volcengine")
+        self.combo_asr_provider.addItem("阿里通义听悟 (DashScope SenseVoice)", "dashscope")
+        if Config.ASR_PROVIDER == "dashscope":
+            self.combo_asr_provider.setCurrentIndex(1)
+        else:
+            self.combo_asr_provider.setCurrentIndex(0)
+        asr_grid.addWidget(self.combo_asr_provider, 0, 1)
+
+        asr_grid.addWidget(QLabel("火山 AppID:"), 1, 0)
+        self.input_volc_appid = QLineEdit()
+        self.input_volc_appid.setText(Config.VOLC_APPID)
+        self.input_volc_appid.setPlaceholderText("火山引擎控制台生成的 AppID")
+        asr_grid.addWidget(self.input_volc_appid, 1, 1)
+
+        asr_grid.addWidget(QLabel("火山 Access Token:"), 2, 0)
+        self.input_volc_token = QLineEdit()
+        self.input_volc_token.setEchoMode(QLineEdit.EchoMode.Password)
+        self.input_volc_token.setText(Config.VOLC_ACCESS_TOKEN)
+        self.input_volc_token.setPlaceholderText("火山引擎 WebSocket 访问令牌 Access Token")
+        asr_grid.addWidget(self.input_volc_token, 2, 1)
+
+        asr_grid.addWidget(QLabel("火山 Resource ID:"), 3, 0)
+        self.input_volc_resource = QLineEdit()
+        self.input_volc_resource.setText(Config.VOLC_RESOURCE_ID)
+        self.input_volc_resource.setPlaceholderText("默认 volc.seedasr.sauc.duration")
+        asr_grid.addWidget(self.input_volc_resource, 3, 1)
+
+        asr_layout.addLayout(asr_grid)
+        v_layout.addWidget(self.card_asr)
+
+        # ---------------- 卡片 4: 对讲热键与静音切片 ----------------
+        self.card_intercom = QFrame()
+        self.card_intercom.setObjectName("settings_card")
+        intercom_layout = QVBoxLayout(self.card_intercom)
+        intercom_layout.setContentsMargins(18, 16, 18, 16)
+        intercom_layout.setSpacing(10)
+
+        intercom_title_row = QHBoxLayout()
+        intercom_icon = QLabel()
+        intercom_icon.setPixmap(get_symbol_pixmap("keyboard", color="#0284C7" if is_light else "#38BDF8", size=16))
+        intercom_lbl = QLabel("全局对讲热键与静音探测")
+        intercom_lbl.setStyleSheet(f"font-size: 13.5px; font-weight: bold; color: {'#0F172A' if is_light else '#FFFFFF'};")
+        intercom_title_row.addWidget(intercom_icon)
+        intercom_title_row.addWidget(intercom_lbl)
+        intercom_title_row.addStretch()
+        intercom_layout.addLayout(intercom_title_row)
+
+        intercom_grid = QGridLayout()
+        intercom_grid.setSpacing(10)
+
+        intercom_grid.addWidget(QLabel("对讲全局热键:"), 0, 0)
+        self.combo_intercom_key = QComboBox()
+        hotkeys = [
+            ("右 Alt (Alt_R · 推荐，单键免组合，高频最顺手)", "Alt_R"),
+            ("左 Alt (Alt_L)", "Alt_L"),
+            ("Ctrl + Space (空格组合键)", "Ctrl+Space"),
+            ("F2 (功能键)", "F2"),
+        ]
+        for name, val in hotkeys:
+            self.combo_intercom_key.addItem(name, val)
+        curr_k = Config.INTERCOM_KEY
+        k_idx = next((i for i, (_, val) in enumerate(hotkeys) if val.lower() == curr_k.lower()), 0)
+        self.combo_intercom_key.setCurrentIndex(k_idx)
+        intercom_grid.addWidget(self.combo_intercom_key, 0, 1)
+
+        intercom_grid.addWidget(QLabel("静音分段灵敏度:"), 1, 0)
+        self.vad_hint_lbl = QLabel("WebRTC VAD 探测模式 2 (平衡模式：兼顾办公室背景噪音过滤与清晰人声捕捉)")
+        self.vad_hint_lbl.setStyleSheet(f"color: {'#64748B' if is_light else '#94A3B8'}; font-size: 11.5px;")
+        intercom_grid.addWidget(self.vad_hint_lbl, 1, 1)
+
+        intercom_layout.addLayout(intercom_grid)
+        v_layout.addWidget(self.card_intercom)
+
+        # ---------------- 卡片 5: 企业扩展插槽 (Modular Extension Slots) ----------------
+        self.card_ext = QFrame()
+        self.card_ext.setObjectName("settings_card")
+        ext_layout = QVBoxLayout(self.card_ext)
+        ext_layout.setContentsMargins(18, 16, 18, 16)
+        ext_layout.setSpacing(10)
+
+        ext_title_row = QHBoxLayout()
+        ext_icon = QLabel()
+        ext_icon.setPixmap(get_symbol_pixmap("extension", color="#0284C7" if is_light else "#38BDF8", size=16))
+        ext_lbl = QLabel("自定义扩展插槽 (预留生态空间)")
+        ext_lbl.setStyleSheet(f"font-size: 13.5px; font-weight: bold; color: {'#0F172A' if is_light else '#FFFFFF'};")
+        ext_title_row.addWidget(ext_icon)
+        ext_title_row.addWidget(ext_lbl)
+        ext_title_row.addStretch()
+        ext_layout.addLayout(ext_title_row)
+
+        ext_desc = QLabel("预留模块化插件与企业系统连接器，后续可直接在此配置外接业务协同与私有模型")
+        ext_desc.setStyleSheet(f"color: {'#64748B' if is_light else '#94A3B8'}; font-size: 11px;")
+        ext_layout.addWidget(ext_desc)
+
+        ext_grid = QGridLayout()
+        ext_grid.setSpacing(8)
+        ext_slots = [
+            ("飞书 / 钉钉企业机器人 Webhook", "会议重要纪要与待办自动推送至群聊 (规划中)"),
+            ("企业私有知识库外挂 (Confluence / Notion)", "自动索引企业沉淀知识，增强检索召回率 (规划中)"),
+            ("本地离线大模型 (Ollama / vLLM 私有化)", "支持内网断网环境下的完全本地化隐私问答 (规划中)"),
+        ]
+        self.ext_boxes = []
+        for i, (t, d) in enumerate(ext_slots):
+            sbox = QFrame()
+            self.ext_boxes.append(sbox)
+            sb_l = QVBoxLayout(sbox)
+            sb_l.setContentsMargins(10, 8, 10, 8)
+            sb_l.setSpacing(2)
+            st = QLabel(t)
+            st.setStyleSheet(f"font-size: 11.5px; font-weight: 600; color: {'#334155' if is_light else '#CBD5E1'};")
+            sd = QLabel(d)
+            sd.setStyleSheet(f"font-size: 10.5px; color: {'#64748B' if is_light else '#94A3B8'};")
+            sb_l.addWidget(st)
+            sb_l.addWidget(sd)
+            ext_grid.addWidget(sbox, i, 0)
+        ext_layout.addLayout(ext_grid)
+        v_layout.addWidget(self.card_ext)
+
+        # ---------------- 底部保存操作栏 ----------------
+        save_action_bar = QHBoxLayout()
+        save_action_bar.setContentsMargins(4, 8, 4, 8)
+        save_action_bar.setSpacing(12)
+
+        self.btn_save_settings = QPushButton("保存全部配置并立即生效")
+        self.btn_save_settings.setIcon(get_symbol_icon("save", color="#FFFFFF", size=14))
+        self.btn_save_settings.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_save_settings.clicked.connect(self._save_all_settings)
+        save_action_bar.addWidget(self.btn_save_settings)
+
+        self.settings_status_lbl = QLabel("")
+        save_action_bar.addWidget(self.settings_status_lbl, 1)
 
         self.btn_goto_update = QPushButton("打开软件更新中心 →")
         self.btn_goto_update.setCursor(Qt.CursorShape.PointingHandCursor)
-        if is_light:
-            self.btn_goto_update.setStyleSheet("""
-                QPushButton {
-                    background: rgba(2, 132, 199, 0.08);
-                    color: #0284C7;
-                    border: 1px solid rgba(2, 132, 199, 0.3);
-                    border-radius: 5px;
-                    padding: 4px 10px;
-                    font-size: 11px;
-                }
-                QPushButton:hover {
-                    background: rgba(2, 132, 199, 0.18);
-                }
-            """)
-        else:
-            self.btn_goto_update.setStyleSheet("""
-                QPushButton {
-                    background: rgba(38, 176, 228, 0.12);
-                    color: #38BDF8;
-                    border: 1px solid rgba(38, 176, 228, 0.3);
-                    border-radius: 5px;
-                    padding: 4px 10px;
-                    font-size: 11px;
-                }
-                QPushButton:hover {
-                    background: rgba(38, 176, 228, 0.25);
-                    color: #FFFFFF;
-                }
-            """)
         self.btn_goto_update.clicked.connect(lambda: self._switch_nav(4))
-        goto_update_box.addWidget(self.btn_goto_update)
-        v_layout.addLayout(goto_update_box)
+        save_action_bar.addWidget(self.btn_goto_update)
 
+        v_layout.addLayout(save_action_bar)
         v_layout.addStretch()
 
         scroll.setWidget(container)
         stack.addWidget(scroll)
+
+    def _toggle_llm_key_visibility(self):
+        if self.input_llm_key.echoMode() == QLineEdit.EchoMode.Password:
+            self.input_llm_key.setEchoMode(QLineEdit.EchoMode.Normal)
+            self.btn_toggle_llm_key.setIcon(get_symbol_icon("visibility_off", color="#64748B" if ThemeManager.get_instance().is_light() else "#94A3B8", size=14))
+        else:
+            self.input_llm_key.setEchoMode(QLineEdit.EchoMode.Password)
+            self.btn_toggle_llm_key.setIcon(get_symbol_icon("visibility", color="#64748B" if ThemeManager.get_instance().is_light() else "#94A3B8", size=14))
+
+    def _preview_tts(self):
+        voice = self.combo_voice_meeting.currentData() or "zh-CN-YunxiNeural"
+        text = "您好，这是 DeskEcho 的当前语音播报试听，知识库已准备就绪。"
+        import threading
+        import asyncio
+        import edge_tts
+
+        def _worker():
+            try:
+                temp_wav = Config.TEMP_DIR / "preview_tts.mp3"
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                communicate = edge_tts.Communicate(text, voice)
+                loop.run_until_complete(communicate.save(str(temp_wav)))
+                loop.close()
+                QMetaObject.invokeMethod(self, lambda: self.play_tts_audio(str(temp_wav)), Qt.ConnectionType.QueuedConnection)
+            except Exception as e:
+                print(f"[PreviewTTS] 试听失败: {e}")
+        threading.Thread(target=_worker, daemon=True).start()
+
+    def _save_all_settings(self):
+        updates = {}
+        # LLM
+        new_llm_key = self.input_llm_key.text().strip()
+        if new_llm_key and not new_llm_key.startswith("••••"):
+            updates["OPENAI_API_KEY"] = new_llm_key
+        updates["OPENAI_BASE_URL"] = self.input_llm_url.text().strip()
+        updates["LLM_MODEL"] = self.input_llm_model.text().strip()
+
+        # TTS
+        updates["ENABLE_TTS"] = "true" if self.chk_enable_tts.isChecked() else "false"
+        updates["TTS_PROVIDER"] = "edge-tts" if "edge-tts" in self.combo_tts_provider.currentText() else "volcengine"
+        updates["TTS_VOICE_MEETING"] = self.combo_voice_meeting.currentData() or "zh-CN-YunxiNeural"
+        updates["TTS_VOICE_GENERAL"] = self.combo_voice_general.currentData() or "zh-CN-XiaoxiaoNeural"
+        updates["TTS_VOICE_INSTRUCTION"] = self.combo_voice_instruction.currentData() or "zh-CN-YunjianNeural"
+        updates["TTS_VOICE"] = updates["TTS_VOICE_MEETING"]
+
+        # ASR
+        updates["ASR_PROVIDER"] = "volcengine" if "volcengine" in self.combo_asr_provider.currentText() else "dashscope"
+        updates["VOLC_APPID"] = self.input_volc_appid.text().strip()
+        new_volc_token = self.input_volc_token.text().strip()
+        if new_volc_token and not new_volc_token.startswith("••••"):
+            updates["VOLC_ACCESS_TOKEN"] = new_volc_token
+        updates["VOLC_RESOURCE_ID"] = self.input_volc_resource.text().strip()
+
+        # Hotkey
+        hotkey_val = self.combo_intercom_key.currentData() or "Alt_R"
+        updates["INTERCOM_KEY"] = hotkey_val
+
+        success = Config.save_settings(updates)
+        if success:
+            self.settings_status_lbl.setText("配置已成功保存并立即生效")
+            self.settings_status_lbl.setStyleSheet("color: #10B981; font-size: 11.5px; font-weight: 600;")
+            if hasattr(self, 'hotkey_tag'):
+                self.hotkey_tag.setText(f"对讲热键: {Config.get_intercom_display_key()}")
+            QTimer.singleShot(4000, lambda: self.settings_status_lbl.setText(""))
+        else:
+            self.settings_status_lbl.setText("保存配置失败，请检查文件写入权限")
+            self.settings_status_lbl.setStyleSheet("color: #EF4444; font-size: 11.5px; font-weight: 600;")
+
 
     # ---------------- Page 4: 软件发版与版本更新 ----------------
     def _build_page_update(self, stack: QStackedWidget):
@@ -4103,18 +4379,18 @@ class MainWindow(QMainWindow):
         slice_border = "#0284C7" if is_light else "#26B0E4"
 
         trash_badge_html = f"""
-        <div style="background-color: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.35); border-left: 4px solid #EF4444; padding: 8px 12px; border-radius: 6px; margin-bottom: 12px;">
-            <span style="color: {'#DC2626' if is_light else '#F87171'}; font-weight: bold; font-size: 11px;">AI 价值分级：次要级切片 (或许没用)</span><br>
-            <span style="color: {'#7F1D1D' if is_light else '#FECACA'}; font-size: 12px;">诊断原因：{reason}</span>
+        <div style="background-color: {box_bg}; border: 1px solid {box_border}; padding: 8px 12px; border-radius: 6px; margin-bottom: 12px;">
+            <span style="color: {'#475569' if is_light else '#94A3B8'}; font-weight: 600; font-size: 11px;">次要切片归档 · 诊断理由：</span>
+            <span style="color: {'#64748B' if is_light else '#CBD5E1'}; font-size: 11.5px;">{reason}</span>
         </div>
         """ if is_trash else ""
 
         detail_html = f"""
         <div style="font-family: -apple-system, 'Segoe UI', sans-serif; line-height: 1.6;">
             {trash_badge_html}
-            <div style="background-color: {slice_bg}; border-left: 3px solid {slice_border}; padding: 10px 14px; border-radius: 6px; margin-bottom: 14px;">
-                <span style="color: {slice_border}; font-weight: bold; font-size: 11px;">会议切片区间</span><br>
-                <span style="color: {time_text_c}; font-size: 13px; font-weight: 600;">{start_t} 至 {end_t}</span>
+            <div style="background-color: {box_bg}; border: 1px solid {box_border}; padding: 8px 12px; border-radius: 6px; margin-bottom: 14px;">
+                <span style="color: {'#64748B' if is_light else '#94A3B8'}; font-size: 11px; font-weight: 600;">会议切片区间：</span>
+                <span style="color: {heading_c}; font-size: 12px; font-weight: 600;">{start_t} 至 {end_t}</span>
             </div>
 
             <div style="color: {heading_c}; font-size: 13.5px; font-weight: bold; margin-bottom: 6px;">结构化纪要提取</div>
@@ -4547,13 +4823,13 @@ class MainWindow(QMainWindow):
         if hasattr(self, 'brand_card'):
             self.brand_card.setStyleSheet("background: transparent; border: none; padding: 0;")
             if is_light:
-                self.brand_title_lbl.setStyleSheet("font-size: 13.5px; font-weight: 800; color: #0F172A; letter-spacing: 0.5px;")
-                self.brand_sub_lbl.setStyleSheet("font-size: 10px; font-weight: 600; color: #0284C7; letter-spacing: 0.5px;")
+                self.brand_title_lbl.setStyleSheet("font-size: 15px; font-weight: 800; color: #0F172A; letter-spacing: 0.5px;")
+                self.brand_sub_lbl.setStyleSheet("font-size: 11px; font-weight: 600; color: #0284C7; letter-spacing: 0.5px;")
                 if hasattr(self, 'hotkey_tag'):
                     self.hotkey_tag.setStyleSheet("color: #64748B; font-size: 10.5px;")
             else:
-                self.brand_title_lbl.setStyleSheet("font-size: 13.5px; font-weight: 800; color: #FFFFFF; letter-spacing: 0.5px;")
-                self.brand_sub_lbl.setStyleSheet("font-size: 10px; font-weight: 600; color: #26B0E4; letter-spacing: 0.5px;")
+                self.brand_title_lbl.setStyleSheet("font-size: 15px; font-weight: 800; color: #FFFFFF; letter-spacing: 0.5px;")
+                self.brand_sub_lbl.setStyleSheet("font-size: 11px; font-weight: 600; color: #26B0E4; letter-spacing: 0.5px;")
                 if hasattr(self, 'hotkey_tag'):
                     self.hotkey_tag.setStyleSheet("color: #64748B; font-size: 10.5px;")
 
@@ -4703,59 +4979,56 @@ class MainWindow(QMainWindow):
         if hasattr(self, 'trash_banner'):
             if is_light:
                 self.trash_banner.setStyleSheet("""
-                    QFrame {
-                        background: rgba(245, 158, 11, 0.08);
-                        border: 1px solid rgba(245, 158, 11, 0.35);
-                        border-left: 4px solid #D97706;
+                    QFrame#trash_banner {
+                        background: #F8FAFC;
+                        border: 1px solid #E2E8F0;
                         border-radius: 8px;
-                        padding: 6px 12px;
                     }
                 """)
             else:
                 self.trash_banner.setStyleSheet("""
-                    QFrame {
-                        background: rgba(245, 158, 11, 0.08);
-                        border: 1px solid rgba(245, 158, 11, 0.3);
-                        border-left: 4px solid #F59E0B;
+                    QFrame#trash_banner {
+                        background: #11141D;
+                        border: 1px solid rgba(255, 255, 255, 0.08);
                         border-radius: 8px;
-                        padding: 6px 12px;
                     }
                 """)
         if hasattr(self, 'trash_tip_lbl'):
-            self.trash_tip_lbl.setStyleSheet(f"color: {'#92400E' if is_light else '#FCD34D'}; font-size: 11px; font-weight: 500;")
+            self.trash_tip_lbl.setStyleSheet(f"color: {'#64748B' if is_light else '#94A3B8'}; font-size: 11px; font-weight: 500;")
         if hasattr(self, 'btn_clean_all_trash'):
-            self.btn_clean_all_trash.setIcon(get_symbol_icon("delete_forever", color="#DC2626" if is_light else "#FCA5A5", size=13))
+            self.btn_clean_all_trash.setIcon(get_symbol_icon("delete_sweep", color="#64748B" if is_light else "#94A3B8", size=13))
             if is_light:
                 self.btn_clean_all_trash.setStyleSheet("""
                     QPushButton {
-                        background-color: rgba(239, 68, 68, 0.10);
-                        color: #DC2626;
-                        border: 1px solid rgba(239, 68, 68, 0.35);
+                        background-color: #FFFFFF;
+                        color: #475569;
+                        border: 1px solid #CBD5E1;
                         border-radius: 6px;
-                        padding: 6px 14px;
+                        padding: 5px 12px;
                         font-size: 11px;
-                        font-weight: bold;
+                        font-weight: 500;
                     }
                     QPushButton:hover {
-                        background-color: #DC2626;
-                        color: #FFFFFF;
+                        background-color: #FEE2E2;
+                        color: #DC2626;
+                        border-color: #FCA5A5;
                     }
                 """)
             else:
                 self.btn_clean_all_trash.setStyleSheet("""
                     QPushButton {
-                        background-color: rgba(239, 68, 68, 0.18);
-                        color: #FCA5A5;
-                        border: 1px solid rgba(239, 68, 68, 0.45);
+                        background-color: rgba(255, 255, 255, 0.05);
+                        color: #94A3B8;
+                        border: 1px solid rgba(255, 255, 255, 0.12);
                         border-radius: 6px;
-                        padding: 6px 14px;
+                        padding: 5px 12px;
                         font-size: 11px;
-                        font-weight: bold;
+                        font-weight: 500;
                     }
                     QPushButton:hover {
-                        background-color: #EF4444;
-                        color: #FFFFFF;
-                        border-color: #DC2626;
+                        background-color: rgba(239, 68, 68, 0.2);
+                        color: #FCA5A5;
+                        border-color: #EF4444;
                     }
                 """)
         if hasattr(self, 'mem_list'):
@@ -4767,89 +5040,92 @@ class MainWindow(QMainWindow):
         if hasattr(self, 'trash_detail_action_bar'):
             if is_light:
                 self.trash_detail_action_bar.setStyleSheet("""
-                    QFrame {
-                        background-color: #FFFFFF;
-                        border: 1px solid rgba(239, 68, 68, 0.35);
+                    QFrame#trash_detail_action_bar {
+                        background-color: #F8FAFC;
+                        border: 1px solid #E2E8F0;
                         border-radius: 8px;
-                        padding: 6px 10px;
                     }
                 """)
+                if hasattr(self, 'trash_reason_lbl'):
+                    self.trash_reason_lbl.setStyleSheet("color: #64748B; font-size: 11px; font-weight: 500;")
             else:
                 self.trash_detail_action_bar.setStyleSheet("""
-                    QFrame {
+                    QFrame#trash_detail_action_bar {
                         background-color: #11141D;
-                        border: 1px solid rgba(239, 68, 68, 0.25);
+                        border: 1px solid rgba(255, 255, 255, 0.08);
                         border-radius: 8px;
-                        padding: 6px 10px;
                     }
                 """)
+                if hasattr(self, 'trash_reason_lbl'):
+                    self.trash_reason_lbl.setStyleSheet("color: #94A3B8; font-size: 11px; font-weight: 500;")
         if hasattr(self, 'btn_restore_curr_slice'):
-            self.btn_restore_curr_slice.setIcon(get_symbol_icon("check_circle", color="#0284C7" if is_light else "#26B0E4", size=13))
+            self.btn_restore_curr_slice.setIcon(get_symbol_icon("check_circle", color="#0284C7" if is_light else "#38BDF8", size=13))
             if is_light:
                 self.btn_restore_curr_slice.setStyleSheet("""
                     QPushButton {
-                        background: rgba(2, 132, 199, 0.08);
+                        background: #FFFFFF;
                         color: #0284C7;
-                        border: 1px solid #0284C7;
+                        border: 1px solid #CBD5E1;
                         border-radius: 6px;
                         padding: 5px 12px;
                         font-size: 11px;
-                        font-weight: bold;
+                        font-weight: 500;
                     }
                     QPushButton:hover {
-                        background: #0284C7;
-                        color: #FFFFFF;
+                        background: rgba(2, 132, 199, 0.08);
+                        border-color: #0284C7;
                     }
                 """)
             else:
                 self.btn_restore_curr_slice.setStyleSheet("""
                     QPushButton {
-                        background: rgba(38, 176, 228, 0.2);
-                        color: #26B0E4;
-                        border: 1px solid #26B0E4;
+                        background: rgba(255, 255, 255, 0.05);
+                        color: #38BDF8;
+                        border: 1px solid rgba(255, 255, 255, 0.12);
                         border-radius: 6px;
                         padding: 5px 12px;
                         font-size: 11px;
-                        font-weight: bold;
+                        font-weight: 500;
                     }
                     QPushButton:hover {
-                        background: #26B0E4;
-                        color: #FFFFFF;
+                        background: rgba(56, 189, 248, 0.15);
+                        border-color: #38BDF8;
                     }
                 """)
         if hasattr(self, 'btn_delete_curr_slice'):
-            self.btn_delete_curr_slice.setIcon(get_symbol_icon("delete_forever", color="#DC2626" if is_light else "#FCA5A5", size=13))
+            self.btn_delete_curr_slice.setIcon(get_symbol_icon("delete", color="#64748B" if is_light else "#94A3B8", size=13))
             if is_light:
                 self.btn_delete_curr_slice.setStyleSheet("""
                     QPushButton {
-                        background: rgba(239, 68, 68, 0.10);
-                        color: #DC2626;
-                        border: 1px solid rgba(239, 68, 68, 0.35);
+                        background: #FFFFFF;
+                        color: #64748B;
+                        border: 1px solid #CBD5E1;
                         border-radius: 6px;
                         padding: 5px 12px;
                         font-size: 11px;
-                        font-weight: bold;
+                        font-weight: 500;
                     }
                     QPushButton:hover {
-                        background: #DC2626;
-                        color: #FFFFFF;
+                        background: #FEE2E2;
+                        color: #DC2626;
+                        border-color: #FCA5A5;
                     }
                 """)
             else:
                 self.btn_delete_curr_slice.setStyleSheet("""
                     QPushButton {
-                        background: rgba(239, 68, 68, 0.2);
-                        color: #FCA5A5;
-                        border: 1px solid rgba(239, 68, 68, 0.45);
+                        background: rgba(255, 255, 255, 0.05);
+                        color: #94A3B8;
+                        border: 1px solid rgba(255, 255, 255, 0.12);
                         border-radius: 6px;
                         padding: 5px 12px;
                         font-size: 11px;
-                        font-weight: bold;
+                        font-weight: 500;
                     }
                     QPushButton:hover {
-                        background: #EF4444;
-                        color: #FFFFFF;
-                        border-color: #DC2626;
+                        background: rgba(239, 68, 68, 0.2);
+                        color: #FCA5A5;
+                        border-color: #EF4444;
                     }
                 """)
         if hasattr(self, 'btn_mem_normal'):
@@ -4960,36 +5236,125 @@ class MainWindow(QMainWindow):
             for card in self.employee_cards:
                 card._apply_style(hover=False)
 
-        # 9. Page 3: 引擎配置动态样式
-        if hasattr(self, 'engine_card'):
-            if is_light:
-                self.engine_card.setStyleSheet("""
-                    QFrame#card {
-                        background-color: #FFFFFF;
-                        border: 1px solid #E2E8F0;
-                        border-radius: 12px;
-                        padding: 16px;
+        # 9. Page 3: 引擎配置与系统设置动态样式
+        card_style_light = """
+            QFrame#settings_card {
+                background-color: #FFFFFF;
+                border: 1px solid #E2E8F0;
+                border-radius: 10px;
+            }
+        """
+        card_style_dark = """
+            QFrame#settings_card {
+                background-color: #11141D;
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 10px;
+            }
+        """
+        for card_attr in ['card_tts', 'card_llm', 'card_asr', 'card_intercom', 'card_ext']:
+            if hasattr(self, card_attr):
+                getattr(self, card_attr).setStyleSheet(card_style_light if is_light else card_style_dark)
+
+        if hasattr(self, 'settings_page_title'):
+            self.settings_page_title.setStyleSheet(f"font-size: 16px; font-weight: bold; color: {'#0F172A' if is_light else '#FFFFFF'};")
+        if hasattr(self, 'settings_page_desc'):
+            self.settings_page_desc.setStyleSheet(f"font-size: 11.5px; color: {'#64748B' if is_light else '#94A3B8'};")
+
+        input_style_light = """
+            QLineEdit, QComboBox {
+                background-color: #F8FAFC;
+                border: 1px solid #CBD5E1;
+                border-radius: 6px;
+                padding: 6px 10px;
+                font-size: 11.5px;
+                color: #0F172A;
+            }
+            QLineEdit:focus, QComboBox:focus {
+                border-color: #0284C7;
+                background-color: #FFFFFF;
+            }
+        """
+        input_style_dark = """
+            QLineEdit, QComboBox {
+                background-color: #0A0C10;
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 6px;
+                padding: 6px 10px;
+                font-size: 11.5px;
+                color: #FFFFFF;
+            }
+            QLineEdit:focus, QComboBox:focus {
+                border-color: #26B0E4;
+                background-color: #12151F;
+            }
+        """
+        for inp_attr in ['input_llm_key', 'input_llm_url', 'input_llm_model',
+                         'input_volc_appid', 'input_volc_token', 'input_volc_resource',
+                         'combo_tts_provider', 'combo_voice_meeting', 'combo_voice_general',
+                         'combo_voice_instruction', 'combo_asr_provider', 'combo_intercom_key']:
+            if hasattr(self, inp_attr):
+                getattr(self, inp_attr).setStyleSheet(input_style_light if is_light else input_style_dark)
+
+        if hasattr(self, 'btn_save_settings'):
+            self.btn_save_settings.setStyleSheet("""
+                QPushButton {
+                    background: #0284C7;
+                    color: #FFFFFF;
+                    border: none;
+                    border-radius: 6px;
+                    padding: 8px 18px;
+                    font-size: 12px;
+                    font-weight: 700;
+                }
+                QPushButton:hover {
+                    background: #0369A1;
+                }
+            """)
+        if hasattr(self, 'btn_preview_tts'):
+            self.btn_preview_tts.setStyleSheet("""
+                QPushButton {
+                    background: #F1F5F9;
+                    color: #0284C7;
+                    border: 1px solid #CBD5E1;
+                    border-radius: 6px;
+                    padding: 5px 12px;
+                    font-size: 11px;
+                    font-weight: 600;
+                }
+                QPushButton:hover {
+                    background: rgba(2, 132, 199, 0.1);
+                    border-color: #0284C7;
+                }
+            """ if is_light else """
+                QPushButton {
+                    background: rgba(255, 255, 255, 0.05);
+                    color: #38BDF8;
+                    border: 1px solid rgba(255, 255, 255, 0.12);
+                    border-radius: 6px;
+                    padding: 5px 12px;
+                    font-size: 11px;
+                    font-weight: 600;
+                }
+                QPushButton:hover {
+                    background: rgba(56, 189, 248, 0.15);
+                    border-color: #38BDF8;
+                }
+            """)
+        if hasattr(self, 'ext_boxes'):
+            for sbox in self.ext_boxes:
+                sbox.setStyleSheet("""
+                    QFrame {
+                        background: #F8FAFC;
+                        border: 1px dashed #CBD5E1;
+                        border-radius: 6px;
+                    }
+                """ if is_light else """
+                    QFrame {
+                        background: #0A0C10;
+                        border: 1px dashed rgba(255, 255, 255, 0.1);
+                        border-radius: 6px;
                     }
                 """)
-            else:
-                self.engine_card.setStyleSheet("""
-                    QFrame#card {
-                        background-color: #11141D;
-                        border: 1px solid rgba(255, 255, 255, 0.08);
-                        border-radius: 12px;
-                        padding: 16px;
-                    }
-                """)
-        if hasattr(self, 'engine_title'):
-            self.engine_title.setStyleSheet(f"font-size: 15px; font-weight: bold; color: {'#0F172A' if is_light else '#FFFFFF'};")
-        if hasattr(self, 'engine_boxes'):
-            for box in self.engine_boxes:
-                box.setStyleSheet("background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px;" if is_light else "background-color: #0A0C10; border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 12px;")
-        if hasattr(self, 'engine_desc_labels'):
-            for lbl in self.engine_desc_labels:
-                lbl.setStyleSheet(f"color: {'#475569' if is_light else '#94A3B8'}; font-size: 11px; line-height: 1.4;")
-        if hasattr(self, 'goto_lbl'):
-            self.goto_lbl.setStyleSheet(f"color: {'#64748B' if is_light else '#94A3B8'}; font-size: 11px;")
         if hasattr(self, 'btn_goto_update'):
             if is_light:
                 self.btn_goto_update.setStyleSheet("""
@@ -4998,7 +5363,7 @@ class MainWindow(QMainWindow):
                         color: #0284C7;
                         border: 1px solid rgba(2, 132, 199, 0.3);
                         border-radius: 5px;
-                        padding: 4px 10px;
+                        padding: 6px 12px;
                         font-size: 11px;
                     }
                     QPushButton:hover {
@@ -5012,7 +5377,7 @@ class MainWindow(QMainWindow):
                         color: #38BDF8;
                         border: 1px solid rgba(38, 176, 228, 0.3);
                         border-radius: 5px;
-                        padding: 4px 10px;
+                        padding: 6px 12px;
                         font-size: 11px;
                     }
                     QPushButton:hover {

@@ -96,3 +96,67 @@ class Config:
         elif cls.ASR_PROVIDER == "openai":
             return bool(cls.OPENAI_API_KEY)
         return False
+
+    @classmethod
+    def save_settings(cls, updates: dict) -> bool:
+        """
+        持久化更新配置项到 .env 文件，并实时同步 cls 属性和 os.environ
+        """
+        for k, v in updates.items():
+            str_val = str(v).strip()
+            os.environ[k] = str_val
+            if hasattr(cls, k):
+                orig = getattr(cls, k)
+                if isinstance(orig, bool):
+                    setattr(cls, k, str_val.lower() in ("1", "true", "yes"))
+                elif isinstance(orig, int):
+                    try:
+                        setattr(cls, k, int(str_val))
+                    except ValueError:
+                        setattr(cls, k, str_val)
+                elif isinstance(orig, float):
+                    try:
+                        setattr(cls, k, float(str_val))
+                    except ValueError:
+                        setattr(cls, k, str_val)
+                else:
+                    setattr(cls, k, str_val)
+
+        # 写入 .env 文件
+        target_env = cls.BASE_DIR / ".env"
+        lines = []
+        if target_env.exists():
+            try:
+                lines = target_env.read_text(encoding="utf-8").splitlines()
+            except Exception:
+                try:
+                    lines = target_env.read_text(encoding="gbk", errors="ignore").splitlines()
+                except Exception:
+                    lines = []
+
+        updated_keys = set()
+        new_lines = []
+        for line in lines:
+            stripped = line.strip()
+            if stripped.startswith("#") or not stripped or "=" not in stripped:
+                new_lines.append(line)
+                continue
+            key = stripped.split("=", 1)[0].strip()
+            if key in updates:
+                new_lines.append(f"{key}={updates[key]}")
+                updated_keys.add(key)
+            else:
+                new_lines.append(line)
+
+        # 追加未在原文件中出现的新配置项
+        for k, v in updates.items():
+            if k not in updated_keys:
+                new_lines.append(f"{k}={v}")
+
+        try:
+            target_env.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+            return True
+        except Exception as e:
+            print(f"[Config] 保存 .env 失败: {e}")
+            return False
+
