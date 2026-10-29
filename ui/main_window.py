@@ -5,6 +5,8 @@ import random
 import datetime
 import html
 import re
+import json
+from pathlib import Path
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QSize, QPropertyAnimation, QEasingCurve, QUrl
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
@@ -1295,7 +1297,7 @@ class TrashSliceItemWidget(QWidget):
         self.setToolTip(f"【AI 研判理由】: {reason}\n【切片时间】: {time_str}\n【切片完整纪要】:\n{summary}")
 
         root_layout = QVBoxLayout(self)
-        root_layout.setContentsMargins(8, 6, 8, 6)
+        root_layout.setContentsMargins(4, 2, 4, 4)
         root_layout.setSpacing(4)
 
         # 第 1 行：时间戳 + 恢复按钮
@@ -1332,14 +1334,14 @@ class TrashSliceItemWidget(QWidget):
 
         # 第 2 行：AI 研判理由
         lbl_reason = QLabel(f"⚠️ 研判原因：{reason}")
-        lbl_reason.setStyleSheet("color: #FCA5A5; font-size: 10px; background: rgba(239, 68, 68, 0.12); border-radius: 3px; padding: 1px 5px;")
+        lbl_reason.setStyleSheet("color: #FCA5A5; font-size: 10px; background: rgba(239, 68, 68, 0.12); border-radius: 3px; padding: 2px 5px;")
         lbl_reason.setWordWrap(True)
         lbl_reason.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         root_layout.addWidget(lbl_reason)
 
         # 第 3 行：切片提炼文本 (完全展示，自适应折行)
         lbl_title = QLabel(f"💬 {first_line}")
-        lbl_title.setStyleSheet("color: #CBD5E1; font-size: 11px; line-height: 1.3;")
+        lbl_title.setStyleSheet("color: #CBD5E1; font-size: 11px; line-height: 1.35; padding-top: 1px;")
         lbl_title.setWordWrap(True)
         lbl_title.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         root_layout.addWidget(lbl_title)
@@ -2898,6 +2900,69 @@ class MainWindow(QMainWindow):
         self.refresh_timer.timeout.connect(self.refresh_records)
         self.refresh_timer.start()
 
+        self.debug_ipc_timer = QTimer(self)
+        self.debug_ipc_timer.setInterval(1000)
+        self.debug_ipc_timer.timeout.connect(self._check_debug_trigger)
+        self.debug_ipc_timer.start()
+
+    def _check_debug_trigger(self):
+        try:
+            trigger_file = Path("C:/DeskEcho/trigger_action.json")
+            if not trigger_file.exists():
+                return
+            content = json.loads(trigger_file.read_text(encoding='utf-8'))
+            action = content.get("action")
+            out_img = content.get("output_path", "C:/DeskEcho/real_window.png")
+
+            if action == "inspect_trash":
+                # 切换到会议记忆切片库 (Page 1)
+                self._switch_nav(1)
+                # 切换到或许没用分类
+                self._switch_mem_mode("trash")
+                # 确保界面布局渲染完成
+                from PyQt6.QtWidgets import QApplication
+                QApplication.processEvents()
+                if self.mem_list.count() > 0:
+                    self.mem_list.setCurrentRow(0)
+                    self._on_mem_item_selected(0)
+                QApplication.processEvents()
+
+                # 截取主窗口真实渲染像素
+                pix = self.grab()
+                pix.save(out_img)
+
+                # 收集每一项详细渲染尺寸与文字信息
+                items_info = []
+                for i in range(min(10, self.mem_list.count())):
+                    it = self.mem_list.item(i)
+                    w = self.mem_list.itemWidget(it)
+                    rec = it.data(Qt.ItemDataRole.UserRole) if it else {}
+                    items_info.append({
+                        "row": i,
+                        "time": rec.get("start_time"),
+                        "reason": rec.get("trash_reason"),
+                        "summary_snippet": rec.get("summary", "")[:90],
+                        "item_sizeHint": [it.sizeHint().width(), it.sizeHint().height()] if it else None,
+                        "widget_actual_size": [w.width(), w.height()] if w else None,
+                    })
+
+                result = {
+                    "status": "success",
+                    "mode": self.current_mem_mode,
+                    "total_items": self.mem_list.count(),
+                    "items": items_info,
+                    "image_saved": out_img
+                }
+                Path("C:/DeskEcho/action_result.json").write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding='utf-8')
+                trigger_file.unlink()
+        except Exception as e:
+            try:
+                Path("C:/DeskEcho/action_result.json").write_text(json.dumps({"status": "error", "error": str(e)}), encoding='utf-8')
+                if trigger_file.exists():
+                    trigger_file.unlink()
+            except Exception:
+                pass
+
     def refresh_records(self):
         try:
             records = self.store.query_recent(limit=200)
@@ -2994,7 +3059,7 @@ class MainWindow(QMainWindow):
 
             if self.current_mem_mode == "trash":
                 item = QListWidgetItem()
-                item.setSizeHint(QSize(280, 82))
+                item.setSizeHint(QSize(280, 108))
                 item.setData(Qt.ItemDataRole.UserRole, rec)
                 self.mem_list.addItem(item)
                 widget = TrashSliceItemWidget(
@@ -3234,7 +3299,7 @@ class MainWindow(QMainWindow):
 
             if self.current_mem_mode == "trash":
                 item = QListWidgetItem()
-                item.setSizeHint(QSize(280, 82))
+                item.setSizeHint(QSize(280, 108))
                 item.setData(Qt.ItemDataRole.UserRole, rec)
                 self.mem_list.addItem(item)
                 widget = TrashSliceItemWidget(
