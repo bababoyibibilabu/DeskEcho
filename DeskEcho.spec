@@ -1,12 +1,14 @@
 # -*- mode: python ; coding: utf-8 -*-
+from PyInstaller.utils.hooks import collect_all
 
+datas_chroma, binaries_chroma, hiddenimports_chroma = collect_all('chromadb')
 
 a = Analysis(
     ['main.py'],
     pathex=[],
-    binaries=[],
-    datas=[],
-    hiddenimports=[],
+    binaries=binaries_chroma,
+    datas=datas_chroma,
+    hiddenimports=hiddenimports_chroma + ['chromadb.telemetry.product.posthog', 'posthog'],
     hookspath=['hooks'],
     hooksconfig={},
     runtime_hooks=[],
