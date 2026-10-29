@@ -7,7 +7,7 @@ ssh Administrator@192.168.1.166 "wmic process where \"Name='cmd.exe' and Command
 Start-Sleep -Seconds 1
 
 Write-Host ">>> 正在将本地最新代码文件同步至笔记本 C:\DeskEcho..." -ForegroundColor Cyan
-scp -r core ui config.py main.py Administrator@192.168.1.166:C:/DeskEcho/
+scp -r core ui config.py main.py version.py version.json Administrator@192.168.1.166:C:/DeskEcho/
 
 Write-Host ">>> 正在拉起全新 DeskEcho 客户端会话..." -ForegroundColor Green
 ssh Administrator@192.168.1.166 "schtasks /run /tn DeskEchoLaunch"
