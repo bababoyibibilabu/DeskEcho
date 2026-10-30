@@ -7,7 +7,7 @@ from core.knowledge_engine import MeetingStore
 
 class HistoryWindow(QWidget):
     """
-    历史会议资产浏览窗口：查看所有沉淀的会议切片与结构化纪要
+    历史会议资产浏览窗口：查看所有沉淀的会议记忆与结构化纪要
     """
     def __init__(self, meeting_store: MeetingStore):
         super().__init__()
@@ -58,7 +58,7 @@ class HistoryWindow(QWidget):
         self.detail_browser.clear()
         
         if not self.records:
-            self.detail_browser.setHtml("<p style='color:gray;'>暂无历史会议记录。开启会议录音后，系统将自动切片归档并提取纪要。</p>")
+            self.detail_browser.setHtml("<p style='color:gray;'>暂无历史会议记录。开启会议录音后，系统将自动记忆归档并提取纪要。</p>")
             return
 
         for rec in self.records:

@@ -747,7 +747,7 @@ class IntercomBanner(QFrame):
                 if focal_topic:
                     self.status_lbl.setText(f"回答已就绪 · 当前焦点「{focal_topic}」，长按【右 Alt】可针对该话题直接追问")
                 else:
-                    self.status_lbl.setText("回答已就绪，已定位历史会议切片上下文")
+                    self.status_lbl.setText("回答已就绪，已定位历史会议记忆上下文")
                 self.status_lbl.setStyleSheet("color: #334155; font-size: 11.5px; font-weight: 500;")
         else:
             self.setStyleSheet("""
@@ -773,7 +773,7 @@ class IntercomBanner(QFrame):
                 if focal_topic:
                     self.status_lbl.setText(f"回答已就绪 · 当前焦点「{focal_topic}」，长按【右 Alt】可针对该话题直接追问")
                 else:
-                    self.status_lbl.setText("回答已就绪，已定位历史会议切片上下文")
+                    self.status_lbl.setText("回答已就绪，已定位历史会议记忆上下文")
                 self.status_lbl.setStyleSheet("color: #94A3B8; font-size: 11.5px;")
         self._reset_timer.start(8000)
 
@@ -1214,7 +1214,7 @@ class CollapsibleSessionMenu(QWidget):
                 self,
                 title="删除会话记录",
                 message="确定删除此场历史会话记录吗？",
-                detail="删除后该会话的问答上下文记录将被清空，但不会影响知识库底层的会议切片资产。",
+                detail="删除后该会话的问答上下文记录将被清空，但不会影响知识库底层的会议记忆资产。",
                 confirm_text="删除会话"
             ):
                 try:
@@ -1407,7 +1407,7 @@ class ExpandableEmployeeCard(QFrame):
         self.duties_lbl.setStyleSheet("font-size: 11.5px; line-height: 1.4;")
         self.main_layout.addWidget(self.duties_lbl)
 
-        # 4. 核心动态高亮胶囊 (动态从会议切片库提取)
+        # 4. 核心动态高亮胶囊 (动态从会议记忆库提取)
         self.highlight_box = QFrame()
         hl_layout = QVBoxLayout(self.highlight_box)
         hl_layout.setContentsMargins(8, 6, 8, 6)
@@ -1445,7 +1445,7 @@ class ExpandableEmployeeCard(QFrame):
         footprint_title.setStyleSheet("font-size: 11px; font-weight: bold;")
         self.detail_layout.addWidget(footprint_title)
 
-        # 动态切片时间轴列表容器
+        # 动态记忆时间轴列表容器
         self.timeline_widget = QWidget()
         self.timeline_layout = QVBoxLayout(self.timeline_widget)
         self.timeline_layout.setContentsMargins(0, 0, 0, 0)
@@ -1579,7 +1579,7 @@ class ExpandableEmployeeCard(QFrame):
         self.search_requested.emit(f"关于{self.emp['name']}在过往会议中的{action_word}")
 
     def refresh_profile(self):
-        """从 store 动态反查该成员的最新会议切片并重新计算画像"""
+        """从 store 动态反查该成员的最新会议记忆并重新计算画像"""
         is_light = ThemeManager.get_instance().is_light()
         profile = get_dynamic_employee_profile(self.store, self.emp)
         m_count = profile.get("meeting_count", 0)
@@ -1641,7 +1641,7 @@ class ExpandableEmployeeCard(QFrame):
         self.hl_content_lbl.setText(core_hl)
         self.hl_content_lbl.setStyleSheet(f"color: {'#1E293B' if is_light else '#E2E8F0'}; font-size: 11px; line-height: 1.35;")
 
-        # 3. 清理并重新填充详细时间轴切片 (无 Emoji)
+        # 3. 清理并重新填充详细时间轴记忆 (无 Emoji)
         while self.timeline_layout.count() > 0:
             child = self.timeline_layout.takeAt(0)
             if child.widget():
@@ -1702,7 +1702,7 @@ class ExpandableEmployeeCard(QFrame):
 
                 self.timeline_layout.addWidget(item_frame)
         else:
-            no_act_lbl = QLabel("暂无直接关联的历史会议切片。后续会议讨论中若提及或由其发言，系统将自动汇总沉淀于此。")
+            no_act_lbl = QLabel("暂无直接关联的历史会议记忆。后续会议讨论中若提及或由其发言，系统将自动汇总沉淀于此。")
             no_act_lbl.setWordWrap(True)
             no_act_lbl.setStyleSheet("color: #94A3B8; font-size: 10.5px; font-style: italic; padding: 4px;")
             self.timeline_layout.addWidget(no_act_lbl)
@@ -1759,11 +1759,11 @@ class TrashSliceItemWidget(QWidget):
 
         time_str = rec.get("start_time", "")
         summary = rec.get("summary", "")
-        first_line = summary.split("\n")[0] if summary else "常驻录音切片"
+        first_line = summary.split("\n")[0] if summary else "常驻录音记忆"
         first_line = re.sub(r'^[\s\d\.\-、*#]*(?:核心议题|议题|Topic|【核心议题】|主题)(?:[（\(].*?[）\)])?[：:\s]*', '', first_line).strip() or "常规沟通"
         reason = rec.get("trash_reason", "次要碎片")
 
-        self.setToolTip(f"【AI 研判理由】: {reason}\n【切片时间】: {time_str}\n【切片完整纪要】:\n{summary}")
+        self.setToolTip(f"【AI 研判理由】: {reason}\n【记忆时间】: {time_str}\n【记忆完整纪要】:\n{summary}")
 
         root_layout = QVBoxLayout(self)
         root_layout.setContentsMargins(6, 4, 6, 4)
@@ -1782,7 +1782,7 @@ class TrashSliceItemWidget(QWidget):
         self.btn_useful = QPushButton("恢复")
         self.btn_useful.setIcon(get_symbol_icon("check_circle", color="#0284C7" if is_light else "#38BDF8", size=12))
         self.btn_useful.setIconSize(QSize(12, 12))
-        self.btn_useful.setToolTip("将此切片判定为有用并恢复为正式会议资产 (消除误判)")
+        self.btn_useful.setToolTip("将此记忆判定为有用并恢复为正式会议资产 (消除误判)")
         self.btn_useful.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_useful.setFixedSize(58, 22)
         if is_light:
@@ -1831,7 +1831,7 @@ class TrashSliceItemWidget(QWidget):
         r_layout.addWidget(lbl_reason)
         root_layout.addWidget(reason_frame)
 
-        # 第 3 行：切片提炼白字部分 (严格固定单行，末尾自动 ...)
+        # 第 3 行：记忆提炼白字部分 (严格固定单行，末尾自动 ...)
         self.lbl_title = ElidedLabel(first_line, color="#1E293B" if is_light else "#E2E8F0", font_size=11, font_weight=400)
         self.lbl_title.setFixedHeight(18)
         root_layout.addWidget(self.lbl_title)
@@ -1911,7 +1911,7 @@ class MainWindow(QMainWindow):
         # 多视图切换区
         self.stack = QStackedWidget()
         self._build_page_ask(self.stack)       # Page 0: 对讲与即时问答
-        self._build_page_memory(self.stack)    # Page 1: 会议记忆切片库
+        self._build_page_memory(self.stack)    # Page 1: 会议记忆记忆库
         self._build_page_roster(self.stack)    # Page 2: 企业通讯录与岗位
         self._build_page_settings(self.stack)  # Page 3: 引擎配置与硬件
         self._build_page_update(self.stack)    # Page 4: 软件发版与自动更新
@@ -2008,7 +2008,7 @@ class MainWindow(QMainWindow):
 
         # 右下角小齿轮按钮 (设置项入口，矢量图标)
         self.btn_gear = QPushButton()
-        self.btn_gear.setToolTip("设置中心 (企业通讯录 / 会议切片档案 / 引擎状态)")
+        self.btn_gear.setToolTip("设置中心 (企业通讯录 / 会议记忆档案 / 引擎状态)")
         self.btn_gear.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_gear.setFixedSize(26, 26)
         self._update_gear_button_style(active=False)
@@ -2084,7 +2084,7 @@ class MainWindow(QMainWindow):
             self._last_settings_tab = index
 
         self.stack.setCurrentIndex(index)
-        titles = ["对讲与即时检索", "会议记忆切片库", "企业组织通讯录", "系统引擎与状态", "软件发版与自动更新"]
+        titles = ["对讲与即时检索", "会议记忆记忆库", "企业组织通讯录", "系统引擎与状态", "软件发版与自动更新"]
 
         # 切换顶栏模式：Page 0 显示简洁面包屑，Page 1/2/3/4 显示设置分段子导航
         if index == 0:
@@ -2097,7 +2097,7 @@ class MainWindow(QMainWindow):
                 self.settings_tab_bar.setVisible(True)
             self._update_settings_sub_tab_styles(index)
 
-        # 若从其他页面切换至会议记忆库且存在待更新的新切片，立即平滑呈现
+        # 若从其他页面切换至会议记忆库且存在待更新的新记忆，立即平滑呈现
         if index == 1 and getattr(self, "_has_pending_update", False):
             self._apply_pending_slice_update()
 
@@ -2392,7 +2392,7 @@ class MainWindow(QMainWindow):
         ans_title_row.addWidget(self.ans_title)
         ans_title_row.addStretch()
 
-        # 今日新增会议切片状态胶囊 (位于“复制内容”左侧)
+        # 今日新增会议记忆状态胶囊 (位于“复制内容”左侧)
         self.today_slice_badge = QFrame()
         self.today_slice_badge.setFixedHeight(26)
         today_badge_layout = QHBoxLayout(self.today_slice_badge)
@@ -2447,7 +2447,7 @@ class MainWindow(QMainWindow):
 
         # 保持内部虚拟控件，保证 refresh_records 逻辑安全运行
         self.slice_list = QListWidget()
-        self.slice_count_badge = QLabel("0 段切片")
+        self.slice_count_badge = QLabel("0 段记忆")
 
     # ---------------- Page 1: 会议记忆库 (Memory Slices) ----------------
     def _build_page_memory(self, stack: QStackedWidget):
@@ -2486,7 +2486,7 @@ class MainWindow(QMainWindow):
         h_layout.setSpacing(10)
         h_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
-        # 两个菜单入口：正式切片 vs 或许没用 (矢量图标，无 Emoji)
+        # 两个菜单入口：正式记忆 vs 或许没用 (矢量图标，无 Emoji)
         self.btn_mem_normal = QPushButton("正式会议记忆 (0)")
         self.btn_mem_normal.setFixedHeight(32)
         self.btn_mem_normal.setIconSize(QSize(14, 14))
@@ -2609,7 +2609,7 @@ class MainWindow(QMainWindow):
         trash_b_layout.setSpacing(12)
         trash_b_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
-        self.trash_tip_lbl = QLabel("AI 研判：以下切片多为开场寒暄、试音或无决议的次要内容，可安全清理以释放检索空间。")
+        self.trash_tip_lbl = QLabel("AI 研判：以下记忆多为开场寒暄、试音或无决议的次要内容，可安全清理以释放检索空间。")
         self.trash_tip_lbl.setWordWrap(True)
         self.trash_tip_lbl.setStyleSheet(f"color: {'#64748B' if is_light else '#94A3B8'}; font-size: 11px; font-weight: 500;")
         trash_b_layout.addWidget(self.trash_tip_lbl, 1)
@@ -2658,12 +2658,12 @@ class MainWindow(QMainWindow):
 
         page_layout.addWidget(self.trash_banner)
 
-        # 3. 双栏切片检查器 (左：切片列表，右：结构化四象限卡片详情与专属删除操作)
+        # 3. 双栏记忆检查器 (左：记忆列表，右：结构化四象限卡片详情与专属删除操作)
         splitter = QSplitter(Qt.Orientation.Horizontal)
         splitter.setHandleWidth(6)
         splitter.setStyleSheet("QSplitter::handle { background: transparent; }")
 
-        # 左栏：容器 (新切片静默浮动提示胶囊 + 切片列表)
+        # 左栏：容器 (新记忆静默浮动提示胶囊 + 记忆列表)
         left_container = QWidget()
         left_container.setMinimumWidth(300)
         left_container.setMaximumWidth(420)
@@ -2671,7 +2671,7 @@ class MainWindow(QMainWindow):
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.setSpacing(6)
 
-        self.new_slice_pill = QPushButton("收到新会议切片已归档 · 点击置顶查看")
+        self.new_slice_pill = QPushButton("收到新会议记忆已归档 · 点击置顶查看")
         self.new_slice_pill.setIcon(get_symbol_icon("article", color="#0284C7" if is_light else "#38BDF8", size=13))
         self.new_slice_pill.setVisible(False)
         self.new_slice_pill.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -2764,7 +2764,7 @@ class MainWindow(QMainWindow):
         self.btn_restore_curr_slice.setFixedHeight(30)
         self.btn_restore_curr_slice.setIconSize(QSize(14, 14))
         self.btn_restore_curr_slice.setIcon(get_symbol_icon("check_circle", color="#0284C7" if is_light else "#38BDF8", size=14))
-        self.btn_restore_curr_slice.setToolTip("将此切片恢复为正式会议资产，杜绝 AI 误判")
+        self.btn_restore_curr_slice.setToolTip("将此记忆恢复为正式会议资产，杜绝 AI 误判")
         self.btn_restore_curr_slice.setCursor(Qt.CursorShape.PointingHandCursor)
         if is_light:
             self.btn_restore_curr_slice.setStyleSheet("""
@@ -2801,7 +2801,7 @@ class MainWindow(QMainWindow):
         self.btn_restore_curr_slice.clicked.connect(lambda: self._restore_slice_useful(self.current_selected_record))
         t_action_layout.addWidget(self.btn_restore_curr_slice)
 
-        self.btn_delete_curr_slice = QPushButton("删除此切片")
+        self.btn_delete_curr_slice = QPushButton("删除此记忆")
         self.btn_delete_curr_slice.setFixedHeight(30)
         self.btn_delete_curr_slice.setIconSize(QSize(14, 14))
         self.btn_delete_curr_slice.setIcon(get_symbol_icon("delete", color="#64748B" if is_light else "#94A3B8", size=14))
@@ -2858,7 +2858,7 @@ class MainWindow(QMainWindow):
                 line-height: 1.6;
             }
         """)
-        self.mem_detail_browser.setHtml("<p style='color:#64748B; text-align:center; padding-top:120px;'>请在左侧选择一段会议切片查看完整结构化提取与原始语音转录。</p>")
+        self.mem_detail_browser.setHtml("<p style='color:#64748B; text-align:center; padding-top:120px;'>请在左侧选择一段会议记忆查看完整结构化提取与原始语音转录。</p>")
         right_layout.addWidget(self.mem_detail_browser, 1)
 
         splitter.addWidget(right_detail_container)
@@ -2871,7 +2871,7 @@ class MainWindow(QMainWindow):
         self._update_mem_tab_styles()
 
     def _switch_mem_mode(self, mode: str):
-        """切换正式切片资产 vs 或许没用次要记忆"""
+        """切换正式记忆资产 vs 或许没用次要记忆"""
         if self.current_mem_mode == mode:
             return
         self.current_mem_mode = mode
@@ -2885,7 +2885,7 @@ class MainWindow(QMainWindow):
         self._render_mem_list(preserve_selection=False)
 
     def _apply_pending_slice_update(self):
-        """平滑应用积压的待更新切片，置顶显示最新会议内容"""
+        """平滑应用积压的待更新记忆，置顶显示最新会议内容"""
         if hasattr(self, "new_slice_pill"):
             self.new_slice_pill.setVisible(False)
         self._has_pending_update = False
@@ -2895,7 +2895,7 @@ class MainWindow(QMainWindow):
         self.mem_list.verticalScrollBar().setValue(0)
 
     def _on_mem_scroll_changed(self, val: int):
-        """当操作员主动滚回顶部且有待更新的新切片时，自动平滑合并并隐藏胶囊"""
+        """当操作员主动滚回顶部且有待更新的新记忆时，自动平滑合并并隐藏胶囊"""
         if val == 0 and getattr(self, "_has_pending_update", False):
             self._apply_pending_slice_update()
 
@@ -3627,7 +3627,7 @@ class MainWindow(QMainWindow):
         asr_layout.addLayout(asr_grid)
         v_layout.addWidget(self.card_asr)
 
-        # ---------------- 卡片 4: 对讲热键与静音切片 ----------------
+        # ---------------- 卡片 4: 对讲热键与静音记忆 ----------------
         self.card_intercom = QFrame()
         self.card_intercom.setObjectName("settings_card")
         intercom_layout = QVBoxLayout(self.card_intercom)
@@ -4150,7 +4150,7 @@ class MainWindow(QMainWindow):
                     parent=self,
                     title="确定彻底销毁所选记忆？",
                     message="操作后将从知识库中永久物理删除该记录，不可撤销恢复。",
-                    detail="切片时间: 2026-10-29 14:30:00\n核心议题: 研发效能与跨域协同机制\n研判原因: 闲聊及无实质决议碎片",
+                    detail="记忆时间: 2026-10-29 14:30:00\n核心议题: 研发效能与跨域协同机制\n研判原因: 闲聊及无实质决议碎片",
                     dialog_type="danger",
                     confirm_text="彻底销毁",
                     cancel_text="放弃操作"
@@ -4235,18 +4235,18 @@ class MainWindow(QMainWindow):
                 return
 
             if action == "test_non_intrusive_update":
-                # 切换到切片库
+                # 切换到记忆库
                 self._switch_nav(1)
                 self._switch_mem_mode("normal")
                 from PyQt6.QtWidgets import QApplication
                 QApplication.processEvents()
-                # 模拟操作员正在阅读过往切片 (选中第 2 项，滚轮下移)
+                # 模拟操作员正在阅读过往记忆 (选中第 2 项，滚轮下移)
                 if self.mem_list.count() > 2:
                     self.mem_list.setCurrentRow(2)
                     self._on_mem_item_selected(2)
                     self.mem_list.verticalScrollBar().setValue(120)
                 QApplication.processEvents()
-                # 模拟后台到达新切片 (插入假变更并触发 refresh_records)
+                # 模拟后台到达新记忆 (插入假变更并触发 refresh_records)
                 self.cached_records = list(self.cached_records)[:-1] if self.cached_records else []
                 self.refresh_records()
                 QApplication.processEvents()
@@ -4265,7 +4265,7 @@ class MainWindow(QMainWindow):
                 return
 
             if action == "inspect_trash":
-                # 切换到会议记忆切片库 (Page 1)
+                # 切换到会议记忆记忆库 (Page 1)
                 self._switch_nav(1)
                 # 切换到或许没用分类
                 self._switch_mem_mode("trash")
@@ -4316,7 +4316,7 @@ class MainWindow(QMainWindow):
         try:
             records = self.store.query_recent(limit=200)
 
-            # 比对数据库记录指纹 (ID、开始时间、纪要及有用标记)，判断数据库切片是否发生新增、删除或变更
+            # 比对数据库记录指纹 (ID、开始时间、纪要及有用标记)，判断数据库记忆是否发生新增、删除或变更
             old_keys = [(r.get("id"), r.get("start_time"), r.get("summary"), r.get("is_useful")) for r in getattr(self, "cached_records", [])]
             new_keys = [(r.get("id"), r.get("start_time"), r.get("summary"), r.get("is_useful")) for r in records]
             data_changed = (old_keys != new_keys)
@@ -4351,7 +4351,7 @@ class MainWindow(QMainWindow):
             if hasattr(self, 'sub_btn_memory'):
                 self.sub_btn_memory.setText(f"会议记忆库 ({len(normal_recs)})")
 
-            # 刷新首屏“今日已新增 X 段切片”徽章
+            # 刷新首屏“今日已新增 X 段记忆”徽章
             self._update_today_slice_badge()
 
             # 智能防打断机制：仅当数据切实变动时响应
@@ -4361,7 +4361,7 @@ class MainWindow(QMainWindow):
                 is_inspecting_history = (self.mem_list.currentRow() > 0)
                 is_searching = bool(hasattr(self, "mem_search_input") and self.mem_search_input.text().strip())
 
-                # 判断操作员是否正在查看过往切片或搜索历史，若是则绝不打断
+                # 判断操作员是否正在查看过往记忆或搜索历史，若是则绝不打断
                 user_is_busy_reading = is_on_mem_page and (is_scrolled_down or is_inspecting_history or is_searching)
 
                 if user_is_busy_reading:
@@ -4381,7 +4381,7 @@ class MainWindow(QMainWindow):
             print(f"[MainWindow] 刷新记录失败: {e}")
 
     def _update_today_slice_badge(self):
-        """计算今日录制切片数量并更新首屏胶囊徽章"""
+        """计算今日录制记忆数量并更新首屏胶囊徽章"""
         if not hasattr(self, 'today_slice_num'):
             return
         try:
@@ -4391,7 +4391,7 @@ class MainWindow(QMainWindow):
         self.today_slice_num.setText(str(today_count))
 
     def _update_today_slice_badge_style(self, is_light: bool):
-        """为今日新增切片胶囊渲染高辨识度且克制的视觉包裹效果"""
+        """为今日新增记忆胶囊渲染高辨识度且克制的视觉包裹效果"""
         if not hasattr(self, 'today_slice_badge'):
             return
 
@@ -4452,7 +4452,7 @@ class MainWindow(QMainWindow):
         if hasattr(self, "slice_list"):
             self.slice_list.clear()
 
-        # 记录当前已选切片 ID 及滚动条位置
+        # 记录当前已选记忆 ID 及滚动条位置
         selected_id = None
         if preserve_selection and hasattr(self, "current_selected_record") and self.current_selected_record:
             selected_id = self.current_selected_record.get("id")
@@ -4466,7 +4466,7 @@ class MainWindow(QMainWindow):
 
         if not target_records:
             self.mem_list.blockSignals(False)
-            empty_msg = "暂无低价值次要记忆，会议记忆库非常健康！" if self.current_mem_mode == "trash" else "暂无沉淀正式切片数据"
+            empty_msg = "暂无低价值次要记忆，会议记忆库非常健康！" if self.current_mem_mode == "trash" else "暂无沉淀正式记忆数据"
             empty_item = QListWidgetItem(empty_msg)
             empty_item.setFlags(Qt.ItemFlag.NoItemFlags)
             empty_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -4481,7 +4481,7 @@ class MainWindow(QMainWindow):
         for idx, rec in enumerate(target_records):
             time_str = rec.get("start_time", "")
             summary = rec.get("summary", "")
-            first_line = summary.split("\n")[0] if summary else "常驻录音切片"
+            first_line = summary.split("\n")[0] if summary else "常驻录音记忆"
             first_line = re.sub(r'^[\s\d\.\-、*#]*(?:核心议题|议题|Topic|【核心议题】|主题)(?:[（\(].*?[）\)])?[：:\s]*', '', first_line).strip()
             if not first_line:
                 first_line = "常规会议沟通讨论"
@@ -4505,14 +4505,14 @@ class MainWindow(QMainWindow):
         self.mem_list.blockSignals(False)
 
         if target_row_to_select >= 0:
-            # 成功找回此前选中的切片：静默恢复选中并维持滚动位置，绝不重新调用 setHtml 导致详情重置滚动
+            # 成功找回此前选中的记忆：静默恢复选中并维持滚动位置，绝不重新调用 setHtml 导致详情重置滚动
             self.mem_list.blockSignals(True)
             self.mem_list.setCurrentRow(target_row_to_select)
             self.mem_list.blockSignals(False)
             self.mem_list.verticalScrollBar().setValue(list_scroll)
             self.mem_detail_browser.verticalScrollBar().setValue(detail_scroll)
         else:
-            # 切换 Tab 或原切片被清理：选中第一项
+            # 切换 Tab 或原记忆被清理：选中第一项
             if self.mem_list.count() > 0:
                 self.mem_list.setCurrentRow(0)
             else:
@@ -4538,7 +4538,7 @@ class MainWindow(QMainWindow):
                 self.trash_detail_action_bar.setVisible(False)
             return
 
-        # 若已经是当前选中的切片，避免重复 setHtml 导致详情窗口滚动条跳顶
+        # 若已经是当前选中的记忆，避免重复 setHtml 导致详情窗口滚动条跳顶
         if self.current_selected_record and self.current_selected_record.get("id") == rec.get("id"):
             return
 
@@ -4601,7 +4601,7 @@ class MainWindow(QMainWindow):
         browser.setHtml(detail_html)
 
     def _restore_slice_useful(self, rec: dict):
-        """将次要记忆恢复为正式切片资产 (纠正 AI 误判)"""
+        """将次要记忆恢复为正式记忆资产 (纠正 AI 误判)"""
         if not rec:
             return
         sid = rec.get("id", "")
@@ -4611,9 +4611,9 @@ class MainWindow(QMainWindow):
 
         ok = ModernDialog.confirm_action(
             self,
-            title="恢复为正式切片",
-            message="确定将此切片恢复为【正式会议资产】吗？",
-            detail=f"切片标识: {sid}\n会议时间: {time_str}\n\n恢复后，该切片将移入【正式会议记忆】库，受到防误删保护，并可在后续对讲检索中作为核心证据参与计算。",
+            title="恢复为正式记忆",
+            message="确定将此记忆恢复为【正式会议资产】吗？",
+            detail=f"记忆标识: {sid}\n会议时间: {time_str}\n\n恢复后，该记忆将移入【正式会议记忆】库，受到防误删保护，并可在后续对讲检索中作为核心证据参与计算。",
             confirm_text="恢复为正式资产"
         )
         if ok:
@@ -4623,7 +4623,7 @@ class MainWindow(QMainWindow):
                 self.current_selected_record = None
                 self.refresh_records()
             else:
-                ModernDialog.show_warning(self, "操作失败", f"更新切片 {sid} 状态时出错。")
+                ModernDialog.show_warning(self, "操作失败", f"更新记忆 {sid} 状态时出错。")
 
     def _delete_current_selected_slice(self):
         """选择性删除当前选中的次要记忆 (仅在'或许没用'生效)"""
@@ -4638,7 +4638,7 @@ class MainWindow(QMainWindow):
             self,
             title="确认彻底删除次要记忆",
             message="确定彻底删除此段次要记忆吗？",
-            detail=f"切片标识: {sid}\n会议时间: {time_str}\n研判原因: {reason}\n\n该操作将同步从 SQLite 数据库及 ChromaDB 向量集合中彻底清除，不可恢复。",
+            detail=f"记忆标识: {sid}\n会议时间: {time_str}\n研判原因: {reason}\n\n该操作将同步从 SQLite 数据库及 ChromaDB 向量集合中彻底清除，不可恢复。",
             confirm_text="彻底删除"
         )
         if ok:
@@ -4662,7 +4662,7 @@ class MainWindow(QMainWindow):
             self,
             title="一键清空次要记忆",
             message=f"确定要一键清理当前识别出的全部 {count} 段次要记忆吗？",
-            detail="这些切片经 AI 研判为闲聊、试音或无决议/无待办碎片。\n删除后将彻底释放空间并优化检索效率，操作不可逆！",
+            detail="这些记忆经 AI 研判为闲聊、试音或无决议/无待办碎片。\n删除后将彻底释放空间并优化检索效率，操作不可逆！",
             confirm_text=f"一键清空 ({count})"
         )
         if ok:
@@ -4672,7 +4672,7 @@ class MainWindow(QMainWindow):
             self.refresh_records()
 
     def _show_mem_list_context_menu(self, pos):
-        """切片列表右键菜单 (仅在'或许没用'显示恢复与删除功能，正常切片无删除)"""
+        """记忆列表右键菜单 (仅在'或许没用'显示恢复与删除功能，正常记忆无删除)"""
         if self.current_mem_mode != "trash":
             return
         item = self.mem_list.itemAt(pos)
@@ -4750,7 +4750,7 @@ class MainWindow(QMainWindow):
         for idx, rec in enumerate(filtered):
             time_str = rec.get("start_time", "")
             summary = rec.get("summary", "")
-            first_line = summary.split("\n")[0] if summary else "匹配切片"
+            first_line = summary.split("\n")[0] if summary else "匹配记忆"
 
             clean_topic = first_line[:30] + "..." if len(first_line) > 30 else first_line
             if self.current_mem_mode == "trash":
@@ -4779,7 +4779,7 @@ class MainWindow(QMainWindow):
             else:
                 self.mem_list.setCurrentRow(0)
         else:
-            self.mem_detail_browser.setHtml(f"<p style='color:#64748B; text-align:center; padding-top:100px;'>在当前分类下未检索到与 <b>“{kw}”</b> 相关的会议切片。</p>")
+            self.mem_detail_browser.setHtml(f"<p style='color:#64748B; text-align:center; padding-top:100px;'>在当前分类下未检索到与 <b>“{kw}”</b> 相关的会议记忆。</p>")
             if hasattr(self, "trash_detail_action_bar"):
                 self.trash_detail_action_bar.setVisible(False)
             self.current_selected_record = None

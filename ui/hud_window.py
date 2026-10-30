@@ -74,7 +74,7 @@ class HUDStreamBrowser(QTextBrowser):
 class StageProgressBar(QWidget):
     """
     Alma 风格三段式胶囊进度指示器
-    Step 1: 识别提问 -> Step 2: 匹配切片 -> Step 3: 归纳溯源
+    Step 1: 识别提问 -> Step 2: 匹配记忆 -> Step 3: 归纳溯源
     """
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -91,7 +91,7 @@ class StageProgressBar(QWidget):
 
         rect = self.rect()
         w, h = rect.width(), rect.height()
-        steps = ["1. 听清提问", "2. 检索切片", "3. 归纳溯源"]
+        steps = ["1. 听清提问", "2. 检索记忆", "3. 归纳溯源"]
         seg_w = w / 3.0
 
         for i, text in enumerate(steps):
@@ -400,7 +400,7 @@ class HUDWindow(QWidget):
         self.content_browser.setHtml(
             "<div style='padding-top: 36px; text-align: center;'>"
             "<div style='font-size: 17px; color: #26B0E4; font-weight: bold;'>稍等，正在检索...</div>"
-            "<div style='margin-top: 14px; color: #94A3B8; font-size: 12px;'>正在将提问转化为文字并对齐记忆切片...</div>"
+            "<div style='margin-top: 14px; color: #94A3B8; font-size: 12px;'>正在将提问转化为文字并对齐记忆记忆...</div>"
             "</div>"
         )
         self.show()
