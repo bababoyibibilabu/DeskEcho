@@ -150,6 +150,10 @@ class ThemeManager(QObject):
             }}
             QPushButton {{
                 text-align: center;
+                outline: none;
+            }}
+            QPushButton:focus {{
+                outline: none;
             }}
             QFrame#card {{
                 background-color: {c['bg_card']};

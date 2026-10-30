@@ -13,10 +13,17 @@ from PyQt6.QtWidgets import (
     QPushButton, QLineEdit, QTextBrowser, QFrame, QSplitter,
     QListWidget, QListWidgetItem, QGraphicsDropShadowEffect,
     QStackedWidget, QScrollArea, QGridLayout, QSizePolicy, QMenu,
-    QMessageBox, QCheckBox, QComboBox
+    QMessageBox, QCheckBox, QComboBox, QProxyStyle, QStyle, QApplication
 )
 from PyQt6.QtGui import QColor, QFont, QIcon, QPainter, QBrush, QPen, QLinearGradient, QFontMetrics
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
+
+class NoFocusRectStyle(QProxyStyle):
+    """全局禁用 Windows 原生粗糙的虚线焦点框 (PE_FrameFocusRect)"""
+    def drawPrimitive(self, element, option, painter, widget=None):
+        if element == QStyle.PrimitiveElement.PE_FrameFocusRect:
+            return
+        super().drawPrimitive(element, option, painter, widget)
 
 from config import Config
 from version import APP_VERSION, APP_NAME, RELEASE_DATE
@@ -1859,6 +1866,10 @@ class MainWindow(QMainWindow):
 
     def __init__(self, meeting_store: MeetingStore):
         super().__init__()
+        app = QApplication.instance()
+        if app and not isinstance(app.style(), NoFocusRectStyle):
+            app.setStyle(NoFocusRectStyle(app.style()))
+
         self.store = meeting_store
         self.setWindowTitle("DeskEcho 桌面回响 · 企业常驻会议记忆空间")
         self.setWindowIcon(get_flower_logo_icon(64))
@@ -2106,6 +2117,7 @@ class MainWindow(QMainWindow):
         for idx, (btn, icon_name) in idx_map.items():
             btn.setFixedHeight(30)
             btn.setIconSize(QSize(14, 14))
+            btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
             if idx == active_index:
                 if is_light:
                     btn.setIcon(get_symbol_icon(icon_name, color="#0284C7", size=14))
@@ -2117,7 +2129,8 @@ class MainWindow(QMainWindow):
                             border-radius: 6px;
                             padding: 0px 12px;
                             font-size: 11px;
-                            font-weight: bold;
+                            font-weight: 600;
+                            outline: none;
                         }
                     """)
                 else:
@@ -2130,7 +2143,8 @@ class MainWindow(QMainWindow):
                             border-radius: 6px;
                             padding: 0px 12px;
                             font-size: 11px;
-                            font-weight: bold;
+                            font-weight: 600;
+                            outline: none;
                         }
                     """)
             else:
@@ -2144,6 +2158,8 @@ class MainWindow(QMainWindow):
                             border-radius: 6px;
                             padding: 0px 12px;
                             font-size: 11px;
+                            font-weight: 600;
+                            outline: none;
                         }
                         QPushButton:hover {
                             background-color: #F1F5F9;
@@ -2161,6 +2177,8 @@ class MainWindow(QMainWindow):
                             border-radius: 6px;
                             padding: 0px 12px;
                             font-size: 11px;
+                            font-weight: 600;
+                            outline: none;
                         }
                         QPushButton:hover {
                             background-color: rgba(255, 255, 255, 0.08);
@@ -2173,6 +2191,7 @@ class MainWindow(QMainWindow):
             self.sub_btn_back.setFixedHeight(30)
             self.sub_btn_back.setIcon(get_symbol_icon("arrow_back", color="#0284C7" if is_light else "#38BDF8", size=14))
             self.sub_btn_back.setIconSize(QSize(14, 14))
+            self.sub_btn_back.setFocusPolicy(Qt.FocusPolicy.NoFocus)
             if is_light:
                 self.sub_btn_back.setStyleSheet("""
                     QPushButton {
@@ -2183,6 +2202,7 @@ class MainWindow(QMainWindow):
                         padding: 0px 12px;
                         font-size: 11px;
                         font-weight: 600;
+                        outline: none;
                     }
                     QPushButton:hover {
                         background: rgba(2, 132, 199, 0.16);
@@ -2200,6 +2220,7 @@ class MainWindow(QMainWindow):
                         padding: 0px 12px;
                         font-size: 11px;
                         font-weight: 600;
+                        outline: none;
                     }
                     QPushButton:hover {
                         background: rgba(38, 176, 228, 0.3);
@@ -2241,6 +2262,7 @@ class MainWindow(QMainWindow):
             btn.setFixedHeight(30)
             btn.setIconSize(QSize(14, 14))
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
         self.sub_btn_roster.setIcon(get_symbol_icon("group", color="#0284C7" if is_light else "#38BDF8", size=14))
         self.sub_btn_memory.setIcon(get_symbol_icon("article", color="#0284C7" if is_light else "#38BDF8", size=14))
@@ -2448,6 +2470,7 @@ class MainWindow(QMainWindow):
 
         for b in (self.btn_mem_normal, self.btn_mem_trash):
             b.setCursor(Qt.CursorShape.PointingHandCursor)
+            b.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
         self.btn_mem_normal.clicked.connect(lambda: self._switch_mem_mode("normal"))
         self.btn_mem_trash.clicked.connect(lambda: self._switch_mem_mode("trash"))
@@ -2852,8 +2875,10 @@ class MainWindow(QMainWindow):
             return
         self.btn_mem_normal.setFixedHeight(32)
         self.btn_mem_normal.setIconSize(QSize(14, 14))
+        self.btn_mem_normal.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.btn_mem_trash.setFixedHeight(32)
         self.btn_mem_trash.setIconSize(QSize(14, 14))
+        self.btn_mem_trash.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
         is_light = ThemeManager.get_instance().is_light()
         if is_light:
@@ -2866,7 +2891,8 @@ class MainWindow(QMainWindow):
                         border-radius: 8px;
                         padding: 0px 14px;
                         font-size: 12px;
-                        font-weight: bold;
+                        font-weight: 600;
+                        outline: none;
                     }
                 """)
                 self.btn_mem_trash.setStyleSheet("""
@@ -2877,6 +2903,8 @@ class MainWindow(QMainWindow):
                         border-radius: 8px;
                         padding: 0px 14px;
                         font-size: 12px;
+                        font-weight: 600;
+                        outline: none;
                     }
                     QPushButton:hover {
                         background-color: rgba(239, 68, 68, 0.08);
@@ -2893,6 +2921,8 @@ class MainWindow(QMainWindow):
                         border-radius: 8px;
                         padding: 0px 14px;
                         font-size: 12px;
+                        font-weight: 600;
+                        outline: none;
                     }
                     QPushButton:hover {
                         background-color: rgba(2, 132, 199, 0.08);
@@ -2908,7 +2938,8 @@ class MainWindow(QMainWindow):
                         border-radius: 8px;
                         padding: 0px 14px;
                         font-size: 12px;
-                        font-weight: bold;
+                        font-weight: 600;
+                        outline: none;
                     }
                 """)
         else:
@@ -2921,7 +2952,8 @@ class MainWindow(QMainWindow):
                         border-radius: 8px;
                         padding: 0px 14px;
                         font-size: 12px;
-                        font-weight: bold;
+                        font-weight: 600;
+                        outline: none;
                     }
                 """)
                 self.btn_mem_trash.setStyleSheet("""
@@ -2932,6 +2964,8 @@ class MainWindow(QMainWindow):
                         border-radius: 8px;
                         padding: 0px 14px;
                         font-size: 12px;
+                        font-weight: 600;
+                        outline: none;
                     }
                     QPushButton:hover {
                         background-color: rgba(239, 68, 68, 0.15);
@@ -2948,6 +2982,8 @@ class MainWindow(QMainWindow):
                         border-radius: 8px;
                         padding: 0px 14px;
                         font-size: 12px;
+                        font-weight: 600;
+                        outline: none;
                     }
                     QPushButton:hover {
                         background-color: rgba(38, 176, 228, 0.15);
@@ -2961,9 +2997,10 @@ class MainWindow(QMainWindow):
                         color: #FECACA;
                         border: 1px solid #EF4444;
                         border-radius: 8px;
-                        padding: 7px 14px;
+                        padding: 0px 14px;
                         font-size: 12px;
-                        font-weight: bold;
+                        font-weight: 600;
+                        outline: none;
                     }
                 """)
 

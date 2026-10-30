@@ -12,8 +12,15 @@ if sys.platform.startswith("win"):
     except Exception:
         pass
 
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtWidgets import QApplication, QProxyStyle, QStyle
 from PyQt6.QtCore import QObject, pyqtSignal
+
+class NoFocusRectStyle(QProxyStyle):
+    """全局禁用 Windows 原生粗糙的虚线焦点框 (PE_FrameFocusRect)"""
+    def drawPrimitive(self, element, option, painter, widget=None):
+        if element == QStyle.PrimitiveElement.PE_FrameFocusRect:
+            return
+        super().drawPrimitive(element, option, painter, widget)
 
 from config import Config
 from core.audio_recorder import AudioSliceWorker, IntercomRecorder
@@ -37,6 +44,7 @@ class AppSignals(QObject):
 class DeskEchoApp:
     def __init__(self):
         self.app = QApplication(sys.argv)
+        self.app.setStyle(NoFocusRectStyle())
         self.app.setQuitOnLastWindowClosed(False)
 
         self.signals = AppSignals()
