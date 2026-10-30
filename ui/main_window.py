@@ -1744,7 +1744,7 @@ class ElidedLabel(QLabel):
 
 class TrashSliceItemWidget(QWidget):
     """
-    或许没用切片列表单项组件
+    或许没用记忆列表单项组件
     第 1 行：时间戳 + 右侧【恢复】按钮
     第 2 行：AI 研判理由红底标签 (单行展示)
     第 3 行：议题提炼文本 (固定单行白字，末尾自动 ...，右侧有完整详情)
@@ -2414,7 +2414,7 @@ class MainWindow(QMainWindow):
         self.today_slice_num.setAlignment(Qt.AlignmentFlag.AlignCenter)
         today_badge_layout.addWidget(self.today_slice_num)
 
-        self.today_slice_suffix = QLabel("段切片")
+        self.today_slice_suffix = QLabel("条记忆")
         self.today_slice_suffix.setStyleSheet("font-size: 11px; font-weight: 500; border: none; background: transparent;")
         today_badge_layout.addWidget(self.today_slice_suffix)
 
@@ -2487,7 +2487,7 @@ class MainWindow(QMainWindow):
         h_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
         # 两个菜单入口：正式切片 vs 或许没用 (矢量图标，无 Emoji)
-        self.btn_mem_normal = QPushButton("正式会议切片 (0)")
+        self.btn_mem_normal = QPushButton("正式会议记忆 (0)")
         self.btn_mem_normal.setFixedHeight(32)
         self.btn_mem_normal.setIconSize(QSize(14, 14))
         self.btn_mem_normal.setIcon(get_symbol_icon("article", color="#0284C7" if is_light else "#38BDF8", size=14))
@@ -2510,7 +2510,7 @@ class MainWindow(QMainWindow):
 
         self.mem_search_input = QLineEdit()
         self.mem_search_input.setFixedHeight(32)
-        self.mem_search_input.setPlaceholderText("在当前切片纪要中快速搜索关键词 (如: 预算, Logo, 机器人)...")
+        self.mem_search_input.setPlaceholderText("在当前会议记忆中快速搜索关键词 (如: 预算, Logo, 机器人)...")
         if is_light:
             self.mem_search_input.setStyleSheet("""
                 QLineEdit {
@@ -2542,7 +2542,7 @@ class MainWindow(QMainWindow):
         self.mem_search_input.returnPressed.connect(self._search_memory_slices)
         h_layout.addWidget(self.mem_search_input, 1)
 
-        self.mem_search_btn = QPushButton("筛选切片")
+        self.mem_search_btn = QPushButton("筛选记忆")
         self.mem_search_btn.setFixedHeight(32)
         self.mem_search_btn.setIconSize(QSize(14, 14))
         self.mem_search_btn.setIcon(get_symbol_icon("search", color="#0284C7" if is_light else "#26B0E4", size=14))
@@ -2584,7 +2584,7 @@ class MainWindow(QMainWindow):
 
         page_layout.addWidget(self.mem_header_card)
 
-        # 2. “或许没用”次要切片 AI 研判提醒与一键清理横幅 (默认隐藏，仅在 trash 模式显示，克制无视觉污染)
+        # 2. “或许没用”次要记忆 AI 研判提醒与一键清理横幅 (默认隐藏，仅在 trash 模式显示，克制无视觉污染)
         self.trash_banner = QFrame()
         self.trash_banner.setObjectName("trash_banner")
         self.trash_banner.setVisible(False)
@@ -2614,7 +2614,7 @@ class MainWindow(QMainWindow):
         self.trash_tip_lbl.setStyleSheet(f"color: {'#64748B' if is_light else '#94A3B8'}; font-size: 11px; font-weight: 500;")
         trash_b_layout.addWidget(self.trash_tip_lbl, 1)
 
-        self.btn_clean_all_trash = QPushButton("清空次要切片")
+        self.btn_clean_all_trash = QPushButton("清空次要记忆")
         self.btn_clean_all_trash.setFixedHeight(30)
         self.btn_clean_all_trash.setIconSize(QSize(14, 14))
         self.btn_clean_all_trash.setIcon(get_symbol_icon("delete_sweep", color="#64748B" if is_light else "#94A3B8", size=14))
@@ -2724,13 +2724,13 @@ class MainWindow(QMainWindow):
 
         splitter.addWidget(left_container)
 
-        # 右栏容器：详情卡 + 顶部专属操作栏 (次要切片专属删除按钮)
+        # 右栏容器：详情卡 + 顶部专属操作栏 (次要记忆专属删除按钮)
         right_detail_container = QWidget()
         right_layout = QVBoxLayout(right_detail_container)
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(8)
 
-        # 次要切片详情顶部的删除与原因栏 (仅 trash 模式显示，克制素雅风格)
+        # 次要记忆详情顶部的删除与原因栏 (仅 trash 模式显示，克制素雅风格)
         self.trash_detail_action_bar = QFrame()
         self.trash_detail_action_bar.setObjectName("trash_detail_action_bar")
         self.trash_detail_action_bar.setVisible(False)
@@ -2871,7 +2871,7 @@ class MainWindow(QMainWindow):
         self._update_mem_tab_styles()
 
     def _switch_mem_mode(self, mode: str):
-        """切换正式切片资产 vs 或许没用次要切片"""
+        """切换正式切片资产 vs 或许没用次要记忆"""
         if self.current_mem_mode == mode:
             return
         self.current_mem_mode = mode
@@ -4148,7 +4148,7 @@ class MainWindow(QMainWindow):
                 from PyQt6.QtCore import QTimer
                 dlg = ModernDialog(
                     parent=self,
-                    title="确定彻底销毁所选切片？",
+                    title="确定彻底销毁所选记忆？",
                     message="操作后将从知识库中永久物理删除该记录，不可撤销恢复。",
                     detail="切片时间: 2026-10-29 14:30:00\n核心议题: 研发效能与跨域协同机制\n研判原因: 闲聊及无实质决议碎片",
                     dialog_type="danger",
@@ -4345,7 +4345,7 @@ class MainWindow(QMainWindow):
             self.cached_trash_records = trash_recs
 
             if hasattr(self, 'btn_mem_normal'):
-                self.btn_mem_normal.setText(f"正式会议切片 ({len(normal_recs)})")
+                self.btn_mem_normal.setText(f"正式会议记忆 ({len(normal_recs)})")
             if hasattr(self, 'btn_mem_trash'):
                 self.btn_mem_trash.setText(f"或许没用 ({len(trash_recs)})")
             if hasattr(self, 'sub_btn_memory'):
@@ -4367,7 +4367,7 @@ class MainWindow(QMainWindow):
                 if user_is_busy_reading:
                     self._has_pending_update = True
                     if hasattr(self, "new_slice_pill"):
-                        self.new_slice_pill.setText("收到新归档会议切片 · 点击置顶查看")
+                        self.new_slice_pill.setText("收到新归档会议记忆 · 点击置顶查看")
                         self.new_slice_pill.setVisible(True)
                 else:
                     self._has_pending_update = False
@@ -4466,7 +4466,7 @@ class MainWindow(QMainWindow):
 
         if not target_records:
             self.mem_list.blockSignals(False)
-            empty_msg = "暂无低价值次要切片，会议记忆库非常健康！" if self.current_mem_mode == "trash" else "暂无沉淀正式切片数据"
+            empty_msg = "暂无低价值次要记忆，会议记忆库非常健康！" if self.current_mem_mode == "trash" else "暂无沉淀正式切片数据"
             empty_item = QListWidgetItem(empty_msg)
             empty_item.setFlags(Qt.ItemFlag.NoItemFlags)
             empty_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -4490,7 +4490,7 @@ class MainWindow(QMainWindow):
             if self.current_mem_mode == "trash":
                 item = QListWidgetItem(f"{time_str}\n   {clean_topic}")
                 reason = rec.get("trash_reason", "次要碎片")
-                item.setToolTip(f"【次要切片】: {time_str}\n【AI 研判理由】: {reason}\n{first_line}")
+                item.setToolTip(f"【次要记忆】: {time_str}\n【AI 研判理由】: {reason}\n{first_line}")
                 item.setData(Qt.ItemDataRole.UserRole, rec)
                 self.mem_list.addItem(item)
             else:
@@ -4574,7 +4574,7 @@ class MainWindow(QMainWindow):
 
         trash_badge_html = f"""
         <div style="background-color: {box_bg}; border: 1px solid {box_border}; padding: 8px 12px; border-radius: 6px; margin-bottom: 12px;">
-            <span style="color: {'#475569' if is_light else '#94A3B8'}; font-weight: 600; font-size: 11px;">次要切片归档 · 诊断理由：</span>
+            <span style="color: {'#475569' if is_light else '#94A3B8'}; font-weight: 600; font-size: 11px;">次要记忆归档 · 诊断理由：</span>
             <span style="color: {'#64748B' if is_light else '#CBD5E1'}; font-size: 11.5px;">{reason}</span>
         </div>
         """ if is_trash else ""
@@ -4583,7 +4583,7 @@ class MainWindow(QMainWindow):
         <div style="font-family: -apple-system, 'Segoe UI', sans-serif; line-height: 1.6;">
             {trash_badge_html}
             <div style="background-color: {box_bg}; border: 1px solid {box_border}; padding: 8px 12px; border-radius: 6px; margin-bottom: 14px;">
-                <span style="color: {'#64748B' if is_light else '#94A3B8'}; font-size: 11px; font-weight: 600;">会议切片区间：</span>
+                <span style="color: {'#64748B' if is_light else '#94A3B8'}; font-size: 11px; font-weight: 600;">会议记忆区间：</span>
                 <span style="color: {heading_c}; font-size: 12px; font-weight: 600;">{start_t} 至 {end_t}</span>
             </div>
 
@@ -4601,7 +4601,7 @@ class MainWindow(QMainWindow):
         browser.setHtml(detail_html)
 
     def _restore_slice_useful(self, rec: dict):
-        """将次要切片恢复为正式切片资产 (纠正 AI 误判)"""
+        """将次要记忆恢复为正式切片资产 (纠正 AI 误判)"""
         if not rec:
             return
         sid = rec.get("id", "")
@@ -4613,20 +4613,20 @@ class MainWindow(QMainWindow):
             self,
             title="恢复为正式切片",
             message="确定将此切片恢复为【正式会议资产】吗？",
-            detail=f"切片标识: {sid}\n会议时间: {time_str}\n\n恢复后，该切片将移入【正式会议切片】库，受到防误删保护，并可在后续对讲检索中作为核心证据参与计算。",
+            detail=f"切片标识: {sid}\n会议时间: {time_str}\n\n恢复后，该切片将移入【正式会议记忆】库，受到防误删保护，并可在后续对讲检索中作为核心证据参与计算。",
             confirm_text="恢复为正式资产"
         )
         if ok:
             success = self.store.set_slice_useful(sid, is_useful=True)
             if success:
-                self.search_status_lbl.setText("✓ 已恢复为正式会议切片资产")
+                self.search_status_lbl.setText("✓ 已恢复为正式会议记忆资产")
                 self.current_selected_record = None
                 self.refresh_records()
             else:
                 ModernDialog.show_warning(self, "操作失败", f"更新切片 {sid} 状态时出错。")
 
     def _delete_current_selected_slice(self):
-        """选择性删除当前选中的次要切片 (仅在'或许没用'生效)"""
+        """选择性删除当前选中的次要记忆 (仅在'或许没用'生效)"""
         if self.current_mem_mode != "trash" or not self.current_selected_record:
             return
         rec = self.current_selected_record
@@ -4636,38 +4636,38 @@ class MainWindow(QMainWindow):
 
         ok = ModernDialog.confirm_danger(
             self,
-            title="确认彻底删除次要切片",
-            message="确定彻底删除此段次要切片吗？",
+            title="确认彻底删除次要记忆",
+            message="确定彻底删除此段次要记忆吗？",
             detail=f"切片标识: {sid}\n会议时间: {time_str}\n研判原因: {reason}\n\n该操作将同步从 SQLite 数据库及 ChromaDB 向量集合中彻底清除，不可恢复。",
             confirm_text="彻底删除"
         )
         if ok:
             success = self.store.delete_slice(sid)
             if success:
-                self.search_status_lbl.setText("✓ 次要切片已删除")
+                self.search_status_lbl.setText("✓ 次要记忆已删除")
                 self.current_selected_record = None
                 self.refresh_records()
             else:
-                ModernDialog.show_warning(self, "删除失败", f"删除切片 {sid} 遇到错误，请检查日志。")
+                ModernDialog.show_warning(self, "删除失败", f"删除记忆 {sid} 遇到错误，请检查日志。")
 
     def _clean_all_trash_slices(self):
-        """一键清空所有次要切片 (仅在'或许没用'生效)"""
+        """一键清空所有次要记忆 (仅在'或许没用'生效)"""
         if self.current_mem_mode != "trash" or not self.cached_trash_records:
-            ModernDialog.show_info(self, "暂无数据", "当前没有识别出的次要切片。")
+            ModernDialog.show_info(self, "暂无数据", "当前没有识别出的次要记忆。")
             return
 
         trash_ids = [r.get("id") for r in self.cached_trash_records if r.get("id")]
         count = len(trash_ids)
         ok = ModernDialog.confirm_danger(
             self,
-            title="一键清空次要切片",
-            message=f"确定要一键清理当前识别出的全部 {count} 段次要切片吗？",
+            title="一键清空次要记忆",
+            message=f"确定要一键清理当前识别出的全部 {count} 段次要记忆吗？",
             detail="这些切片经 AI 研判为闲聊、试音或无决议/无待办碎片。\n删除后将彻底释放空间并优化检索效率，操作不可逆！",
             confirm_text=f"一键清空 ({count})"
         )
         if ok:
             deleted_count = self.store.delete_slices(trash_ids)
-            self.search_status_lbl.setText(f"✓ 已一键清理 {deleted_count} 段次要切片")
+            self.search_status_lbl.setText(f"✓ 已一键清理 {deleted_count} 段次要记忆")
             self.current_selected_record = None
             self.refresh_records()
 
@@ -4716,7 +4716,7 @@ class MainWindow(QMainWindow):
             """)
         restore_action = menu.addAction("判定有用并恢复 (移回正式资产)")
         restore_action.setIcon(get_symbol_icon("check_circle", color="#16A34A" if is_light else "#8AC657", size=13))
-        del_action = menu.addAction("确认删除此段次要切片")
+        del_action = menu.addAction("确认删除此段次要记忆")
         del_action.setIcon(get_symbol_icon("delete_forever", color="#DC2626" if is_light else "#EF4444", size=13))
         action = menu.exec(self.mem_list.mapToGlobal(pos))
         if action == restore_action:
@@ -4756,7 +4756,7 @@ class MainWindow(QMainWindow):
             if self.current_mem_mode == "trash":
                 item = QListWidgetItem(f"{time_str}\n   {clean_topic}")
                 reason = rec.get("trash_reason", "次要碎片")
-                item.setToolTip(f"【次要切片】: {time_str}\n【AI 研判理由】: {reason}\n{first_line}")
+                item.setToolTip(f"【次要记忆】: {time_str}\n【AI 研判理由】: {reason}\n{first_line}")
                 item.setData(Qt.ItemDataRole.UserRole, rec)
                 self.mem_list.addItem(item)
             else:
