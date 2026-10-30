@@ -2392,6 +2392,35 @@ class MainWindow(QMainWindow):
         ans_title_row.addWidget(self.ans_title)
         ans_title_row.addStretch()
 
+        # 今日新增会议切片状态胶囊 (位于“复制内容”左侧)
+        self.today_slice_badge = QFrame()
+        self.today_slice_badge.setFixedHeight(26)
+        today_badge_layout = QHBoxLayout(self.today_slice_badge)
+        today_badge_layout.setContentsMargins(8, 0, 10, 0)
+        today_badge_layout.setSpacing(5)
+        today_badge_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+
+        self.today_slice_icon = QLabel()
+        self.today_slice_icon.setStyleSheet("border: none; background: transparent;")
+        self.today_slice_icon.setPixmap(get_symbol_pixmap("auto_awesome", color="#0284C7" if is_light else "#38BDF8", size=13))
+        today_badge_layout.addWidget(self.today_slice_icon)
+
+        self.today_slice_lbl = QLabel("今日已新增")
+        self.today_slice_lbl.setStyleSheet("font-size: 11px; font-weight: 500; border: none; background: transparent;")
+        today_badge_layout.addWidget(self.today_slice_lbl)
+
+        self.today_slice_num = QLabel("0")
+        self.today_slice_num.setFixedHeight(18)
+        self.today_slice_num.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        today_badge_layout.addWidget(self.today_slice_num)
+
+        self.today_slice_suffix = QLabel("段切片")
+        self.today_slice_suffix.setStyleSheet("font-size: 11px; font-weight: 500; border: none; background: transparent;")
+        today_badge_layout.addWidget(self.today_slice_suffix)
+
+        ans_title_row.addWidget(self.today_slice_badge)
+        ans_title_row.addSpacing(6)
+
         self.copy_btn = QPushButton("复制内容")
         self.copy_btn.setIcon(get_symbol_icon("content_copy", color="#64748B" if is_light else "#94A3B8", size=13))
         self.copy_btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -4322,6 +4351,9 @@ class MainWindow(QMainWindow):
             if hasattr(self, 'sub_btn_memory'):
                 self.sub_btn_memory.setText(f"会议记忆库 ({len(normal_recs)})")
 
+            # 刷新首屏“今日已新增 X 段切片”徽章
+            self._update_today_slice_badge()
+
             # 智能防打断机制：仅当数据切实变动时响应
             if data_changed:
                 is_on_mem_page = (self.stack.currentIndex() == 1)
@@ -4347,6 +4379,68 @@ class MainWindow(QMainWindow):
 
         except Exception as e:
             print(f"[MainWindow] 刷新记录失败: {e}")
+
+    def _update_today_slice_badge(self):
+        """计算今日录制切片数量并更新首屏胶囊徽章"""
+        if not hasattr(self, 'today_slice_num'):
+            return
+        try:
+            today_count = self.store.get_today_count()
+        except Exception:
+            today_count = 0
+        self.today_slice_num.setText(str(today_count))
+
+    def _update_today_slice_badge_style(self, is_light: bool):
+        """为今日新增切片胶囊渲染高辨识度且克制的视觉包裹效果"""
+        if not hasattr(self, 'today_slice_badge'):
+            return
+
+        if is_light:
+            self.today_slice_badge.setStyleSheet("""
+                QFrame {
+                    background-color: #F8FAFC;
+                    border: 1px solid #E2E8F0;
+                    border-radius: 13px;
+                }
+            """)
+            self.today_slice_icon.setPixmap(get_symbol_pixmap("auto_awesome", color="#0284C7", size=13))
+            self.today_slice_lbl.setStyleSheet("color: #475569; font-size: 11px; font-weight: 500; border: none; background: transparent;")
+            self.today_slice_num.setStyleSheet("""
+                QLabel {
+                    background-color: rgba(2, 132, 199, 0.12);
+                    color: #0284C7;
+                    border: 1px solid rgba(2, 132, 199, 0.28);
+                    border-radius: 9px;
+                    padding: 0px 7px;
+                    font-size: 11px;
+                    font-weight: 700;
+                    font-family: 'Segoe UI Variable Display', 'Segoe UI', sans-serif;
+                }
+            """)
+            self.today_slice_suffix.setStyleSheet("color: #475569; font-size: 11px; font-weight: 500; border: none; background: transparent;")
+        else:
+            self.today_slice_badge.setStyleSheet("""
+                QFrame {
+                    background-color: rgba(255, 255, 255, 0.04);
+                    border: 1px solid rgba(255, 255, 255, 0.08);
+                    border-radius: 13px;
+                }
+            """)
+            self.today_slice_icon.setPixmap(get_symbol_pixmap("auto_awesome", color="#38BDF8", size=13))
+            self.today_slice_lbl.setStyleSheet("color: #94A3B8; font-size: 11px; font-weight: 500; border: none; background: transparent;")
+            self.today_slice_num.setStyleSheet("""
+                QLabel {
+                    background-color: rgba(56, 189, 248, 0.18);
+                    color: #38BDF8;
+                    border: 1px solid rgba(56, 189, 248, 0.35);
+                    border-radius: 9px;
+                    padding: 0px 7px;
+                    font-size: 11px;
+                    font-weight: 700;
+                    font-family: 'Segoe UI Variable Display', 'Segoe UI', sans-serif;
+                }
+            """)
+            self.today_slice_suffix.setStyleSheet("color: #94A3B8; font-size: 11px; font-weight: 500; border: none; background: transparent;")
 
     def _render_mem_list(self, preserve_selection: bool = True):
         # 若搜索框当前有关键词，转入搜索渲染并保持选中
@@ -4972,6 +5066,8 @@ class MainWindow(QMainWindow):
             self.ans_title_icon.setPixmap(get_symbol_pixmap("chat", color="#0284C7" if is_light else "#26B0E4", size=16))
         if hasattr(self, 'ans_title'):
             self.ans_title.setStyleSheet(f"font-size: 14px; font-weight: 700; color: {colors['text_primary']};")
+        if hasattr(self, 'today_slice_badge'):
+            self._update_today_slice_badge_style(is_light)
         if hasattr(self, 'copy_btn'):
             self.copy_btn.setIcon(get_symbol_icon("content_copy", color="#64748B" if is_light else "#94A3B8", size=13))
             self.copy_btn.setStyleSheet(f"background: transparent; border: none; color: {colors['text_muted']}; font-size: 11px;")

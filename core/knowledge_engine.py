@@ -190,6 +190,21 @@ class MeetingStore:
         except Exception:
             return 0
 
+    def get_today_count(self) -> int:
+        """获取今天新增录制的会议切片总段数 (包含正式切片与过滤切片)"""
+        try:
+            today_str = datetime.date.today().strftime("%Y-%m-%d")
+            cursor = self.conn.cursor()
+            cursor.execute(
+                "SELECT COUNT(*) FROM meeting_slices WHERE start_time LIKE ? OR created_at LIKE ?",
+                (f"{today_str}%", f"{today_str}%")
+            )
+            row = cursor.fetchone()
+            return row[0] if row else 0
+        except Exception as e:
+            print(f"[MeetingStore] 获取今日新增切片数异常: {e}")
+            return 0
+
     def query_recent(self, limit: int = 10) -> List[Dict[str, Any]]:
         cursor = self.conn.cursor()
         cursor.execute(
