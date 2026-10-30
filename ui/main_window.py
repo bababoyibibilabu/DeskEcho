@@ -4933,19 +4933,7 @@ class MainWindow(QMainWindow):
         eng_layout.addWidget(self.status_engine_lbl)
         sb.addWidget(self.status_engine_widget)
 
-        # 右侧 1：热键提示
-        self.status_hotkey_widget = QWidget()
-        hot_layout = QHBoxLayout(self.status_hotkey_widget)
-        hot_layout.setContentsMargins(6, 0, 6, 0)
-        hot_layout.setSpacing(4)
-        self.status_hotkey_icon = QLabel()
-        self.status_hotkey_icon.setPixmap(get_symbol_pixmap("keyboard", color="#475569" if is_light else "#94A3B8", size=13))
-        self.status_hotkey_lbl = QLabel(f"长按 [{Config.get_intercom_display_key()}] 随心对讲")
-        hot_layout.addWidget(self.status_hotkey_icon)
-        hot_layout.addWidget(self.status_hotkey_lbl)
-        sb.addPermanentWidget(self.status_hotkey_widget)
-
-        # 右侧 2：企业空间
+        # 右侧：企业空间
         self.status_space_widget = QWidget()
         spc_layout = QHBoxLayout(self.status_space_widget)
         spc_layout.setContentsMargins(6, 0, 10, 0)
@@ -4975,9 +4963,6 @@ class MainWindow(QMainWindow):
             if hasattr(self, 'status_engine_lbl'):
                 self.status_engine_lbl.setStyleSheet("color: #0F766E; font-size: 11px; font-weight: 500;")
                 self.status_engine_icon.setPixmap(get_symbol_pixmap("check_circle", color="#16A34A", size=13))
-            if hasattr(self, 'status_hotkey_lbl'):
-                self.status_hotkey_lbl.setStyleSheet("color: #475569; font-size: 11px;")
-                self.status_hotkey_icon.setPixmap(get_symbol_pixmap("keyboard", color="#475569", size=13))
             if hasattr(self, 'status_space_lbl'):
                 self.status_space_lbl.setStyleSheet("color: #0284C7; font-size: 11px; font-weight: 600;")
                 self.status_space_icon.setPixmap(get_symbol_pixmap("apartment", color="#0284C7", size=13))
@@ -4995,9 +4980,6 @@ class MainWindow(QMainWindow):
             if hasattr(self, 'status_engine_lbl'):
                 self.status_engine_lbl.setStyleSheet("color: #10B981; font-size: 11px; font-weight: 500;")
                 self.status_engine_icon.setPixmap(get_symbol_pixmap("check_circle", color="#10B981", size=13))
-            if hasattr(self, 'status_hotkey_lbl'):
-                self.status_hotkey_lbl.setStyleSheet("color: #94A3B8; font-size: 11px;")
-                self.status_hotkey_icon.setPixmap(get_symbol_pixmap("keyboard", color="#94A3B8", size=13))
             if hasattr(self, 'status_space_lbl'):
                 self.status_space_lbl.setStyleSheet("color: #26B0E4; font-size: 11px; font-weight: 600;")
                 self.status_space_icon.setPixmap(get_symbol_pixmap("apartment", color="#26B0E4", size=13))
