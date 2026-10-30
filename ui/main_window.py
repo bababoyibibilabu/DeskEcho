@@ -4398,9 +4398,8 @@ class MainWindow(QMainWindow):
         if is_light:
             self.today_slice_badge.setStyleSheet("""
                 QFrame {
-                    background-color: #F8FAFC;
-                    border: 1px solid #E2E8F0;
-                    border-radius: 13px;
+                    background-color: transparent;
+                    border: none;
                 }
             """)
             self.today_slice_icon.setPixmap(get_symbol_pixmap("auto_awesome", color="#0284C7", size=13))
@@ -4421,9 +4420,8 @@ class MainWindow(QMainWindow):
         else:
             self.today_slice_badge.setStyleSheet("""
                 QFrame {
-                    background-color: rgba(255, 255, 255, 0.04);
-                    border: 1px solid rgba(255, 255, 255, 0.08);
-                    border-radius: 13px;
+                    background-color: transparent;
+                    border: none;
                 }
             """)
             self.today_slice_icon.setPixmap(get_symbol_pixmap("auto_awesome", color="#38BDF8", size=13))
