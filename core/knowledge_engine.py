@@ -237,6 +237,90 @@ class MeetingStore:
         rows = cursor.fetchall()
         return [dict(row) for row in rows]
 
+    def get_month_calendar_overview(self, year: int, month: int) -> Dict[str, Dict[str, Any]]:
+        """
+        获取指定月份所有日期的会议统计概览 (返回以 'YYYY-MM-DD' 为 key 的字典)
+        包含总切片数、有效资产数、次要数、提炼的核心议题预览等
+        """
+        month_prefix = f"{year:04d}-{month:02d}-%"
+        cursor = self.conn.cursor()
+        cursor.execute(
+            """
+            SELECT id, start_time, raw_text, summary, is_useful
+            FROM meeting_slices
+            WHERE start_time LIKE ?
+            ORDER BY start_time ASC
+            """,
+            (month_prefix,)
+        )
+        rows = cursor.fetchall()
+        overview: Dict[str, Dict[str, Any]] = {}
+        for r in rows:
+            st = r["start_time"]
+            if not st:
+                continue
+            day = st[:10]
+            if day not in overview:
+                overview[day] = {
+                    "total_count": 0,
+                    "useful_count": 0,
+                    "trash_count": 0,
+                    "topics": [],
+                    "first_time": st[11:16],
+                    "last_time": st[11:16]
+                }
+            item = overview[day]
+            item["total_count"] += 1
+            is_u = r["is_useful"]
+            if is_u is None or is_u != 0:
+                item["useful_count"] += 1
+            else:
+                item["trash_count"] += 1
+            item["last_time"] = st[11:16]
+
+            summary = r["summary"] or ""
+            topic = ""
+            for line in summary.splitlines():
+                if "核心议题" in line or "Topic" in line:
+                    parts = line.split("：") if "：" in line else line.split(":")
+                    if len(parts) > 1:
+                        topic = parts[-1].strip()
+                    break
+            if not topic and r["raw_text"]:
+                topic = r["raw_text"][:22].strip()
+            if topic and topic not in item["topics"] and len(item["topics"]) < 2:
+                if not any(w in topic for w in ["无明确", "无具体", "开场", "试音"]):
+                    item["topics"].append(topic)
+        return overview
+
+    def get_records_by_day(self, date_str: str) -> List[Dict[str, Any]]:
+        """获取某一特定日期的全部切片"""
+        day_prefix = f"{date_str}%"
+        cursor = self.conn.cursor()
+        cursor.execute(
+            "SELECT * FROM meeting_slices WHERE start_time LIKE ? ORDER BY start_time DESC",
+            (day_prefix,)
+        )
+        return [dict(r) for r in cursor.fetchall()]
+
+    def get_adjacent_recorded_days(self, current_day: str) -> Tuple[Optional[str], Optional[str]]:
+        """获取当前日期前一个和后一个有会议记录的日期"""
+        cursor = self.conn.cursor()
+        cursor.execute(
+            "SELECT DISTINCT substr(start_time, 1, 10) as day FROM meeting_slices WHERE substr(start_time, 1, 10) < ? ORDER BY day DESC LIMIT 1",
+            (current_day,)
+        )
+        prev_row = cursor.fetchone()
+        prev_day = prev_row[0] if prev_row else None
+
+        cursor.execute(
+            "SELECT DISTINCT substr(start_time, 1, 10) as day FROM meeting_slices WHERE substr(start_time, 1, 10) > ? ORDER BY day ASC LIMIT 1",
+            (current_day,)
+        )
+        next_row = cursor.fetchone()
+        next_day = next_row[0] if next_row else None
+        return prev_day, next_day
+
     # ---------------- 历史问答与多轮会话持久化 ----------------
     def create_or_update_session(self, session_id: str, title: str, turn_count: int = 1):
         """创建或更新会话元数据"""

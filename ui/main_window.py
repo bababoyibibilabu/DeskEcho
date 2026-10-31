@@ -41,6 +41,7 @@ from ui.styles import (
     get_top_version_style, get_theme_btn_style, get_intercom_banner_style,
     get_mem_list_style, get_mem_detail_style
 )
+from ui.meeting_calendar_widget import MeetingCalendarWidget
 
 class ModernBreathingSwitch(QPushButton):
     """
@@ -2084,7 +2085,9 @@ class MainWindow(QMainWindow):
             self._last_settings_tab = index
 
         self.stack.setCurrentIndex(index)
-        titles = ["对讲与即时检索", "会议记忆记忆库", "企业组织通讯录", "系统引擎与状态", "软件发版与自动更新"]
+        if index == 1 and hasattr(self, '_refresh_calendar_view'):
+            self._refresh_calendar_view()
+        titles = ["对讲与即时检索", "会议记忆库", "企业组织通讯录", "系统引擎与状态", "软件发版与自动更新"]
 
         # 切换顶栏模式：Page 0 显示简洁面包屑，Page 1/2/3/4 显示设置分段子导航
         if index == 0:
@@ -2454,14 +2457,67 @@ class MainWindow(QMainWindow):
         page = QWidget()
         page_layout = QVBoxLayout(page)
         page_layout.setContentsMargins(0, 0, 0, 0)
-        page_layout.setSpacing(10)
+        page_layout.setSpacing(0)
 
+        self.current_selected_day = None  # None: 日历看板视图; 有值: 单日详情视图
         self.current_mem_mode = "normal"  # "normal" 或 "trash"
         self.cached_normal_records = []
         self.cached_trash_records = []
         self.current_selected_record = None
 
-        # 1. 顶部模式切换与搜索条
+        # 内部视图切换器：Index 0 为月度日历看板；Index 1 为选定日期的记忆详情页
+        self.mem_sub_stack = QStackedWidget()
+
+        # ========== 视图 0: 月度会议日历看板 ==========
+        self.mem_calendar_view = MeetingCalendarWidget()
+        self.mem_calendar_view.day_selected.connect(self._open_day_detail)
+        self.mem_calendar_view.on_month_changed_callback = self._on_calendar_month_changed
+        self.mem_sub_stack.addWidget(self.mem_calendar_view)
+
+        # ========== 视图 1: 选定单日会议记忆详情 ==========
+        self.mem_day_detail_view = QWidget()
+        day_layout = QVBoxLayout(self.mem_day_detail_view)
+        day_layout.setContentsMargins(14, 10, 14, 14)
+        day_layout.setSpacing(10)
+
+        # 1. 顶部日期导航横幅：返回日历看板 + 所选日期与统计 + 前后天快捷翻页
+        self.day_header_card = QFrame()
+        self.day_header_card.setObjectName("day_header_card")
+        dh_layout = QHBoxLayout(self.day_header_card)
+        dh_layout.setContentsMargins(12, 8, 14, 8)
+        dh_layout.setSpacing(10)
+        dh_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+
+        self.btn_back_to_cal = QPushButton("返回日历看板")
+        self.btn_back_to_cal.setFixedHeight(30)
+        self.btn_back_to_cal.setIconSize(QSize(14, 14))
+        self.btn_back_to_cal.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_back_to_cal.clicked.connect(self._back_to_calendar)
+        dh_layout.addWidget(self.btn_back_to_cal)
+
+        self.lbl_day_title = QLabel("2026年10月31日")
+        dh_layout.addWidget(self.lbl_day_title)
+
+        self.lbl_day_badge = QLabel("共 0 段记忆")
+        dh_layout.addWidget(self.lbl_day_badge)
+
+        dh_layout.addStretch(1)
+
+        self.btn_prev_recorded_day = QPushButton("◀ 前一天")
+        self.btn_prev_recorded_day.setFixedHeight(30)
+        self.btn_prev_recorded_day.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_prev_recorded_day.clicked.connect(self._go_prev_recorded_day)
+        dh_layout.addWidget(self.btn_prev_recorded_day)
+
+        self.btn_next_recorded_day = QPushButton("后一天 ▶")
+        self.btn_next_recorded_day.setFixedHeight(30)
+        self.btn_next_recorded_day.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_next_recorded_day.clicked.connect(self._go_next_recorded_day)
+        dh_layout.addWidget(self.btn_next_recorded_day)
+
+        day_layout.addWidget(self.day_header_card)
+
+        # 2. 模式切换与搜索条
         is_light = ThemeManager.get_instance().is_light()
         self.mem_header_card = QFrame()
         self.mem_header_card.setObjectName("mem_header_card")
@@ -2582,9 +2638,9 @@ class MainWindow(QMainWindow):
         self.mem_search_btn.clicked.connect(self._search_memory_slices)
         h_layout.addWidget(self.mem_search_btn)
 
-        page_layout.addWidget(self.mem_header_card)
+        day_layout.addWidget(self.mem_header_card)
 
-        # 2. “或许没用”次要记忆 AI 研判提醒与一键清理横幅 (默认隐藏，仅在 trash 模式显示，克制无视觉污染)
+        # 3. “或许没用”次要记忆 AI 研判提醒与一键清理横幅 (默认隐藏，仅在 trash 模式显示，克制无视觉污染)
         self.trash_banner = QFrame()
         self.trash_banner.setObjectName("trash_banner")
         self.trash_banner.setVisible(False)
@@ -2656,7 +2712,7 @@ class MainWindow(QMainWindow):
         self.btn_clean_all_trash.clicked.connect(self._clean_all_trash_slices)
         trash_b_layout.addWidget(self.btn_clean_all_trash)
 
-        page_layout.addWidget(self.trash_banner)
+        day_layout.addWidget(self.trash_banner)
 
         # 3. 双栏记忆检查器 (左：记忆列表，右：结构化四象限卡片详情与专属删除操作)
         splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -2866,9 +2922,165 @@ class MainWindow(QMainWindow):
         splitter.setStretchFactor(1, 1)
         splitter.setSizes([320, 680])
 
-        page_layout.addWidget(splitter, 1)
+        day_layout.addWidget(splitter, 1)
+
+        self.mem_sub_stack.addWidget(self.mem_day_detail_view)
+        page_layout.addWidget(self.mem_sub_stack, 1)
+
         stack.addWidget(page)
         self._update_mem_tab_styles()
+        self._update_day_header_card_style()
+
+
+    # ---------------- 会议日历看板与单日下钻联动 ----------------
+    def _refresh_calendar_view(self):
+        """刷新月度日历看板的数据展示"""
+        if hasattr(self, "mem_calendar_view") and hasattr(self, "store"):
+            yr = self.mem_calendar_view.current_year
+            mo = self.mem_calendar_view.current_month
+            overview = self.store.get_month_calendar_overview(yr, mo)
+            self.mem_calendar_view.set_month_data(yr, mo, overview)
+
+    def _on_calendar_month_changed(self, year: int, month: int):
+        """月份切换回调"""
+        if hasattr(self, "store"):
+            overview = self.store.get_month_calendar_overview(year, month)
+            self.mem_calendar_view.set_month_data(year, month, overview)
+
+    def _open_day_detail(self, date_str: str):
+        """从日历看板下钻至特定日期的会议记忆详情"""
+        self.current_selected_day = date_str
+        self.current_selected_record = None
+
+        # 格式化日期标题，例如 2026年10月31日 (周六)
+        try:
+            import datetime
+            dt = datetime.datetime.strptime(date_str, "%Y-%m-%d")
+            weekdays = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
+            w_str = weekdays[dt.weekday()]
+            self.lbl_day_title.setText(f"📅 {dt.year}年{dt.month}月{dt.day}日 ({w_str})")
+        except Exception:
+            self.lbl_day_title.setText(f"📅 {date_str}")
+
+        # 计算该天记录统计
+        day_normal = [r for r in getattr(self, "cached_normal_records", []) if r.get("start_time", "").startswith(date_str)]
+        day_trash = [r for r in getattr(self, "cached_trash_records", []) if r.get("start_time", "").startswith(date_str)]
+        total = len(day_normal) + len(day_trash)
+        self.lbl_day_badge.setText(f"共 {total} 段记忆 (正式 {len(day_normal)} · 次要 {len(day_trash)})")
+        self.btn_mem_normal.setText(f"正式会议记忆 ({len(day_normal)})")
+        self.btn_mem_trash.setText(f"或许没用 ({len(day_trash)})")
+
+        # 前后天邻近导航
+        prev_day, next_day = self.store.get_adjacent_recorded_days(date_str)
+        self._adjacent_prev_day = prev_day
+        self._adjacent_next_day = next_day
+        if prev_day:
+            self.btn_prev_recorded_day.setEnabled(True)
+            self.btn_prev_recorded_day.setText(f"◀ {prev_day[5:]}")
+            self.btn_prev_recorded_day.setToolTip(f"跳转至上一有记录日期: {prev_day}")
+        else:
+            self.btn_prev_recorded_day.setEnabled(False)
+            self.btn_prev_recorded_day.setText("◀ 前一天")
+            self.btn_prev_recorded_day.setToolTip("此前无更早的会议记录")
+
+        if next_day:
+            self.btn_next_recorded_day.setEnabled(True)
+            self.btn_next_recorded_day.setText(f"{next_day[5:]} ▶")
+            self.btn_next_recorded_day.setToolTip(f"跳转至下一有记录日期: {next_day}")
+        else:
+            self.btn_next_recorded_day.setEnabled(False)
+            self.btn_next_recorded_day.setText("后一天 ▶")
+            self.btn_next_recorded_day.setToolTip("暂无更新的会议记录")
+
+        self._update_day_header_card_style()
+        self._render_mem_list(preserve_selection=False)
+        self.mem_sub_stack.setCurrentIndex(1)
+
+    def _back_to_calendar(self):
+        """从单日详情返回月度日历看板"""
+        self.current_selected_day = None
+        self._refresh_calendar_view()
+        self.mem_sub_stack.setCurrentIndex(0)
+
+    def _go_prev_recorded_day(self):
+        if getattr(self, "_adjacent_prev_day", None):
+            self._open_day_detail(self._adjacent_prev_day)
+
+    def _go_next_recorded_day(self):
+        if getattr(self, "_adjacent_next_day", None):
+            self._open_day_detail(self._adjacent_next_day)
+
+    def _update_day_header_card_style(self):
+        if not hasattr(self, "day_header_card"):
+            return
+        is_light = ThemeManager.get_instance().is_light()
+        if is_light:
+            self.day_header_card.setStyleSheet("""
+                QFrame#day_header_card {
+                    background-color: #FFFFFF;
+                    border: 1px solid #E2E8F0;
+                    border-radius: 10px;
+                }
+            """)
+            btn_style = """
+                QPushButton {
+                    background-color: #F8FAFC;
+                    color: #0F172A;
+                    border: 1px solid #CBD5E1;
+                    border-radius: 6px;
+                    padding: 0px 12px;
+                    font-size: 11.5px;
+                    font-weight: 500;
+                }
+                QPushButton:hover {
+                    background-color: rgba(2, 132, 199, 0.08);
+                    border-color: #0284C7;
+                    color: #0284C7;
+                }
+                QPushButton:disabled {
+                    background-color: #F1F5F9;
+                    color: #94A3B8;
+                    border-color: #E2E8F0;
+                }
+            """
+            self.lbl_day_title.setStyleSheet("font-size: 14px; font-weight: 700; color: #0F172A;")
+            self.lbl_day_badge.setStyleSheet("font-size: 11.5px; font-weight: 600; color: #0284C7; background-color: rgba(2, 132, 199, 0.1); border-radius: 4px; padding: 2px 8px;")
+        else:
+            self.day_header_card.setStyleSheet("""
+                QFrame#day_header_card {
+                    background-color: #11141D;
+                    border: 1px solid rgba(255, 255, 255, 0.07);
+                    border-radius: 10px;
+                }
+            """)
+            btn_style = """
+                QPushButton {
+                    background-color: rgba(255, 255, 255, 0.05);
+                    color: #E2E8F0;
+                    border: 1px solid rgba(255, 255, 255, 0.1);
+                    border-radius: 6px;
+                    padding: 0px 12px;
+                    font-size: 11.5px;
+                    font-weight: 500;
+                }
+                QPushButton:hover {
+                    background-color: rgba(38, 176, 228, 0.15);
+                    border-color: #38BDF8;
+                    color: #38BDF8;
+                }
+                QPushButton:disabled {
+                    background-color: rgba(255, 255, 255, 0.02);
+                    color: #475569;
+                    border-color: rgba(255, 255, 255, 0.04);
+                }
+            """
+            self.lbl_day_title.setStyleSheet("font-size: 14px; font-weight: 700; color: #FFFFFF;")
+            self.lbl_day_badge.setStyleSheet("font-size: 11.5px; font-weight: 600; color: #38BDF8; background-color: rgba(38, 176, 228, 0.18); border-radius: 4px; padding: 2px 8px;")
+
+        self.btn_back_to_cal.setStyleSheet(btn_style)
+        self.btn_prev_recorded_day.setStyleSheet(btn_style)
+        self.btn_next_recorded_day.setStyleSheet(btn_style)
+        self.btn_back_to_cal.setIcon(get_symbol_icon("arrow_back", color="#475569" if is_light else "#CBD5E1", size=14))
 
     def _switch_mem_mode(self, mode: str):
         """切换正式记忆资产 vs 或许没用次要记忆"""
@@ -4354,6 +4566,10 @@ class MainWindow(QMainWindow):
             # 刷新首屏“今日已新增 X 段记忆”徽章
             self._update_today_slice_badge()
 
+            # 同步刷新日历看板数据
+            if hasattr(self, '_refresh_calendar_view'):
+                self._refresh_calendar_view()
+
             # 智能防打断机制：仅当数据切实变动时响应
             if data_changed:
                 is_on_mem_page = (self.stack.currentIndex() == 1)
@@ -4447,6 +4663,8 @@ class MainWindow(QMainWindow):
             return
 
         target_records = self.cached_trash_records if self.current_mem_mode == "trash" else self.cached_normal_records
+        if getattr(self, "current_selected_day", None):
+            target_records = [r for r in target_records if r.get("start_time", "").startswith(self.current_selected_day)]
 
         # 兼容备用 dummy slice_list
         if hasattr(self, "slice_list"):
@@ -4731,6 +4949,8 @@ class MainWindow(QMainWindow):
             return
 
         target_records = self.cached_trash_records if self.current_mem_mode == "trash" else self.cached_normal_records
+        if getattr(self, "current_selected_day", None):
+            target_records = [r for r in target_records if r.get("start_time", "").startswith(self.current_selected_day)]
         filtered = [
             r for r in target_records
             if kw.lower() in (r.get("summary", "") + " " + r.get("raw_text", "")).lower()
@@ -5023,6 +5243,11 @@ class MainWindow(QMainWindow):
             else:
                 self.theme_btn.setIcon(get_symbol_icon("light_mode", color="#FBBF24", size=16))
                 self.theme_btn.setToolTip("切换为浅色模式 (Light Mode)")
+
+        if hasattr(self, 'mem_calendar_view'):
+            self.mem_calendar_view.update_theme(is_light)
+        if hasattr(self, '_update_day_header_card_style'):
+            self._update_day_header_card_style()
 
         if hasattr(self, 'top_version_btn'):
             self.top_version_btn.setFixedHeight(30)
