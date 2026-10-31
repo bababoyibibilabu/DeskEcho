@@ -52,10 +52,10 @@ class Config:
     CHUNK_SIZE = int(SAMPLE_RATE * (CHUNK_DURATION_MS / 1000.0))
     VAD_MODE = 2
 
-    # 切片触发策略
-    MAX_SLICE_SECONDS = float(os.getenv("MAX_SLICE_SECONDS", "300"))
-    MIN_SILENCE_CUT_SECONDS = float(os.getenv("MIN_SILENCE_CUT_SECONDS", "120"))
-    SILENCE_DURATION_SECONDS = float(os.getenv("SILENCE_DURATION_SECONDS", "3.0"))
+    # 切片触发策略 (针对会议室自然语流调优：30s~90s 动态短句切割，大幅降低 ASR 尾部截断与长音频丢词)
+    MAX_SLICE_SECONDS = float(os.getenv("MAX_SLICE_SECONDS", "90"))
+    MIN_SILENCE_CUT_SECONDS = float(os.getenv("MIN_SILENCE_CUT_SECONDS", "30"))
+    SILENCE_DURATION_SECONDS = float(os.getenv("SILENCE_DURATION_SECONDS", "2.0"))
 
     # 对讲交互热键与 TTS 配置 (默认采用笔记本免 Fn 的单键【右 Alt】)
     INTERCOM_KEY = os.getenv("INTERCOM_KEY", "Alt_R").strip()

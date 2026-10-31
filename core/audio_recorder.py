@@ -96,6 +96,7 @@ class AudioSliceWorker(threading.Thread):
         frames = []
         slice_start_time = time.time()
         continuous_silence_seconds = 0.0
+        total_speech_seconds = 0.0
         chunk_sec = Config.CHUNK_DURATION_MS / 1000.0
         chunk_bytes = int(Config.SAMPLE_RATE * chunk_sec * 2)  # 16-bit mono 对应字节数
 
@@ -105,6 +106,7 @@ class AudioSliceWorker(threading.Thread):
                 slice_start_time = time.time()
                 frames.clear()
                 continuous_silence_seconds = 0.0
+                total_speech_seconds = 0.0
                 continue
 
             if self.intercom_active:
@@ -137,6 +139,7 @@ class AudioSliceWorker(threading.Thread):
 
             if is_speech:
                 continuous_silence_seconds = 0.0
+                total_speech_seconds += chunk_sec
             else:
                 continuous_silence_seconds += chunk_sec
 
@@ -150,16 +153,18 @@ class AudioSliceWorker(threading.Thread):
 
             # 虚拟模式下不向转录队列产生无意义的全静音切片，避免浪费 API 调用
             if (is_max_reached or is_silence_cut) and len(frames) > 0:
-                if not self.is_virtual and elapsed_seconds >= 5.0:
+                # 只有切片内累计有效语音时长达到 1.5 秒且总时长 >= 5 秒时才归档转录，杜绝无意义静音
+                if not self.is_virtual and elapsed_seconds >= 5.0 and total_speech_seconds >= 1.5:
                     end_time = time.time()
                     wav_path = self._save_slice(frames)
                     if wav_path:
-                        print(f"[AudioWorker] 产生切片: {wav_path} (时长: {elapsed_seconds:.1f}s)")
+                        print(f"[AudioWorker] 产生切片: {wav_path} (时长: {elapsed_seconds:.1f}s, 有效人声: {total_speech_seconds:.1f}s)")
                         self.on_slice_ready(wav_path, slice_start_time, end_time)
                 
                 frames = []
                 slice_start_time = time.time()
                 continuous_silence_seconds = 0.0
+                total_speech_seconds = 0.0
 
         self._cleanup()
 
