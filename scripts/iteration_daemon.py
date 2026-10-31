@@ -33,9 +33,9 @@ def get_local_queue_path() -> Path:
 def fetch_remote_tasks(remote_host: str = REMOTE_SSH) -> List[Dict[str, Any]]:
     """通过 SSH 从笔记本读取 iteration_queue.json"""
     for rpath in REMOTE_QUEUE_PATHS:
-        cmd = f'ssh {remote_host} "if exist {rpath} (type {rpath})"'
+        cmd = f'ssh -o ConnectTimeout=5 {remote_host} "if exist {rpath} (type {rpath})"'
         try:
-            res = subprocess.run(cmd, shell=True, capture_output=True, text=True, encoding="utf-8", errors="replace")
+            res = subprocess.run(cmd, shell=True, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=8)
             if res.returncode == 0 and res.stdout.strip():
                 try:
                     data = json.loads(res.stdout.strip())
@@ -76,7 +76,7 @@ def update_remote_task_status(task_id: str, new_status: str = "COMPLETED", commi
             import tempfile
             tmp = Path(tempfile.gettempdir()) / "remote_queue_update.json"
             tmp.write_text(json.dumps(remote_tasks, ensure_ascii=False, indent=2), encoding="utf-8")
-            subprocess.run(["scp", str(tmp), f"{remote_host}:D:/DeskEcho_Data/iteration_queue.json"], capture_output=True)
+            subprocess.run(["scp", "-o", "ConnectTimeout=5", str(tmp), f"{remote_host}:D:/DeskEcho_Data/iteration_queue.json"], capture_output=True, timeout=10)
             print(f"[Loop] 远程任务 {task_id} 状态已更新为 {new_status}")
 
     # 2. 同步更新本地
