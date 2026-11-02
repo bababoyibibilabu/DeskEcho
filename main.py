@@ -12,6 +12,41 @@ if sys.platform.startswith("win"):
     except Exception:
         pass
 
+def acquire_single_instance_lock(app_name: str = "DeskEcho_App_Single_Instance_Mutex_2026"):
+    """
+    基于 Windows 原生 Named Mutex 的单例进程锁。
+    如果已有实例在运行，则唤醒现有窗口并直接优雅退出，彻底杜绝重复自启与多开争抢。
+    优先尝试 Global 命名空间（跨 Session），失败时回退至 Local 命名空间。
+    """
+    if not sys.platform.startswith("win"):
+        return None
+    try:
+        import ctypes
+        ERROR_ALREADY_EXISTS = 183
+        kernel32 = ctypes.windll.kernel32
+
+        # 优先使用 Global\\ 跨 Session 检测，权限受限时回退到 Local\\
+        for name in (f"Global\\{app_name}", f"Local\\{app_name}"):
+            mutex = kernel32.CreateMutexW(None, False, name)
+            last_error = kernel32.GetLastError()
+            if last_error == ERROR_ALREADY_EXISTS:
+                print(f"[DeskEcho] 检测到已有实例正在运行 ({name})，拒绝重复启动。正在尝试激活前台窗口...")
+                try:
+                    user32 = ctypes.windll.user32
+                    hwnd = user32.FindWindowW(None, "DeskEcho")
+                    if hwnd:
+                        user32.ShowWindow(hwnd, 9)  # SW_RESTORE
+                        user32.SetForegroundWindow(hwnd)
+                except Exception:
+                    pass
+                return False
+            if mutex:
+                return mutex
+        return None
+    except Exception as e:
+        print(f"[DeskEcho] 单例锁检测异常 (安全放行): {e}")
+        return None
+
 from PyQt6.QtWidgets import QApplication, QProxyStyle, QStyle
 from PyQt6.QtCore import QObject, pyqtSignal
 
@@ -419,5 +454,10 @@ class DeskEchoApp:
         self.app.quit()
 
 if __name__ == "__main__":
+    _instance_mutex = acquire_single_instance_lock()
+    if _instance_mutex is False:
+        sys.exit(0)
+
     app_instance = DeskEchoApp()
+    app_instance._single_instance_mutex = _instance_mutex
     sys.exit(app_instance.start())
