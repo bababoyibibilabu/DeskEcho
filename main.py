@@ -75,6 +75,7 @@ class AppSignals(QObject):
     instant_ack = pyqtSignal(str)          # ack_audio_path
     stage_progress = pyqtSignal(int, str, str) # step, title, detail
     query_answered = pyqtSignal(str, str, str, bool, str, str)  # query_text, answer_markdown, tts_audio_path, is_followup, focal_topic, response_mode
+    asr_status_changed = pyqtSignal(str, str) # status, error_msg
 
 class DeskEchoApp:
     def __init__(self):
@@ -87,6 +88,9 @@ class DeskEchoApp:
         # 核心引擎初始化
         self.store = MeetingStore()
         self.asr = ASRClient()
+        self._pending_asr_slices = [] # 欠费/断网期间暂存的未转写切片 [(wav_path, start_ts, end_ts)]
+        self._is_retrying_pending = False
+        self.asr.on_status_changed = lambda status, err: self.signals.asr_status_changed.emit(status, err)
         self.summarizer = LLMSummarizer()
         self.rag = RAGEngine(self.store)
         self.tts = TTSEngine()
@@ -112,6 +116,7 @@ class DeskEchoApp:
         self.signals.hotkey_pressed.connect(self._handle_hotkey_pressed)
         self.signals.hotkey_released.connect(self._handle_hotkey_released)
         self.signals.slice_processed.connect(self._handle_slice_processed)
+        self.signals.asr_status_changed.connect(self._on_asr_status_changed)
         
         # 阶段性即时反馈
         self.signals.instant_ack.connect(self._handle_instant_ack)
@@ -137,6 +142,49 @@ class DeskEchoApp:
         # 语音播报结束，短暂缓冲 0.3 秒以衰减房间余音，随后恢复背景录制
         threading.Timer(0.3, lambda: self.audio_worker.set_intercom_active(False)).start()
 
+
+    def _on_asr_status_changed(self, status: str, error_msg: str):
+        """处理 ASR 状态变更，通知 UI 并触发断点自动补录"""
+        if hasattr(self, "main_window"):
+            self.main_window.update_asr_status(status, error_msg)
+        if status == "ok" and self._pending_asr_slices and not self._is_retrying_pending:
+            threading.Thread(target=self._retry_pending_asr_slices, daemon=True).start()
+
+    def _retry_pending_asr_slices(self):
+        """当 ASR 服务恢复正常时，自动重试转写并归档暂存队列中的录音"""
+        if self._is_retrying_pending:
+            return
+        self._is_retrying_pending = True
+        try:
+            count = len(self._pending_asr_slices)
+            print(f"[AutoBackfill] ASR 服务恢复就绪，开始自动补录暂存的 {count} 段会议录音...")
+            while self._pending_asr_slices and getattr(self.asr, "status", "ok") == "ok":
+                item = self._pending_asr_slices.pop(0)
+                try:
+                    self._on_audio_slice_ready(item[0], item[1], item[2])
+                except Exception as e:
+                    print(f"[AutoBackfill] 补录切片失败: {e}")
+                time.sleep(0.5)
+            print("[AutoBackfill] 暂存录音全部补录完毕。")
+        finally:
+            self._is_retrying_pending = False
+
+    def _start_asr_health_monitor(self):
+        """启动 ASR 服务后台静默健康巡检 (启动后 2 秒自检，此后每 3 分钟巡检一次)"""
+        from PyQt6.QtCore import QTimer
+        def _do_health_check():
+            try:
+                self.asr.check_health()
+            except Exception as e:
+                print(f"[ASRHealth] 健康巡检异常: {e}")
+
+        threading.Timer(2.0, _do_health_check).start()
+
+        self.asr_health_timer = QTimer(self.main_window)
+        self.asr_health_timer.setInterval(3 * 60 * 1000)
+        self.asr_health_timer.timeout.connect(lambda: threading.Thread(target=_do_health_check, daemon=True).start())
+        self.asr_health_timer.start()
+
     def start(self):
         key_display = Config.get_intercom_display_key()
         print("==================================================")
@@ -152,6 +200,9 @@ class DeskEchoApp:
 
         # 启动后台自动更新检查 (为方便高频迭代测试，客户端在后台静默自动检测并升级)
         self._start_auto_update_daemon()
+
+        # 启动 ASR 服务健康巡检与异常告警监听
+        self._start_asr_health_monitor()
 
         self.tray.tray_icon.showMessage(
             "DeskEcho 桌面回响",
@@ -193,7 +244,11 @@ class DeskEchoApp:
         print(f"[Pipeline] 开始处理切片 {slice_id} ({start_time_str} ~ {end_time_str})...")
         raw_text = self.asr.transcribe(wav_path)
         if not raw_text or not raw_text.strip():
-            print(f"[Pipeline] 切片 {slice_id} 为静音或未识别到文本，跳过归档。")
+            if getattr(self.asr, "status", "ok") == "error":
+                print(f"[Pipeline] ASR 异常导致切片 {slice_id} 转写失败，已自动加入待补录队列 (录音暂存保护)")
+                self._pending_asr_slices.append((wav_path, start_ts, end_ts))
+            else:
+                print(f"[Pipeline] 切片 {slice_id} 为静音或未识别到文本，跳过归档。")
             return
 
         print(f"[Pipeline] 切片识别文本: {raw_text[:60]}...")

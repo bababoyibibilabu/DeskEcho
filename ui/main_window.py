@@ -46,18 +46,22 @@ from ui.meeting_calendar_widget import MeetingCalendarWidget
 class ModernBreathingSwitch(QPushButton):
     """
     Alma 风格的微胶囊呼吸状态开关
-    - 活跃状态：深暗底座 + 柔和脉冲绿光光晕 + '🎙️ 实时环境倾听中 [开启]'
-    - 暂停状态：静谧暗灰 + '⏸️ 环境倾听已暂停 [点击开启]'
+    - 活跃正常：柔和脉冲绿光 + '实时倾听中 [已开启]'
+    - 活跃但ASR异常：警示红橙光晕 + '⚠️ 识别服务异常 [排查]'
+    - 暂停状态：静谧暗黄 + '倾听已暂停 [点击恢复]'
     """
     toggled_state = pyqtSignal(bool)
+    warning_clicked = pyqtSignal()
 
     def __init__(self, checked: bool = True, parent=None):
         super().__init__(parent)
         self.is_active = checked
+        self.asr_status = "ok" # "ok", "error", "unconfigured"
+        self.asr_error_msg = ""
         self.setFixedHeight(44)
         self.setMinimumWidth(210)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.clicked.connect(self._toggle)
+        self.clicked.connect(self._on_click)
 
         self.glow_radius = 5.0
         self.glow_direction = 1
@@ -71,6 +75,21 @@ class ModernBreathingSwitch(QPushButton):
     def set_active(self, active: bool):
         self.is_active = active
         self.update()
+
+    def set_asr_status(self, status: str, error_msg: str = ""):
+        self.asr_status = status
+        self.asr_error_msg = error_msg
+        if status in ("error", "unconfigured"):
+            err = error_msg or "账户额度不足/未充值或鉴权失败"
+            self.setToolTip(f"⚠️ ASR语音识别异常:\n{err}\n\n点击立即跳转至【系统引擎状态】排查")
+        else:
+            self.setToolTip("实时环境倾听与动态会议记忆归档中")
+        self.update()
+
+    def _on_click(self):
+        if self.is_active and self.asr_status in ("error", "unconfigured"):
+            self.warning_clicked.emit()
+        self._toggle()
 
     def _toggle(self):
         self.is_active = not self.is_active
@@ -104,12 +123,20 @@ class ModernBreathingSwitch(QPushButton):
 
         # 胶囊底座
         if self.is_active:
-            if is_light:
-                painter.setBrush(QBrush(QColor(22, 163, 74, 18)))
-                painter.setPen(QPen(QColor(22, 163, 74, 160), 1.2))
+            if self.asr_status in ("error", "unconfigured"):
+                if is_light:
+                    painter.setBrush(QBrush(QColor(239, 68, 68, 22)))
+                    painter.setPen(QPen(QColor(239, 68, 68, 180), 1.2))
+                else:
+                    painter.setBrush(QBrush(QColor(239, 68, 68, 38)))
+                    painter.setPen(QPen(QColor(248, 113, 113, 200), 1.2))
             else:
-                painter.setBrush(QBrush(QColor(16, 185, 129, 30)))
-                painter.setPen(QPen(QColor(138, 198, 87, 180), 1.2))
+                if is_light:
+                    painter.setBrush(QBrush(QColor(22, 163, 74, 18)))
+                    painter.setPen(QPen(QColor(22, 163, 74, 160), 1.2))
+                else:
+                    painter.setBrush(QBrush(QColor(16, 185, 129, 30)))
+                    painter.setPen(QPen(QColor(138, 198, 87, 180), 1.2))
         else:
             painter.setBrush(QBrush(QColor(245, 158, 11, 20)))
             painter.setPen(QPen(QColor(245, 158, 11, 120), 1.2))
@@ -122,8 +149,13 @@ class ModernBreathingSwitch(QPushButton):
         core_r = 4.0
 
         if self.is_active:
-            active_color = QColor(colors["brand_success"])
-            halo_color = QColor(active_color.red(), active_color.green(), active_color.blue(), int(self.glow_alpha * 0.45))
+            if self.asr_status in ("error", "unconfigured"):
+                active_color = QColor("#EF4444")
+                halo_color = QColor(239, 68, 68, int(self.glow_alpha * 0.45))
+            else:
+                active_color = QColor(colors["brand_success"])
+                halo_color = QColor(active_color.red(), active_color.green(), active_color.blue(), int(self.glow_alpha * 0.45))
+
             painter.setBrush(QBrush(halo_color))
             painter.setPen(Qt.PenStyle.NoPen)
             painter.drawEllipse(int(dot_x - self.glow_radius), int(dot_y - self.glow_radius),
@@ -140,8 +172,13 @@ class ModernBreathingSwitch(QPushButton):
         painter.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
         text_rect = rect.adjusted(30, 0, -6, 0)
         if self.is_active:
-            painter.setPen(QColor(colors["text_primary"]))
-            painter.drawText(text_rect, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, "实时倾听中 [已开启]")
+            if self.asr_status in ("error", "unconfigured"):
+                err_text_color = QColor("#DC2626" if is_light else "#F87171")
+                painter.setPen(err_text_color)
+                painter.drawText(text_rect, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, "⚠️ 识别服务异常 [排查]")
+            else:
+                painter.setPen(QColor(colors["text_primary"]))
+                painter.drawText(text_rect, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, "实时倾听中 [已开启]")
         else:
             pause_color = QColor("#D97706" if is_light else "#FBBF24")
             painter.setPen(pause_color)
@@ -1996,7 +2033,18 @@ class MainWindow(QMainWindow):
         # 底部常驻 VAD 录音呼吸胶囊
         self.record_switch = ModernBreathingSwitch(checked=True)
         self.record_switch.toggled_state.connect(self._on_switch_toggled)
+        self.record_switch.warning_clicked.connect(self._on_asr_warning_banner_clicked)
         side_layout.addWidget(self.record_switch)
+
+        # ASR 异常显式警示条 (仅在 ASR 服务异常/额度欠费时浮现)
+        self.asr_warning_banner = QPushButton()
+        self.asr_warning_banner.setFixedHeight(26)
+        self.asr_warning_banner.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.asr_warning_banner.setIcon(get_symbol_icon("warning", color="#DC2626", size=13))
+        self.asr_warning_banner.setText(" 识别服务异常 (点击排查)")
+        self.asr_warning_banner.setVisible(False)
+        self.asr_warning_banner.clicked.connect(self._on_asr_warning_banner_clicked)
+        side_layout.addWidget(self.asr_warning_banner)
 
         # 底部栏：左侧热键小标签 + 右下角小齿轮设置项按钮
         bottom_footer_layout = QHBoxLayout()
@@ -2077,6 +2125,55 @@ class MainWindow(QMainWindow):
         else:
             target = getattr(self, "_last_settings_tab", 2)
             self._switch_nav(target)
+
+
+    def update_asr_status(self, status: str, error_msg: str = ""):
+        """更新 ASR 服务的可用状态并刷新左下角告警指示"""
+        self.record_switch.set_asr_status(status, error_msg)
+        is_light = ThemeManager.get_instance().is_light()
+        if status in ("error", "unconfigured"):
+            short_msg = "ASR识别异常 (额度/网络)" if status == "error" else "ASR未配置"
+            self.asr_warning_banner.setText(f" {short_msg}")
+            self.asr_warning_banner.setToolTip(f"ASR语音识别服务状态异常:\n{error_msg or '账户额度不足/未充值或鉴权失败'}\n\n点击直接前往【系统引擎状态】排查检测")
+            if is_light:
+                self.asr_warning_banner.setStyleSheet("""
+                    QPushButton {
+                        background-color: rgba(239, 68, 68, 0.12);
+                        color: #DC2626;
+                        border: 1px solid rgba(239, 68, 68, 0.4);
+                        border-radius: 6px;
+                        font-size: 11px;
+                        font-weight: 600;
+                        text-align: left;
+                        padding-left: 6px;
+                    }
+                    QPushButton:hover {
+                        background-color: rgba(239, 68, 68, 0.22);
+                    }
+                """)
+            else:
+                self.asr_warning_banner.setStyleSheet("""
+                    QPushButton {
+                        background-color: rgba(239, 68, 68, 0.25);
+                        color: #F87171;
+                        border: 1px solid rgba(239, 68, 68, 0.5);
+                        border-radius: 6px;
+                        font-size: 11px;
+                        font-weight: 600;
+                        text-align: left;
+                        padding-left: 6px;
+                    }
+                    QPushButton:hover {
+                        background-color: rgba(239, 68, 68, 0.35);
+                    }
+                """)
+            self.asr_warning_banner.setVisible(True)
+        else:
+            self.asr_warning_banner.setVisible(False)
+
+    def _on_asr_warning_banner_clicked(self):
+        """点击 ASR 告警条直接切换至系统引擎状态进行排查"""
+        self._switch_nav(3)
 
     def _switch_nav(self, index: int):
         self.btn_ask.set_active(index == 0)
