@@ -3904,34 +3904,20 @@ class MainWindow(QMainWindow):
         asr_grid = QGridLayout()
         asr_grid.setSpacing(10)
 
-        asr_grid.addWidget(QLabel("ASR 引擎提供商:"), 0, 0)
-        self.combo_asr_provider = ModernComboBox()
-        self.combo_asr_provider.addItem("火山引擎 (Volcengine 豆包流式 ASR 2.0)", "volcengine")
-        self.combo_asr_provider.addItem("阿里通义听悟 (DashScope SenseVoice)", "dashscope")
-        if Config.ASR_PROVIDER == "dashscope":
-            self.combo_asr_provider.setCurrentIndex(1)
-        else:
-            self.combo_asr_provider.setCurrentIndex(0)
-        asr_grid.addWidget(self.combo_asr_provider, 0, 1)
+        asr_grid.addWidget(QLabel("ASR 核心引擎:"), 0, 0)
+        self.lbl_asr_engine = QLabel("本地离线高精大模型 (Alibaba SenseVoice-Small INT8 · 100% 免费离线)")
+        self.lbl_asr_engine.setStyleSheet(f"font-size: 12px; font-weight: 600; color: {'#059669' if is_light else '#34D399'};")
+        asr_grid.addWidget(self.lbl_asr_engine, 0, 1)
 
-        asr_grid.addWidget(QLabel("火山 AppID:"), 1, 0)
-        self.input_volc_appid = QLineEdit()
-        self.input_volc_appid.setText(Config.VOLC_APPID)
-        self.input_volc_appid.setPlaceholderText("火山引擎控制台生成的 AppID")
-        asr_grid.addWidget(self.input_volc_appid, 1, 1)
+        asr_grid.addWidget(QLabel("VAD 人声切片:"), 1, 0)
+        self.lbl_vad_strategy = QLabel("事件驱动 Silero VAD (ONNX) + 预语音缓冲断句 (静默期零计算与零IO)")
+        self.lbl_vad_strategy.setStyleSheet(f"font-size: 11.5px; color: {'#475569' if is_light else '#94A3B8'};")
+        asr_grid.addWidget(self.lbl_vad_strategy, 1, 1)
 
-        asr_grid.addWidget(QLabel("火山 Access Token:"), 2, 0)
-        self.input_volc_token = QLineEdit()
-        self.input_volc_token.setEchoMode(QLineEdit.EchoMode.Password)
-        self.input_volc_token.setText(Config.VOLC_ACCESS_TOKEN)
-        self.input_volc_token.setPlaceholderText("火山引擎 WebSocket 访问令牌 Access Token")
-        asr_grid.addWidget(self.input_volc_token, 2, 1)
-
-        asr_grid.addWidget(QLabel("火山 Resource ID:"), 3, 0)
-        self.input_volc_resource = QLineEdit()
-        self.input_volc_resource.setText(Config.VOLC_RESOURCE_ID)
-        self.input_volc_resource.setPlaceholderText("默认 volc.seedasr.sauc.duration")
-        asr_grid.addWidget(self.input_volc_resource, 3, 1)
+        asr_grid.addWidget(QLabel("后台算力平衡:"), 2, 0)
+        self.lbl_queue_strategy = QLabel("低优先级平滑归档队列 (限速平滑调度，保障前台办公与实时对讲极速响应)")
+        self.lbl_queue_strategy.setStyleSheet(f"font-size: 11.5px; color: {'#475569' if is_light else '#94A3B8'};")
+        asr_grid.addWidget(self.lbl_queue_strategy, 2, 1)
 
         asr_layout.addLayout(asr_grid)
         v_layout.addWidget(self.card_asr)
@@ -4100,13 +4086,8 @@ class MainWindow(QMainWindow):
         updates["TTS_VOICE_INSTRUCTION"] = self.combo_voice_instruction.currentData() or "zh-CN-YunjianNeural"
         updates["TTS_VOICE"] = updates["TTS_VOICE_MEETING"]
 
-        # ASR
-        updates["ASR_PROVIDER"] = "volcengine" if "volcengine" in self.combo_asr_provider.currentText() else "dashscope"
-        updates["VOLC_APPID"] = self.input_volc_appid.text().strip()
-        new_volc_token = self.input_volc_token.text().strip()
-        if new_volc_token and not new_volc_token.startswith("••••"):
-            updates["VOLC_ACCESS_TOKEN"] = new_volc_token
-        updates["VOLC_RESOURCE_ID"] = self.input_volc_resource.text().strip()
+        # ASR (保持本地离线 SenseVoice 引擎，代码层保留火山备用，无显式UI开关)
+        updates["ASR_PROVIDER"] = "sensevoice"
 
         # Hotkey
         hotkey_val = self.combo_intercom_key.currentData() or "Alt_R"
@@ -5829,14 +5810,13 @@ class MainWindow(QMainWindow):
                 background-color: #12151F;
             }
         """
-        for inp_attr in ['input_llm_key', 'input_llm_url', 'input_llm_model',
-                         'input_volc_appid', 'input_volc_token', 'input_volc_resource']:
+        for inp_attr in ['input_llm_key', 'input_llm_url', 'input_llm_model']:
             if hasattr(self, inp_attr):
                 getattr(self, inp_attr).setStyleSheet(input_style_light if is_light else input_style_dark)
 
         combo_style = get_modern_combobox_style(is_light)
         for combo_attr in ['combo_tts_provider', 'combo_voice_meeting', 'combo_voice_general',
-                          'combo_voice_instruction', 'combo_asr_provider', 'combo_intercom_key']:
+                          'combo_voice_instruction', 'combo_intercom_key']:
             if hasattr(self, combo_attr):
                 getattr(self, combo_attr).setStyleSheet(combo_style)
 

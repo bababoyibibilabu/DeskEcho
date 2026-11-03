@@ -3,6 +3,7 @@ import os
 import time
 import datetime
 import threading
+import queue
 from typing import Optional
 
 if sys.platform.startswith("win"):
@@ -94,6 +95,12 @@ class DeskEchoApp:
         self.summarizer = LLMSummarizer()
         self.rag = RAGEngine(self.store)
         self.tts = TTSEngine()
+
+        # 后台平滑归档队列 (限速低耗调度，平衡 CPU 资源利用)
+        self._archival_queue = queue.Queue()
+        self._archival_stop_event = threading.Event()
+        self._archival_worker = threading.Thread(target=self._archival_worker_loop, daemon=True)
+        self._archival_worker.start()
 
         # 音频与对讲组件
         self.audio_worker = AudioSliceWorker(on_slice_ready=self._on_audio_slice_ready)
@@ -228,13 +235,40 @@ class DeskEchoApp:
             self.audio_worker.pause()
         self.main_window.set_record_state(is_active)
 
-    # ---------------- 录音切片处理管道 ----------------
+    # ---------------- 录音切片处理管道与平滑归档队列 ----------------
     def _on_audio_slice_ready(self, wav_path: str, start_ts: float, end_ts: float):
-        threading.Thread(
-            target=self._process_slice_pipeline,
-            args=(wav_path, start_ts, end_ts),
-            daemon=True
-        ).start()
+        self._archival_queue.put((wav_path, start_ts, end_ts))
+        print(f"[ArchivalQueue] 新语音切片入队待归档 (当前队列深度: {self._archival_queue.qsize()})")
+
+    def _archival_worker_loop(self):
+        """后台低优先级平滑归档循环，平衡 CPU 算力，防止长会议持续占满 CPU 线程"""
+        if sys.platform.startswith("win"):
+            try:
+                import ctypes
+                handle = ctypes.windll.kernel32.GetCurrentThread()
+                # THREAD_PRIORITY_BELOW_NORMAL (-1)
+                ctypes.windll.kernel32.SetThreadPriority(handle, -1)
+            except Exception:
+                pass
+
+        while not self._archival_stop_event.is_set():
+            try:
+                item = self._archival_queue.get(timeout=1.0)
+            except queue.Empty:
+                continue
+
+            wav_path, start_ts, end_ts = item
+            try:
+                self._process_slice_pipeline(wav_path, start_ts, end_ts)
+            except Exception as e:
+                print(f"[ArchivalQueue] 归档切片处理异常: {e}")
+            finally:
+                self._archival_queue.task_done()
+
+            # 动态平滑冷却，避免低功耗 CPU (如 i5-8250U) 持续发热降频
+            cooldown = getattr(Config, "ARCHIVE_COOLDOWN_SECONDS", 0.8)
+            if cooldown > 0:
+                time.sleep(cooldown)
 
     def _process_slice_pipeline(self, wav_path: str, start_ts: float, end_ts: float):
         start_time_str = datetime.datetime.fromtimestamp(start_ts).strftime("%Y-%m-%d %H:%M:%S")
@@ -504,6 +538,7 @@ class DeskEchoApp:
 
     def quit(self):
         print("[DeskEcho] 正在退出应用...")
+        self._archival_stop_event.set()
         self.audio_worker.stop()
         self.hotkey_listener.stop()
         self.app.quit()

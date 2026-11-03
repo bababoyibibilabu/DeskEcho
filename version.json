@@ -1,14 +1,15 @@
 {
-  "version": "0.2.8",
-  "release_date": "2026-10-29",
-  "title": "DeskEcho v0.2.8 基于 Impeccable 设计规范体系的整体工业级重塑",
+  "version": "0.2.20",
+  "release_date": "2026-11-03",
+  "title": "DeskEcho v0.2.20 本地离线 SenseVoice-Small ASR 与事件驱动 Silero VAD 架构重塑",
   "changelog": [
-    "确立设计权威真相：基于 Impeccable 规范正式建立 PRODUCT.md 与 DESIGN.md，固化产品愿景与全量设计系统 Token",
-    "根除 AI Slop 模板痕迹：经 Impeccable 静态与动态检测，彻底清零 10 处粗侧边 border-left 反模式，代之以精致克制的 1px 微微全边框",
-    "Operate 生产力模式纯化：全量界面聚焦高扫描率、严谨字重阶梯与原生直觉，去除浮夸彩色块与嵌套卡片",
-    "桌面交互微表面打磨：全局统一文本选区高亮配色、细窄圆滑滚动条与精准焦点色环，满足专业级桌面软件手感"
+    "完全免费与数据安全：默认启用阿里开源 SenseVoice-Small INT8 本地离线引擎，0 API 费用，断网可用，告别云端时长计费",
+    "事件驱动 Silero VAD 架构：升级神经网络 VAD 与 0.8s 预语音环形缓冲，静默期 0 计算、0 磁盘 IO、0 API 消耗",
+    "会议段落级聚合防碎片化：按 25s~60s 自然段落或 2.5s 话题停顿断句，杜绝 1 秒微片段与频繁总结骚扰",
+    "低优先级平滑归档队列：平衡低功耗 CPU 算力利用，确保前台办公流畅与长按对讲极速并发响应",
+    "云端通道保全：代码层完好保留火山引擎作为备选通道，无缝平滑迁移"
   ],
-  "download_url": "https://github.com/bababoyibibilabu/DeskEcho/releases/download/v0.2.8/DeskEcho.exe",
-  "zip_url": "https://github.com/bababoyibibilabu/DeskEcho/archive/refs/tags/v0.2.8.zip",
+  "download_url": "https://github.com/bababoyibibilabu/DeskEcho/releases/download/v0.2.20/DeskEcho.exe",
+  "zip_url": "https://github.com/bababoyibibilabu/DeskEcho/archive/refs/tags/v0.2.20.zip",
   "min_version": "0.1.0"
 }

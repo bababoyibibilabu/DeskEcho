@@ -33,11 +33,17 @@ class Config:
     OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1").strip()
     LLM_MODEL = os.getenv("LLM_MODEL", "qwen-plus").strip()
 
-    # ASR 配置 (dashscope | volcengine | openai | mock)
-    ASR_PROVIDER = os.getenv("ASR_PROVIDER", "dashscope").lower().strip()
+    # ASR 配置 (sensevoice | volcengine | dashscope | openai | mock)
+    ASR_PROVIDER = os.getenv("ASR_PROVIDER", "sensevoice").lower().strip()
     DASHSCOPE_API_KEY = os.getenv("DASHSCOPE_API_KEY", "").strip() or OPENAI_API_KEY
 
-    # 火山引擎 (Volcengine) ASR 配置
+    # 本地离线 ASR 与 VAD 模型路径配置 (SenseVoice-Small INT8 + Silero VAD)
+    MODELS_DIR = (BASE_DIR / "models").resolve()
+    SENSEVOICE_MODEL_DIR = MODELS_DIR / "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17"
+    SILERO_VAD_MODEL_PATH = MODELS_DIR / "silero_vad.onnx"
+    ASR_NUM_THREADS = int(os.getenv("ASR_NUM_THREADS", "2"))
+
+    # 火山引擎 (Volcengine) ASR 配置 (保留在代码层作为备选/次选，不暴露显式UI开关)
     VOLC_APPID = os.getenv("VOLC_APPID", "").strip()
     VOLC_ACCESS_TOKEN = os.getenv("VOLC_ACCESS_TOKEN", "").strip()
     VOLC_RESOURCE_ID = os.getenv("VOLC_RESOURCE_ID", "volc.seedasr.sauc.duration").strip()
@@ -45,17 +51,28 @@ class Config:
     VOLC_ACCESS_KEY = os.getenv("VOLC_ACCESS_KEY", "").strip()
     VOLC_SECRET_KEY = os.getenv("VOLC_SECRET_KEY", "").strip()
 
-    # 音频采集参数
+    # 音频采集参数 (30ms 对应 480 samples @ 16kHz，同时无缝兼容 Silero VAD 与 WebRTC VAD)
     SAMPLE_RATE = 16000
     CHANNELS = 1
     CHUNK_DURATION_MS = 30
-    CHUNK_SIZE = int(SAMPLE_RATE * (CHUNK_DURATION_MS / 1000.0))
+    CHUNK_SIZE = int(SAMPLE_RATE * (CHUNK_DURATION_MS / 1000.0))  # 480
     VAD_MODE = 2
 
-    # 切片触发策略 (针对会议室自然语流调优：30s~90s 动态短句切割，大幅降低 ASR 尾部截断与长音频丢词)
-    MAX_SLICE_SECONDS = float(os.getenv("MAX_SLICE_SECONDS", "90"))
-    MIN_SILENCE_CUT_SECONDS = float(os.getenv("MIN_SILENCE_CUT_SECONDS", "30"))
+    # 智能 VAD 与切片触发策略 (事件驱动 Silero VAD + 预语音缓冲 + 会议自然语流断句)
+    VAD_THRESHOLD = float(os.getenv("VAD_THRESHOLD", "0.5"))
+    VAD_MIN_SPEECH_DURATION = float(os.getenv("VAD_MIN_SPEECH_DURATION", "0.5"))
+    VAD_MIN_SILENCE_DURATION = float(os.getenv("VAD_MIN_SILENCE_DURATION", "0.8"))
+    VAD_MAX_SPEECH_DURATION = float(os.getenv("VAD_MAX_SPEECH_DURATION", "60.0"))
+    VAD_PRE_SPEECH_BUFFER = float(os.getenv("VAD_PRE_SPEECH_BUFFER", "0.8"))
+    
+    # 会议切片智能聚合策略 (段落级 25s~60s 归档或话题停顿 2.5s 断句，杜绝 1 秒微片段与空转浪费)
+    SILENCE_BREAK_SECONDS = float(os.getenv("SILENCE_BREAK_SECONDS", "2.5"))
+    MIN_SILENCE_CUT_SECONDS = float(os.getenv("MIN_SILENCE_CUT_SECONDS", "25.0"))
+    MAX_SLICE_SECONDS = float(os.getenv("MAX_SLICE_SECONDS", "60.0"))
     SILENCE_DURATION_SECONDS = float(os.getenv("SILENCE_DURATION_SECONDS", "2.0"))
+
+    # 后台平滑归档队列与算力平衡策略 (保持 CPU 负载平稳低耗，不抢占前台办公与实时对讲)
+    ARCHIVE_COOLDOWN_SECONDS = float(os.getenv("ARCHIVE_COOLDOWN_SECONDS", "0.8"))
 
     # 对讲交互热键与 TTS 配置 (默认采用笔记本免 Fn 的单键【右 Alt】)
     INTERCOM_KEY = os.getenv("INTERCOM_KEY", "Alt_R").strip()
@@ -89,7 +106,9 @@ class Config:
 
     @classmethod
     def has_asr_key(cls) -> bool:
-        if cls.ASR_PROVIDER == "dashscope":
+        if cls.ASR_PROVIDER in ("sensevoice", "local"):
+            return True
+        elif cls.ASR_PROVIDER == "dashscope":
             return bool(cls.DASHSCOPE_API_KEY)
         elif cls.ASR_PROVIDER == "volcengine":
             return bool(cls.VOLC_APPID and (cls.VOLC_ACCESS_TOKEN or cls.VOLC_ACCESS_KEY))
