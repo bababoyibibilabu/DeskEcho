@@ -272,25 +272,36 @@ class MeetingStore:
             item = overview[day]
             item["total_count"] += 1
             is_u = r["is_useful"]
-            if is_u is None or is_u != 0:
+            is_low = False
+            if is_u == 1:
                 item["useful_count"] += 1
-            else:
+            elif is_u == 0:
+                is_low = True
                 item["trash_count"] += 1
+            else:
+                # 遵循与 UI 统一的 AI 研判标准
+                is_low, _ = assess_slice_utility(r["summary"] or "", r["raw_text"] or "")
+                if is_low:
+                    item["trash_count"] += 1
+                else:
+                    item["useful_count"] += 1
             item["last_time"] = st[11:16]
 
-            summary = r["summary"] or ""
-            topic = ""
-            for line in summary.splitlines():
-                if "核心议题" in line or "Topic" in line:
-                    parts = line.split("：") if "：" in line else line.split(":")
-                    if len(parts) > 1:
-                        topic = parts[-1].strip()
-                    break
-            if not topic and r["raw_text"]:
-                topic = r["raw_text"][:22].strip()
-            if topic and topic not in item["topics"] and len(item["topics"]) < 2:
-                if not any(w in topic for w in ["无明确", "无具体", "开场", "试音"]):
-                    item["topics"].append(topic)
+            # 仅在非次要碎片时提取议题预览，避免试音或闲聊污染看板日历卡片
+            if not is_low:
+                summary = r["summary"] or ""
+                topic = ""
+                for line in summary.splitlines():
+                    if "核心议题" in line or "Topic" in line:
+                        parts = line.split("：") if "：" in line else line.split(":")
+                        if len(parts) > 1:
+                            topic = parts[-1].strip()
+                        break
+                if not topic and r["raw_text"]:
+                    topic = r["raw_text"][:22].strip()
+                if topic and topic not in item["topics"] and len(item["topics"]) < 2:
+                    if not any(w in topic for w in ["无明确", "无具体", "开场", "试音"]):
+                        item["topics"].append(topic)
         return overview
 
     def get_records_by_day(self, date_str: str) -> List[Dict[str, Any]]:

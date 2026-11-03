@@ -1,15 +1,14 @@
 {
-  "version": "0.2.20",
+  "version": "0.2.21",
   "release_date": "2026-11-03",
-  "title": "DeskEcho v0.2.20 本地离线 SenseVoice-Small ASR 与事件驱动 Silero VAD 架构重塑",
+  "title": "DeskEcho v0.2.21 记忆层级统计自洽与单日安全清理边界重塑",
   "changelog": [
-    "完全免费与数据安全：默认启用阿里开源 SenseVoice-Small INT8 本地离线引擎，0 API 费用，断网可用，告别云端时长计费",
-    "事件驱动 Silero VAD 架构：升级神经网络 VAD 与 0.8s 预语音环形缓冲，静默期 0 计算、0 磁盘 IO、0 API 消耗",
-    "会议段落级聚合防碎片化：按 25s~60s 自然段落或 2.5s 话题停顿断句，杜绝 1 秒微片段与频繁总结骚扰",
-    "低优先级平滑归档队列：平衡低功耗 CPU 算力利用，确保前台办公流畅与长按对讲极速并发响应",
-    "云端通道保全：代码层完好保留火山引擎作为备选通道，无缝平滑迁移"
+    "层级数字统计自洽：修复单日会议详情页 Tab 按钮被全历史总数错误覆盖的 Bug，正式记忆与或许没用数量严格与所选单日列表 100% 联动",
+    "日历看板与详情研判对齐：统一底层未标记记录的 AI 研判标准，彻底解决月度日历看板与单日详情视图数据打架问题",
+    "单日清理安全隔离：单日详情页中的清空按钮明确重命名为【清空本日次要记忆】，点击仅删除当前所选日期的废弃碎片，杜绝全库误伤",
+    "全局清理入口分层：在日历看板主视图右上角提供独立的【清理全库次要】操作入口，层级边界严谨分明"
   ],
-  "download_url": "https://github.com/bababoyibibilabu/DeskEcho/releases/download/v0.2.20/DeskEcho.exe",
-  "zip_url": "https://github.com/bababoyibibilabu/DeskEcho/archive/refs/tags/v0.2.20.zip",
+  "download_url": "https://github.com/bababoyibibilabu/DeskEcho/releases/download/v0.2.21/DeskEcho.exe",
+  "zip_url": "https://github.com/bababoyibibilabu/DeskEcho/archive/refs/tags/v0.2.21.zip",
   "min_version": "0.1.0"
 }

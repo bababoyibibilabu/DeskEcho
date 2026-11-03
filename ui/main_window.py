@@ -2569,6 +2569,7 @@ class MainWindow(QMainWindow):
         self.mem_calendar_view = MeetingCalendarWidget()
         self.mem_calendar_view.day_selected.connect(self._open_day_detail)
         self.mem_calendar_view.on_month_changed_callback = self._on_calendar_month_changed
+        self.mem_calendar_view.clean_all_trash_requested.connect(self._clean_global_trash_slices)
         self.mem_sub_stack.addWidget(self.mem_calendar_view)
 
         # ========== 视图 1: 选定单日会议记忆详情 ==========
@@ -2767,11 +2768,12 @@ class MainWindow(QMainWindow):
         self.trash_tip_lbl.setStyleSheet(f"color: {'#64748B' if is_light else '#94A3B8'}; font-size: 11px; font-weight: 500;")
         trash_b_layout.addWidget(self.trash_tip_lbl, 1)
 
-        self.btn_clean_all_trash = QPushButton("清空次要记忆")
+        self.btn_clean_all_trash = QPushButton("清空本日次要记忆 (0)")
         self.btn_clean_all_trash.setFixedHeight(30)
         self.btn_clean_all_trash.setIconSize(QSize(14, 14))
         self.btn_clean_all_trash.setIcon(get_symbol_icon("delete_sweep", color="#64748B" if is_light else "#94A3B8", size=14))
         self.btn_clean_all_trash.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_clean_all_trash.setEnabled(False)
         if is_light:
             self.btn_clean_all_trash.setStyleSheet("""
                 QPushButton {
@@ -2787,6 +2789,11 @@ class MainWindow(QMainWindow):
                     background-color: #FEE2E2;
                     color: #DC2626;
                     border-color: #FCA5A5;
+                }
+                QPushButton:disabled {
+                    background-color: #F1F5F9;
+                    color: #94A3B8;
+                    border-color: #E2E8F0;
                 }
             """)
         else:
@@ -2804,6 +2811,11 @@ class MainWindow(QMainWindow):
                     background-color: rgba(239, 68, 68, 0.2);
                     color: #FCA5A5;
                     border-color: #EF4444;
+                }
+                QPushButton:disabled {
+                    background-color: rgba(255, 255, 255, 0.02);
+                    color: #475569;
+                    border-color: rgba(255, 255, 255, 0.04);
                 }
             """)
         self.btn_clean_all_trash.clicked.connect(self._clean_all_trash_slices)
@@ -3044,6 +3056,30 @@ class MainWindow(QMainWindow):
             overview = self.store.get_month_calendar_overview(year, month)
             self.mem_calendar_view.set_month_data(year, month, overview)
 
+    def _update_day_detail_stats(self):
+        """同步更新单日详情页内的各层级数字统计与清空按钮状态，确保 Tab 数量与列表严格一致"""
+        if not getattr(self, "current_selected_day", None):
+            return
+        date_str = self.current_selected_day
+        day_normal = [r for r in getattr(self, "cached_normal_records", []) if r.get("start_time", "").startswith(date_str)]
+        day_trash = [r for r in getattr(self, "cached_trash_records", []) if r.get("start_time", "").startswith(date_str)]
+        total = len(day_normal) + len(day_trash)
+
+        if hasattr(self, 'lbl_day_badge'):
+            self.lbl_day_badge.setText(f"共 {total} 段记忆 (正式 {len(day_normal)} · 次要 {len(day_trash)})")
+        if hasattr(self, 'btn_mem_normal'):
+            self.btn_mem_normal.setText(f"正式会议记忆 ({len(day_normal)})")
+        if hasattr(self, 'btn_mem_trash'):
+            self.btn_mem_trash.setText(f"或许没用 ({len(day_trash)})")
+        if hasattr(self, 'btn_clean_all_trash'):
+            trash_count = len(day_trash)
+            self.btn_clean_all_trash.setText(f"清空本日次要记忆 ({trash_count})")
+            self.btn_clean_all_trash.setEnabled(trash_count > 0)
+            if trash_count == 0:
+                self.btn_clean_all_trash.setToolTip(f"{date_str} 暂无识别出的次要记忆")
+            else:
+                self.btn_clean_all_trash.setToolTip(f"彻底清空 {date_str} 当天的 {trash_count} 段次要记忆（其他日期记录不受影响）")
+
     def _open_day_detail(self, date_str: str):
         """从日历看板下钻至特定日期的会议记忆详情"""
         self.current_selected_day = date_str
@@ -3059,13 +3095,8 @@ class MainWindow(QMainWindow):
         except Exception:
             self.lbl_day_title.setText(f"📅 {date_str}")
 
-        # 计算该天记录统计
-        day_normal = [r for r in getattr(self, "cached_normal_records", []) if r.get("start_time", "").startswith(date_str)]
-        day_trash = [r for r in getattr(self, "cached_trash_records", []) if r.get("start_time", "").startswith(date_str)]
-        total = len(day_normal) + len(day_trash)
-        self.lbl_day_badge.setText(f"共 {total} 段记忆 (正式 {len(day_normal)} · 次要 {len(day_trash)})")
-        self.btn_mem_normal.setText(f"正式会议记忆 ({len(day_normal)})")
-        self.btn_mem_trash.setText(f"或许没用 ({len(day_trash)})")
+        # 同步更新该天记录统计与 Tab 按钮数量联动
+        self._update_day_detail_stats()
 
         # 前后天邻近导航
         prev_day, next_day = self.store.get_adjacent_recorded_days(date_str)
@@ -3093,10 +3124,19 @@ class MainWindow(QMainWindow):
         self._render_mem_list(preserve_selection=False)
         self.mem_sub_stack.setCurrentIndex(1)
 
+    _drilldown_to_day = _open_day_detail
+
     def _back_to_calendar(self):
         """从单日详情返回月度日历看板"""
         self.current_selected_day = None
         self._refresh_calendar_view()
+        if hasattr(self, 'btn_mem_normal'):
+            self.btn_mem_normal.setText("正式会议记忆 (0)")
+        if hasattr(self, 'btn_mem_trash'):
+            self.btn_mem_trash.setText("或许没用 (0)")
+        if hasattr(self, 'btn_clean_all_trash'):
+            self.btn_clean_all_trash.setText("清空本日次要记忆 (0)")
+            self.btn_clean_all_trash.setEnabled(False)
         self.mem_sub_stack.setCurrentIndex(0)
 
     def _go_prev_recorded_day(self):
@@ -3181,8 +3221,6 @@ class MainWindow(QMainWindow):
 
     def _switch_mem_mode(self, mode: str):
         """切换正式记忆资产 vs 或许没用次要记忆"""
-        if self.current_mem_mode == mode:
-            return
         self.current_mem_mode = mode
         self.current_selected_record = None
         self._update_mem_tab_styles()
@@ -3191,7 +3229,24 @@ class MainWindow(QMainWindow):
         if hasattr(self, "new_slice_pill"):
             self.new_slice_pill.setVisible(False)
         self._has_pending_update = False
-        self._render_mem_list(preserve_selection=False)
+
+        # 若未选定具体日期而直接切换记忆模式，自动锚定至最新有记录日期或今日并下钻详情
+        if not getattr(self, "current_selected_day", None):
+            target_day = None
+            for r in getattr(self, "cached_records", []):
+                st = (r.get("start_time") or "").strip()
+                if len(st) >= 10:
+                    target_day = st[:10]
+                    break
+            if not target_day:
+                import datetime
+                target_day = datetime.date.today().strftime("%Y-%m-%d")
+            self._open_day_detail(target_day)
+        else:
+            if hasattr(self, "mem_sub_stack") and self.mem_sub_stack.currentIndex() == 0:
+                self.mem_sub_stack.setCurrentIndex(1)
+            self._update_day_detail_stats()
+            self._render_mem_list(preserve_selection=False)
 
     def _apply_pending_slice_update(self):
         """平滑应用积压的待更新记忆，置顶显示最新会议内容"""
@@ -4634,12 +4689,25 @@ class MainWindow(QMainWindow):
             self.cached_normal_records = normal_recs
             self.cached_trash_records = trash_recs
 
-            if hasattr(self, 'btn_mem_normal'):
-                self.btn_mem_normal.setText(f"正式会议记忆 ({len(normal_recs)})")
-            if hasattr(self, 'btn_mem_trash'):
-                self.btn_mem_trash.setText(f"或许没用 ({len(trash_recs)})")
+            # 顶栏全局导航按钮：始终保持为全库正式会议资产总数
             if hasattr(self, 'sub_btn_memory'):
                 self.sub_btn_memory.setText(f"会议记忆库 ({len(normal_recs)})")
+
+            # 同步更新日历看板右上角全局安全清理按钮 (全库次要记忆统计)
+            if hasattr(self, 'mem_calendar_view') and hasattr(self.mem_calendar_view, 'update_global_trash_count'):
+                self.mem_calendar_view.update_global_trash_count(len(trash_recs))
+
+            # 层级与数字展示一致性（修复数据打架 Bug）：若正处于单日详情页，Tab 按钮与统计严格与所选日期联动
+            if getattr(self, "current_selected_day", None):
+                self._update_day_detail_stats()
+            else:
+                if hasattr(self, 'btn_mem_normal'):
+                    self.btn_mem_normal.setText("正式会议记忆 (0)")
+                if hasattr(self, 'btn_mem_trash'):
+                    self.btn_mem_trash.setText("或许没用 (0)")
+                if hasattr(self, 'btn_clean_all_trash'):
+                    self.btn_clean_all_trash.setText("清空本日次要记忆 (0)")
+                    self.btn_clean_all_trash.setEnabled(False)
 
             # 刷新首屏“今日已新增 X 段记忆”徽章
             self._update_today_slice_badge()
@@ -4947,23 +5015,57 @@ class MainWindow(QMainWindow):
                 ModernDialog.show_warning(self, "删除失败", f"删除记忆 {sid} 遇到错误，请检查日志。")
 
     def _clean_all_trash_slices(self):
-        """一键清空所有次要记忆 (仅在'或许没用'生效)"""
-        if self.current_mem_mode != "trash" or not self.cached_trash_records:
-            ModernDialog.show_info(self, "暂无数据", "当前没有识别出的次要记忆。")
+        """清除次要记忆 (单日详情页内清空本日次要碎片；杜绝全库误伤)"""
+        if self.current_mem_mode != "trash":
             return
 
-        trash_ids = [r.get("id") for r in self.cached_trash_records if r.get("id")]
+        if not getattr(self, "current_selected_day", None):
+            ModernDialog.show_info(self, "未选定日期", "请先在日历看板中选择具体日期进入单日详情。")
+            return
+
+        date_str = self.current_selected_day
+        day_trash = [r for r in getattr(self, "cached_trash_records", []) if r.get("start_time", "").strip().startswith(date_str)]
+        trash_ids = [r.get("id") for r in day_trash if r.get("id")]
         count = len(trash_ids)
+        if count == 0:
+            ModernDialog.show_info(self, "暂无数据", f"{date_str} 当天没有识别出的次要记忆。")
+            return
+
         ok = ModernDialog.confirm_danger(
             self,
-            title="一键清空次要记忆",
-            message=f"确定要一键清理当前识别出的全部 {count} 段次要记忆吗？",
-            detail="这些记忆经 AI 研判为闲聊、试音或无决议/无待办碎片。\n删除后将彻底释放空间并优化检索效率，操作不可逆！",
-            confirm_text=f"一键清空 ({count})"
+            title="清空本日次要记忆",
+            message=f"确定清空 {date_str} 当天的 {count} 段次要记忆吗？（其他日期的记录不受影响）",
+            detail=f"日期: {date_str}\n待清理记录数: 共 {count} 段次要碎片\n\n这些记录经 AI 研判为开场寒暄、试音或无决议内容。\n清理后将释放空间，其他历史日期的正式与次要记忆均不受任何影响。\n操作不可逆，请确认！",
+            confirm_text=f"清空本日次要 ({count})"
         )
         if ok:
             deleted_count = self.store.delete_slices(trash_ids)
-            self.search_status_lbl.setText(f"✓ 已一键清理 {deleted_count} 段次要记忆")
+            if hasattr(self, 'search_status_lbl'):
+                self.search_status_lbl.setText(f"✓ 已清空 {date_str} 当天的 {deleted_count} 段次要记忆")
+            self.current_selected_record = None
+            self.refresh_records()
+
+    def _clean_global_trash_slices(self):
+        """全局安全清理：清空全库所有历史次要记忆 (日历看板根视图入口)"""
+        trash_recs = getattr(self, "cached_trash_records", [])
+        trash_ids = [r.get("id") for r in trash_recs if r.get("id")]
+        count = len(trash_ids)
+        if count == 0:
+            ModernDialog.show_info(self, "暂无次要记忆", "当前全库中暂无识别出的次要碎片，无需清理。")
+            return
+
+        normal_count = len(getattr(self, "cached_normal_records", []))
+        ok = ModernDialog.confirm_danger(
+            self,
+            title="清空全库次要记忆",
+            message=f"确定清空会议记忆库中全部 {count} 段历史次要记忆吗？",
+            detail=f"待清理全库次要记忆: 共 {count} 段\n\n这些记录经 AI 研判为全历史跨天录制的闲聊、试音或碎片。\n所有正式会议资产（共 {normal_count} 段）将完整保留，不受任何影响。\n操作不可逆，请确认！",
+            confirm_text=f"彻底清空全库次要 ({count})"
+        )
+        if ok:
+            deleted_count = self.store.delete_slices(trash_ids)
+            if hasattr(self, 'search_status_lbl'):
+                self.search_status_lbl.setText(f"✓ 已清理全库共 {deleted_count} 段次要记忆")
             self.current_selected_record = None
             self.refresh_records()
 
@@ -5498,6 +5600,11 @@ class MainWindow(QMainWindow):
                         color: #DC2626;
                         border-color: #FCA5A5;
                     }
+                    QPushButton:disabled {
+                        background-color: #F1F5F9;
+                        color: #94A3B8;
+                        border-color: #E2E8F0;
+                    }
                 """)
             else:
                 self.btn_clean_all_trash.setStyleSheet("""
@@ -5514,6 +5621,11 @@ class MainWindow(QMainWindow):
                         background-color: rgba(239, 68, 68, 0.2);
                         color: #FCA5A5;
                         border-color: #EF4444;
+                    }
+                    QPushButton:disabled {
+                        background-color: rgba(255, 255, 255, 0.02);
+                        color: #475569;
+                        border-color: rgba(255, 255, 255, 0.04);
                     }
                 """)
         if hasattr(self, 'mem_list'):

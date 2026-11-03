@@ -93,31 +93,60 @@ class DayCard(QFrame):
         if self.has_records:
             total_cnt = self.day_data.get("total_count", 0)
             useful_cnt = self.day_data.get("useful_count", total_cnt)
-            badge_text = f"● {useful_cnt} 条记忆"
-            self.badge_lbl = QLabel(badge_text)
-            if self.is_light:
-                self.badge_lbl.setStyleSheet("""
-                    QLabel {
-                        background-color: rgba(2, 132, 199, 0.12);
-                        color: #0284C7;
-                        font-size: 10.5px;
-                        font-weight: 600;
-                        border-radius: 4px;
-                        padding: 1px 6px;
-                    }
-                """)
+            trash_cnt = self.day_data.get("trash_count", max(0, total_cnt - useful_cnt))
+
+            if useful_cnt > 0:
+                badge_text = f"● {useful_cnt} 条记忆"
+                if self.is_light:
+                    badge_style = """
+                        QLabel {
+                            background-color: rgba(2, 132, 199, 0.12);
+                            color: #0284C7;
+                            font-size: 10.5px;
+                            font-weight: 600;
+                            border-radius: 4px;
+                            padding: 1px 6px;
+                        }
+                    """
+                else:
+                    badge_style = """
+                        QLabel {
+                            background-color: rgba(38, 176, 228, 0.18);
+                            color: #38BDF8;
+                            font-size: 10.5px;
+                            font-weight: 600;
+                            border-radius: 4px;
+                            padding: 1px 6px;
+                        }
+                    """
             else:
-                self.badge_lbl.setStyleSheet("""
-                    QLabel {
-                        background-color: rgba(38, 176, 228, 0.18);
-                        color: #38BDF8;
-                        font-size: 10.5px;
-                        font-weight: 600;
-                        border-radius: 4px;
-                        padding: 1px 6px;
-                    }
-                """)
+                badge_text = f"● {trash_cnt} 段次要"
+                if self.is_light:
+                    badge_style = """
+                        QLabel {
+                            background-color: #F1F5F9;
+                            color: #64748B;
+                            font-size: 10.5px;
+                            font-weight: 500;
+                            border-radius: 4px;
+                            padding: 1px 6px;
+                        }
+                    """
+                else:
+                    badge_style = """
+                        QLabel {
+                            background-color: rgba(255, 255, 255, 0.05);
+                            color: #94A3B8;
+                            font-size: 10.5px;
+                            font-weight: 500;
+                            border-radius: 4px;
+                            padding: 1px 6px;
+                        }
+                    """
+            self.badge_lbl = QLabel(badge_text)
+            self.badge_lbl.setStyleSheet(badge_style)
             header_layout.addWidget(self.badge_lbl)
+            self.setToolTip(f"{self.date_str}\n共 {total_cnt} 段记忆 (正式 {useful_cnt} · 次要 {trash_cnt})")
 
         layout.addLayout(header_layout)
 
@@ -207,6 +236,7 @@ class MeetingCalendarWidget(QWidget):
     月度会议日历主看板
     """
     day_selected = pyqtSignal(str) # 抛出所选日期 'YYYY-MM-DD'
+    clean_all_trash_requested = pyqtSignal() # 请求清空全库次要记忆信号
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
@@ -270,6 +300,18 @@ class MeetingCalendarWidget(QWidget):
         self.lbl_month_stats = QLabel("本月统计加载中...")
         self.lbl_month_stats.setStyleSheet(f"font-size: 12px; font-weight: 600; color: {'#0284C7' if is_light else '#38BDF8'};")
         h_layout.addWidget(self.lbl_month_stats)
+        h_layout.addSpacing(6)
+
+        # 全局安全清理入口：清空全库次要记忆 (日历看板根视图)
+        self.btn_clean_all_trash = QPushButton("清理全库次要 (0)")
+        self.btn_clean_all_trash.setObjectName("cal_btn_clean_trash")
+        self.btn_clean_all_trash.setFixedHeight(30)
+        self.btn_clean_all_trash.setIconSize(QSize(14, 14))
+        self.btn_clean_all_trash.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_clean_all_trash.setEnabled(False)
+        self.btn_clean_all_trash.setToolTip("安全清理全库所有历史次要碎片（正式会议记忆不受影响）")
+        self.btn_clean_all_trash.clicked.connect(self._on_clean_all_trash_clicked)
+        h_layout.addWidget(self.btn_clean_all_trash)
 
         main_layout.addWidget(self.header_card)
 
@@ -353,6 +395,52 @@ class MeetingCalendarWidget(QWidget):
         self.btn_today.setStyleSheet(cur_style)
         self.btn_prev_month.setIcon(get_symbol_icon("chevron_left", color="#475569" if is_light else "#CBD5E1", size=14))
         self.btn_next_month.setIcon(get_symbol_icon("chevron_right", color="#475569" if is_light else "#CBD5E1", size=14))
+
+        if hasattr(self, 'btn_clean_all_trash'):
+            btn_clean_style_light = """
+                QPushButton#cal_btn_clean_trash {
+                    background-color: #FFFFFF;
+                    color: #475569;
+                    border: 1px solid #CBD5E1;
+                    border-radius: 6px;
+                    padding: 0px 10px;
+                    font-size: 11.5px;
+                    font-weight: 500;
+                }
+                QPushButton#cal_btn_clean_trash:hover {
+                    background-color: #FEE2E2;
+                    border-color: #FCA5A5;
+                    color: #DC2626;
+                }
+                QPushButton#cal_btn_clean_trash:disabled {
+                    background-color: #F1F5F9;
+                    color: #94A3B8;
+                    border-color: #E2E8F0;
+                }
+            """
+            btn_clean_style_dark = """
+                QPushButton#cal_btn_clean_trash {
+                    background-color: rgba(255, 255, 255, 0.05);
+                    color: #94A3B8;
+                    border: 1px solid rgba(255, 255, 255, 0.1);
+                    border-radius: 6px;
+                    padding: 0px 10px;
+                    font-size: 11.5px;
+                    font-weight: 500;
+                }
+                QPushButton#cal_btn_clean_trash:hover {
+                    background-color: rgba(239, 68, 68, 0.2);
+                    border-color: #EF4444;
+                    color: #FCA5A5;
+                }
+                QPushButton#cal_btn_clean_trash:disabled {
+                    background-color: rgba(255, 255, 255, 0.02);
+                    color: #475569;
+                    border-color: rgba(255, 255, 255, 0.04);
+                }
+            """
+            self.btn_clean_all_trash.setStyleSheet(btn_clean_style_light if is_light else btn_clean_style_dark)
+            self.btn_clean_all_trash.setIcon(get_symbol_icon("delete_sweep", color="#64748B" if is_light else "#94A3B8", size=14))
 
     def _go_prev_month(self):
         if self.current_month == 1:
@@ -457,3 +545,18 @@ class MeetingCalendarWidget(QWidget):
             if isinstance(w, QLabel):
                 w.setStyleSheet(f"font-size: 11.5px; font-weight: 600; color: {'#64748B' if is_light else '#94A3B8'};")
         self._render_grid()
+
+    def _on_clean_all_trash_clicked(self):
+        """用户点击日历主看板右上角的清空全库次要记忆"""
+        self.clean_all_trash_requested.emit()
+
+    def update_global_trash_count(self, count: int):
+        """更新全局次要记忆统计与清理按钮状态"""
+        if hasattr(self, 'btn_clean_all_trash'):
+            self.btn_clean_all_trash.setText(f"清理全库次要 ({count})")
+            self.btn_clean_all_trash.setEnabled(count > 0)
+            if count == 0:
+                self.btn_clean_all_trash.setToolTip("全库暂无次要碎片，无需清理")
+            else:
+                self.btn_clean_all_trash.setToolTip(f"安全清理全库共 {count} 段次要碎片（正式会议记忆不受影响）")
+
