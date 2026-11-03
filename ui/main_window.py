@@ -4691,7 +4691,7 @@ class MainWindow(QMainWindow):
 
             # 顶栏全局导航按钮：始终保持为全库正式会议资产总数
             if hasattr(self, 'sub_btn_memory'):
-                self.sub_btn_memory.setText(f"会议记忆库 ({len(normal_recs)})")
+                self.sub_btn_memory.setText("会议记忆库")
 
             # 同步更新日历看板右上角全局安全清理按钮 (全库次要记忆统计)
             if hasattr(self, 'mem_calendar_view') and hasattr(self.mem_calendar_view, 'update_global_trash_count'):

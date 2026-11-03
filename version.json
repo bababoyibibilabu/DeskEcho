@@ -1,14 +1,12 @@
 {
-  "version": "0.2.21",
+  "version": "0.2.22",
   "release_date": "2026-11-03",
-  "title": "DeskEcho v0.2.21 记忆层级统计自洽与单日安全清理边界重塑",
+  "title": "DeskEcho v0.2.22 移除顶栏菜单数字与保持一级导航纯净",
   "changelog": [
-    "层级数字统计自洽：修复单日会议详情页 Tab 按钮被全历史总数错误覆盖的 Bug，正式记忆与或许没用数量严格与所选单日列表 100% 联动",
-    "日历看板与详情研判对齐：统一底层未标记记录的 AI 研判标准，彻底解决月度日历看板与单日详情视图数据打架问题",
-    "单日清理安全隔离：单日详情页中的清空按钮明确重命名为【清空本日次要记忆】，点击仅删除当前所选日期的废弃碎片，杜绝全库误伤",
-    "全局清理入口分层：在日历看板主视图右上角提供独立的【清理全库次要】操作入口，层级边界严谨分明"
+    "响应操作员改进指令 (REQ-20261103170537-A254)：移除顶栏菜单项『会议记忆库』后截断且打架的伪数字，保持一级功能模块导航清晰自洽",
+    "各层级数据严密自洽：一级导航清爽纯净，二级日历看板展现月度统计，三级单日详情展现精准单日切片统计"
   ],
-  "download_url": "https://github.com/bababoyibibilabu/DeskEcho/releases/download/v0.2.21/DeskEcho.exe",
-  "zip_url": "https://github.com/bababoyibibilabu/DeskEcho/archive/refs/tags/v0.2.21.zip",
+  "download_url": "https://github.com/bababoyibibilabu/DeskEcho/releases/download/v0.2.22/DeskEcho.exe",
+  "zip_url": "https://github.com/bababoyibibilabu/DeskEcho/archive/refs/tags/v0.2.22.zip",
   "min_version": "0.1.0"
 }
