@@ -5569,22 +5569,36 @@ class MainWindow(QMainWindow):
         is_light = tm.is_light()
         colors = tm.get_colors()
 
-        # 1. 全局窗口 QSS 与全局 ToolTip 样式（确保任意主题下 ToolTip 均为高对比度清晰深色胶囊）
+        # 1. 全局窗口 QSS 与全局 ToolTip 样式（主题自适应：亮色模式下使用纯白高对比度浅色气泡，暗色模式下使用暗夜胶囊）
         self.setStyleSheet(tm.get_global_qss())
         app = QApplication.instance()
         if app:
-            app.setStyleSheet("""
-                QToolTip {
-                    background-color: #1E293B;
-                    color: #FFFFFF;
-                    border: 1px solid #334155;
-                    border-radius: 5px;
-                    padding: 5px 9px;
-                    font-size: 11px;
-                    font-weight: 500;
-                    font-family: 'Segoe UI', 'Microsoft YaHei UI', sans-serif;
-                }
-            """)
+            if is_light:
+                app.setStyleSheet("""
+                    QToolTip {
+                        background-color: #FFFFFF;
+                        color: #0F172A;
+                        border: 1px solid #CBD5E1;
+                        border-radius: 6px;
+                        padding: 6px 10px;
+                        font-size: 11.5px;
+                        font-weight: 500;
+                        font-family: 'Segoe UI', 'Microsoft YaHei UI', sans-serif;
+                    }
+                """)
+            else:
+                app.setStyleSheet("""
+                    QToolTip {
+                        background-color: #1E293B;
+                        color: #F8FAFC;
+                        border: 1px solid #475569;
+                        border-radius: 6px;
+                        padding: 6px 10px;
+                        font-size: 11.5px;
+                        font-weight: 500;
+                        font-family: 'Segoe UI', 'Microsoft YaHei UI', sans-serif;
+                    }
+                """)
 
         # 2. 品牌卡与侧边栏 (通透无多余边框)
         if hasattr(self, 'brand_card'):
@@ -6089,6 +6103,7 @@ class MainWindow(QMainWindow):
             icon_name = "visibility" if is_pwd else "visibility_off"
             icon_color = ("#475569" if is_pwd else "#0284C7") if is_light else ("#94A3B8" if is_pwd else "#38BDF8")
             self.btn_toggle_llm_key.setIcon(get_symbol_icon(icon_name, color=icon_color, size=15))
+            self.btn_toggle_llm_key.setToolTip("显示密钥明文" if is_pwd else "隐藏密钥明文")
             if is_light:
                 self.btn_toggle_llm_key.setStyleSheet("""
                     QPushButton {

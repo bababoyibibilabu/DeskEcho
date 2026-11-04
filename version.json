@@ -1,13 +1,13 @@
 {
-  "version": "0.2.24",
+  "version": "0.2.25",
   "release_date": "2026-11-04",
-  "title": "DeskEcho v0.2.24 修复大模型连通性探测挂起与明文切换UI/暗色提示框",
+  "title": "DeskEcho v0.2.25 优化API Key提示气泡对比度与主题自适应",
   "changelog": [
-    "修复大模型连通性测试按钮因跨线程异步派发异常导致长时间卡在'正在测试'的致命缺陷，改用 Qt 强类型 Signal 异步回调，确保精准超时与即时返回",
-    "补齐缺失的 visibility / visibility_off / save 等 9 款矢量图标，解决 API Key 密码显隐按钮显示为空白灰块的问题",
-    "重构 API Key 明文切换按钮样式与尺寸规整，并全局优化 QToolTip 提示框样式为高对比度深色胶囊，彻底解决提示字看不清的问题"
+    "优化模型 API Key 输入框右侧小眼睛切换按钮悬浮气球提示样式，使其与全局主题动态联动自适应",
+    "在浅色主题下采用纯净明亮卡片背景 (#FFFFFF) 搭配深色高对比文字 (#0F172A) 与细腻轮廓线，彻底消除因背景过黑导致文字辨识困难的体验痛点",
+    "深色模式保持深蓝夜景高对比胶囊样式，并确保中英文多系统字阶清晰锐利"
   ],
-  "download_url": "https://github.com/bababoyibibilabu/DeskEcho/releases/download/v0.2.24/DeskEcho.exe",
-  "zip_url": "https://github.com/bababoyibibilabu/DeskEcho/archive/refs/tags/v0.2.24.zip",
+  "download_url": "https://github.com/bababoyibibilabu/DeskEcho/releases/download/v0.2.25/DeskEcho.exe",
+  "zip_url": "https://github.com/bababoyibibilabu/DeskEcho/archive/refs/tags/v0.2.25.zip",
   "min_version": "0.1.0"
 }

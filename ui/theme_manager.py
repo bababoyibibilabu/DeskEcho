@@ -250,12 +250,14 @@ class ThemeManager(QObject):
                 background: transparent;
             }}
             QToolTip {{
-                background-color: {c['bg_card']};
-                color: {c['text_primary']};
-                border: 1px solid {c['border_card']};
+                background-color: {'#FFFFFF' if c['name'] == 'light' else '#1E293B'};
+                color: {'#0F172A' if c['name'] == 'light' else '#F8FAFC'};
+                border: 1px solid {'#CBD5E1' if c['name'] == 'light' else '#475569'};
                 border-radius: 6px;
-                padding: 5px 8px;
-                font-size: 11px;
+                padding: 6px 10px;
+                font-size: 11.5px;
+                font-weight: 500;
+                font-family: 'Segoe UI', 'Microsoft YaHei UI', sans-serif;
             }}
             QLineEdit, QTextBrowser, QListWidget, QComboBox {{
                 selection-background-color: {c['brand_accent']};
