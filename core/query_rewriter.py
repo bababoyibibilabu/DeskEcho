@@ -55,11 +55,18 @@ MULTI_TURN_REWRITE_SYSTEM_PROMPT = """你是一个专业的企业语音对讲意
 
 class QueryRewriter:
     def __init__(self):
-        self.api_key = Config.OPENAI_API_KEY
+        self.api_key = ""
+        self.base_url = ""
+        self.model = ""
+        self.client = None
+        self.reload_config()
+
+    def reload_config(self):
+        """重新同步配置并初始化 OpenAI Client"""
+        self.api_key = Config.get_active_llm_key()
         self.base_url = Config.OPENAI_BASE_URL
         self.model = Config.LLM_MODEL
         self.client = None
-
         if self.api_key:
             try:
                 from openai import OpenAI
@@ -70,6 +77,13 @@ class QueryRewriter:
             except Exception as e:
                 print(f"[QueryRewriter] 初始化 OpenAI Client 失败: {e}")
 
+    def _ensure_client(self):
+        cur_key = Config.get_active_llm_key()
+        if (cur_key != self.api_key or Config.OPENAI_BASE_URL != self.base_url
+                or Config.LLM_MODEL != self.model or (cur_key and self.client is None)):
+            self.reload_config()
+        return self.client
+
     def rewrite_and_normalize(self, raw_query: str, history: Optional[List[Any]] = None) -> Dict[str, Any]:
         """
         多轮与单轮双层重塑流水线：
@@ -79,7 +93,8 @@ class QueryRewriter:
         has_history = bool(history and len(history) > 0)
         tier1_res = self._local_fast_normalize(raw_query, history=history)
 
-        if not self.client:
+        client = self._ensure_client()
+        if not client:
             return tier1_res
 
         try:
@@ -104,7 +119,7 @@ class QueryRewriter:
                 prompt_user = f"用户口语对讲提问：“{raw_query}”"
                 system_prompt = REWRITE_SYSTEM_PROMPT
 
-            response = self.client.chat.completions.create(
+            response = client.chat.completions.create(
                 model=self.model,
                 messages=[
                     {"role": "system", "content": system_prompt},

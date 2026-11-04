@@ -50,13 +50,21 @@ class InstructionHandler:
 
     def __init__(self):
         self.enabled = Config.ENABLE_DEV_INSTRUCTION_MODE
-        self.api_key = Config.OPENAI_API_KEY or Config.DASHSCOPE_API_KEY
-        self.base_url = Config.OPENAI_BASE_URL
-        self.model = Config.LLM_MODEL
+        self.api_key = ""
+        self.base_url = ""
+        self.model = ""
         self.client = None
         self._lock = threading.Lock()
         self.queue_file = Config.DATA_DIR / "iteration_queue.json"
+        self.reload_config()
 
+    def reload_config(self):
+        """重新同步配置并初始化 OpenAI Client"""
+        self.enabled = Config.ENABLE_DEV_INSTRUCTION_MODE
+        self.api_key = Config.get_active_llm_key()
+        self.base_url = Config.OPENAI_BASE_URL
+        self.model = Config.LLM_MODEL
+        self.client = None
         if self.api_key:
             try:
                 from openai import OpenAI
@@ -66,6 +74,13 @@ class InstructionHandler:
                 )
             except Exception as e:
                 print(f"[InstructionHandler] 初始化 OpenAI Client 失败: {e}")
+
+    def _ensure_client(self):
+        cur_key = Config.get_active_llm_key()
+        if (cur_key != self.api_key or Config.OPENAI_BASE_URL != self.base_url
+                or Config.LLM_MODEL != self.model or (cur_key and self.client is None)):
+            self.reload_config()
+        return self.client
 
     def is_instruction(self, text: str) -> bool:
         """检查输入文本是否命中改进指令触发词"""
@@ -176,10 +191,11 @@ class InstructionHandler:
 
     def _evaluate_with_llm(self, raw_instruction: str) -> Dict[str, Any]:
         """调用大模型评估需求并输出结构化方案"""
-        if self.client:
+        client = self._ensure_client()
+        if client:
             try:
                 prompt = INSTRUCTION_EVAL_PROMPT.format(raw_instruction=raw_instruction)
-                resp = self.client.chat.completions.create(
+                resp = client.chat.completions.create(
                     model=self.model,
                     messages=[
                         {"role": "system", "content": "You are a professional software architect. Return pure JSON."},

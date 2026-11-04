@@ -16,11 +16,18 @@ SUMMARIZE_PROMPT = """你是一个企业常驻会议知识库助理。请对以�
 
 class LLMSummarizer:
     def __init__(self):
-        self.api_key = Config.OPENAI_API_KEY or Config.DASHSCOPE_API_KEY
+        self.api_key = ""
+        self.base_url = ""
+        self.model = ""
+        self.client = None
+        self.reload_config()
+
+    def reload_config(self):
+        """重新同步配置并初始化 OpenAI Client"""
+        self.api_key = Config.get_active_llm_key()
         self.base_url = Config.OPENAI_BASE_URL
         self.model = Config.LLM_MODEL
         self.client = None
-        
         if self.api_key:
             try:
                 from openai import OpenAI
@@ -31,6 +38,13 @@ class LLMSummarizer:
             except Exception as e:
                 print(f"[LLMSummarizer] OpenAI Client 初始化失败: {e}")
 
+    def _ensure_client(self):
+        cur_key = Config.get_active_llm_key()
+        if (cur_key != self.api_key or Config.OPENAI_BASE_URL != self.base_url
+                or Config.LLM_MODEL != self.model or (cur_key and self.client is None)):
+            self.reload_config()
+        return self.client
+
     def summarize(self, raw_text: str, start_time: str, end_time: str) -> str:
         """
         结构化提炼切片文本
@@ -38,14 +52,15 @@ class LLMSummarizer:
         if not raw_text.strip():
             return "【无有效发言内容】"
 
-        if self.client:
+        client = self._ensure_client()
+        if client:
             try:
                 prompt = SUMMARIZE_PROMPT.format(
                     start_time=start_time,
                     end_time=end_time,
                     raw_text=raw_text
                 )
-                response = self.client.chat.completions.create(
+                response = client.chat.completions.create(
                     model=self.model,
                     messages=[
                         {"role": "system", "content": "你是一个严谨的企业会议纪要分析专家。"},

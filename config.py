@@ -28,14 +28,61 @@ class Config:
     TEMP_DIR = DATA_DIR / "temp"
     TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
+    # LLM 预设字典 (支持一键切换主流服务商)
+    LLM_PRESETS = {
+        "zhipu": {
+            "name": "智谱 AI (GLM-4-Flash · 高速稳定)",
+            "base_url": "https://open.bigmodel.cn/api/coding/paas/v4",
+            "model": "glm-4-flash",
+            "key_env": "ZHIPU_API_KEY",
+        },
+        "deepseek-chat": {
+            "name": "DeepSeek (官方标准 deepseek-chat)",
+            "base_url": "https://api.deepseek.com/v1",
+            "model": "deepseek-chat",
+            "key_env": "DEEPSEEK_API_KEY",
+        },
+        "deepseek-reasoner": {
+            "name": "DeepSeek (深度推理 deepseek-reasoner / R1)",
+            "base_url": "https://api.deepseek.com/v1",
+            "model": "deepseek-reasoner",
+            "key_env": "DEEPSEEK_API_KEY",
+        },
+        "qwen": {
+            "name": "阿里通义千问 (Qwen-Plus)",
+            "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+            "model": "qwen-plus",
+            "key_env": "DASHSCOPE_API_KEY",
+        },
+        "custom": {
+            "name": "自定义 (OpenAI 兼容接口)",
+            "base_url": "",
+            "model": "",
+            "key_env": "OPENAI_API_KEY",
+        }
+    }
+
     # LLM 配置
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "").strip()
     OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1").strip()
     LLM_MODEL = os.getenv("LLM_MODEL", "qwen-plus").strip()
+    LLM_PROVIDER = os.getenv("LLM_PROVIDER", "").strip()
+
+    # 独立记忆各服务商 API Key
+    DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "").strip()
+    ZHIPU_API_KEY = os.getenv("ZHIPU_API_KEY", "").strip()
+    DASHSCOPE_API_KEY = os.getenv("DASHSCOPE_API_KEY", "").strip()
+
+    # 自动继承推导已存服务商 Key
+    if not ZHIPU_API_KEY and ("bigmodel.cn" in OPENAI_BASE_URL or "glm" in LLM_MODEL):
+        ZHIPU_API_KEY = OPENAI_API_KEY
+    if not DEEPSEEK_API_KEY and ("deepseek" in OPENAI_BASE_URL or "deepseek" in LLM_MODEL):
+        DEEPSEEK_API_KEY = OPENAI_API_KEY
+    if not DASHSCOPE_API_KEY and ("dashscope" in OPENAI_BASE_URL or "qwen" in LLM_MODEL):
+        DASHSCOPE_API_KEY = OPENAI_API_KEY
 
     # ASR 配置 (sensevoice | volcengine | dashscope | openai | mock)
     ASR_PROVIDER = os.getenv("ASR_PROVIDER", "sensevoice").lower().strip()
-    DASHSCOPE_API_KEY = os.getenv("DASHSCOPE_API_KEY", "").strip() or OPENAI_API_KEY
 
     # 本地离线 ASR 与 VAD 模型路径配置 (SenseVoice-Small INT8 + Silero VAD)
     MODELS_DIR = (BASE_DIR / "models").resolve()
@@ -101,8 +148,43 @@ class Config:
     ENABLE_DEV_INSTRUCTION_MODE = os.getenv("ENABLE_DEV_INSTRUCTION_MODE", "true").lower() in ("1", "true", "yes")
 
     @classmethod
+    def get_current_llm_provider(cls) -> str:
+        if cls.LLM_PROVIDER and cls.LLM_PROVIDER in cls.LLM_PRESETS:
+            return cls.LLM_PROVIDER
+        url = (cls.OPENAI_BASE_URL or "").lower()
+        model = (cls.LLM_MODEL or "").lower()
+        if "deepseek-reasoner" in model:
+            return "deepseek-reasoner"
+        if "deepseek" in url or "deepseek" in model:
+            return "deepseek-chat"
+        if "bigmodel.cn" in url or "glm" in model:
+            return "zhipu"
+        if "dashscope" in url or "qwen" in model:
+            return "qwen"
+        return "custom"
+
+    @classmethod
+    def get_provider_key(cls, provider: str) -> str:
+        if provider in ("deepseek-chat", "deepseek-reasoner"):
+            return cls.DEEPSEEK_API_KEY or (cls.OPENAI_API_KEY if "deepseek" in (cls.OPENAI_BASE_URL or "").lower() else "")
+        elif provider == "zhipu":
+            return cls.ZHIPU_API_KEY or (cls.OPENAI_API_KEY if "bigmodel" in (cls.OPENAI_BASE_URL or "").lower() else "")
+        elif provider == "qwen":
+            return cls.DASHSCOPE_API_KEY or (cls.OPENAI_API_KEY if "dashscope" in (cls.OPENAI_BASE_URL or "").lower() else "")
+        else:
+            return cls.OPENAI_API_KEY
+
+    @classmethod
+    def get_active_llm_key(cls) -> str:
+        """获取当前激活服务商的 API Key"""
+        if cls.OPENAI_API_KEY:
+            return cls.OPENAI_API_KEY
+        provider = cls.get_current_llm_provider()
+        return cls.get_provider_key(provider)
+
+    @classmethod
     def has_llm_key(cls) -> bool:
-        return bool(cls.OPENAI_API_KEY)
+        return bool(cls.get_active_llm_key())
 
     @classmethod
     def has_asr_key(cls) -> bool:

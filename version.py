@@ -1,6 +1,6 @@
-APP_VERSION = "0.2.22"
+APP_VERSION = "0.2.23"
 APP_NAME = "DeskEcho"
-RELEASE_DATE = "2026-11-03"
+RELEASE_DATE = "2026-11-04"
 GITHUB_REPO = "bababoyibibilabu/DeskEcho"
 VERSION_URL = f"https://raw.githubusercontent.com/{GITHUB_REPO}/main/version.json"
 RELEASE_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"

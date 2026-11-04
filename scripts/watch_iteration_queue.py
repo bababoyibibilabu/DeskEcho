@@ -19,7 +19,7 @@ from scripts.iteration_daemon import fetch_all_tasks
 def main():
     print("[Watcher] Started watching for PENDING tasks on remote test machine...")
     sys.stdout.flush()
-    max_duration = 3600  # 1 hour max per watcher task
+    max_duration = 86400 * 7  # 7 days continuous watching
     start_time = time.time()
     
     while time.time() - start_time < max_duration:

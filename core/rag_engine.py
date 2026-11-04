@@ -85,15 +85,22 @@ GENERAL_FALLBACK_USER_PROMPT = """{dialogue_context}【用户提问】：
 class RAGEngine:
     def __init__(self, meeting_store: MeetingStore):
         self.store = meeting_store
-        self.api_key = Config.OPENAI_API_KEY or Config.DASHSCOPE_API_KEY
-        self.base_url = Config.OPENAI_BASE_URL
-        self.model = Config.LLM_MODEL
+        self.api_key = ""
+        self.base_url = ""
+        self.model = ""
         self.client = None
         self.rewriter = QueryRewriter()
         self.instruction_handler = InstructionHandler()
         self.session_manager = SessionManager(store=self.store, ttl_seconds=600.0, max_turns=3)
         self.entity_context = get_entity_context_prompt()
-        
+        self.reload_config()
+
+    def reload_config(self):
+        """重新同步配置并初始化 OpenAI Client"""
+        self.api_key = Config.get_active_llm_key()
+        self.base_url = Config.OPENAI_BASE_URL
+        self.model = Config.LLM_MODEL
+        self.client = None
         if self.api_key:
             try:
                 from openai import OpenAI
@@ -103,6 +110,17 @@ class RAGEngine:
                 )
             except Exception as e:
                 print(f"[RAGEngine] 初始化 OpenAI Client 失败: {e}")
+        if hasattr(self, 'rewriter') and self.rewriter:
+            self.rewriter.reload_config()
+        if hasattr(self, 'instruction_handler') and self.instruction_handler:
+            self.instruction_handler.reload_config()
+
+    def _ensure_client(self):
+        cur_key = Config.get_active_llm_key()
+        if (cur_key != self.api_key or Config.OPENAI_BASE_URL != self.base_url
+                or Config.LLM_MODEL != self.model or (cur_key and self.client is None)):
+            self.reload_config()
+        return self.client
 
     def reset_session(self):
         """主动清空会话上下文 (开启新对话)"""
@@ -249,7 +267,8 @@ class RAGEngine:
         # 5. LLM 深度生成
         answer = ""
         spoken_text = ""
-        if self.client:
+        client = self._ensure_client()
+        if client:
             try:
                 sys_prompt = QA_SYSTEM_PROMPT.format(entity_context=self.entity_context)
                 user_prompt = QA_USER_PROMPT.format(
@@ -259,7 +278,7 @@ class RAGEngine:
                     strategy_hint=strategy_hint
                 )
 
-                response = self.client.chat.completions.create(
+                response = client.chat.completions.create(
                     model=self.model,
                     messages=[
                         {"role": "system", "content": sys_prompt},
@@ -308,7 +327,8 @@ class RAGEngine:
 
     def _generate_general_fallback(self, query: str, dialogue_context: str = "") -> tuple:
         """当内部会议库 0 匹配时，直接触发大模型全网通用知识解答"""
-        if not self.client:
+        client = self._ensure_client()
+        if not client:
             default_txt = "过往会议记录中暂未找到相关信息。"
             ans = f"> **结论播报**：{default_txt}\n\n> **全网通用知识解答**：过往内部会议中未检索到相关讨论，当前未配置大模型密钥，无法推导演绎。\n\n### 详细说明\n知识库未命中该议题。"
             return ans, default_txt
@@ -319,7 +339,7 @@ class RAGEngine:
                 dialogue_context=dialogue_context,
                 query=query
             )
-            response = self.client.chat.completions.create(
+            response = client.chat.completions.create(
                 model=self.model,
                 messages=[
                     {"role": "system", "content": sys_prompt},

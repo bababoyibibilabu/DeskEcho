@@ -1901,6 +1901,7 @@ class MainWindow(QMainWindow):
     tts_playback_finished = pyqtSignal()
     new_session_requested = pyqtSignal()
     session_switched = pyqtSignal(str)
+    settings_saved = pyqtSignal(dict)
 
     def __init__(self, meeting_store: MeetingStore):
         super().__init__()
@@ -3908,7 +3909,37 @@ class MainWindow(QMainWindow):
         llm_grid = QGridLayout()
         llm_grid.setSpacing(10)
 
-        llm_grid.addWidget(QLabel("API Key (密钥):"), 0, 0)
+        # 服务商预设切换 (智谱 / DeepSeek / 通义千问 / 自定义)
+        llm_grid.addWidget(QLabel("服务商预设:"), 0, 0)
+        self.combo_llm_provider = ModernComboBox()
+        llm_providers = [
+            ("智谱 AI (GLM-4-Flash · 高速稳定)", "zhipu"),
+            ("DeepSeek (官方标准 deepseek-chat)", "deepseek-chat"),
+            ("DeepSeek (深度推理 deepseek-reasoner / R1)", "deepseek-reasoner"),
+            ("阿里通义千问 (Qwen-Plus)", "qwen"),
+            ("自定义 (OpenAI 兼容接口)", "custom"),
+        ]
+        for name, p_code in llm_providers:
+            self.combo_llm_provider.addItem(name, p_code)
+
+        # 独立记忆各服务商已存的 Key
+        self._llm_provider_keys = {
+            "zhipu": Config.get_provider_key("zhipu"),
+            "deepseek-chat": Config.get_provider_key("deepseek-chat"),
+            "deepseek-reasoner": Config.get_provider_key("deepseek-reasoner"),
+            "qwen": Config.get_provider_key("qwen"),
+            "custom": Config.OPENAI_API_KEY if Config.get_current_llm_provider() == "custom" else "",
+        }
+        current_p = Config.get_current_llm_provider()
+        self._current_selected_provider = current_p
+        p_idx = next((i for i, (_, c) in enumerate(llm_providers) if c == current_p), 0)
+        self.combo_llm_provider.blockSignals(True)
+        self.combo_llm_provider.setCurrentIndex(p_idx)
+        self.combo_llm_provider.blockSignals(False)
+        self.combo_llm_provider.currentIndexChanged.connect(self._on_llm_provider_changed)
+        llm_grid.addWidget(self.combo_llm_provider, 0, 1)
+
+        llm_grid.addWidget(QLabel("API Key (密钥):"), 1, 0)
         llm_key_box = QHBoxLayout()
         self.input_llm_key = QLineEdit()
         self.input_llm_key.setEchoMode(QLineEdit.EchoMode.Password)
@@ -3922,21 +3953,39 @@ class MainWindow(QMainWindow):
         self.btn_toggle_llm_key.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_toggle_llm_key.clicked.connect(self._toggle_llm_key_visibility)
         llm_key_box.addWidget(self.btn_toggle_llm_key)
-        llm_grid.addLayout(llm_key_box, 0, 1)
+        llm_grid.addLayout(llm_key_box, 1, 1)
 
-        llm_grid.addWidget(QLabel("接口地址 (Base URL):"), 1, 0)
+        llm_grid.addWidget(QLabel("接口地址 (Base URL):"), 2, 0)
         self.input_llm_url = QLineEdit()
         self.input_llm_url.setText(Config.OPENAI_BASE_URL)
         self.input_llm_url.setPlaceholderText("https://open.bigmodel.cn/api/coding/paas/v4 或 https://api.deepseek.com/v1")
-        llm_grid.addWidget(self.input_llm_url, 1, 1)
+        llm_grid.addWidget(self.input_llm_url, 2, 1)
 
-        llm_grid.addWidget(QLabel("模型名称 (Model):"), 2, 0)
+        llm_grid.addWidget(QLabel("模型名称 (Model):"), 3, 0)
         self.input_llm_model = QLineEdit()
         self.input_llm_model.setText(Config.LLM_MODEL)
-        self.input_llm_model.setPlaceholderText("glm-4-flash / deepseek-chat / qwen-plus")
-        llm_grid.addWidget(self.input_llm_model, 2, 1)
+        self.input_llm_model.setPlaceholderText("glm-4-flash / deepseek-chat / deepseek-reasoner / qwen-plus")
+        llm_grid.addWidget(self.input_llm_model, 3, 1)
 
         llm_layout.addLayout(llm_grid)
+
+        # 连通性测试栏
+        test_row = QHBoxLayout()
+        test_row.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+        self.btn_test_llm = QPushButton("测试大模型连通性")
+        self.btn_test_llm.setFixedHeight(32)
+        self.btn_test_llm.setIconSize(QSize(14, 14))
+        self.btn_test_llm.setIcon(get_symbol_icon("bolt", color="#0284C7" if is_light else "#38BDF8", size=14))
+        self.btn_test_llm.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_test_llm.clicked.connect(self._test_llm_connection)
+        test_row.addWidget(self.btn_test_llm)
+
+        self.lbl_test_llm_status = QLabel("")
+        self.lbl_test_llm_status.setStyleSheet("font-size: 11.5px; font-weight: 500;")
+        test_row.addWidget(self.lbl_test_llm_status)
+        test_row.addStretch()
+        llm_layout.addLayout(test_row)
+
         v_layout.addWidget(self.card_llm)
 
         # ---------------- 卡片 3: 语音识别 (ASR) 与采集配置 ----------------
@@ -4104,6 +4153,99 @@ class MainWindow(QMainWindow):
             self.input_llm_key.setEchoMode(QLineEdit.EchoMode.Password)
             self.btn_toggle_llm_key.setIcon(get_symbol_icon("visibility", color="#64748B" if ThemeManager.get_instance().is_light() else "#94A3B8", size=14))
 
+    def _on_llm_provider_changed(self, index: int):
+        new_provider = self.combo_llm_provider.currentData()
+        if not new_provider:
+            return
+
+        # 记录前一个服务商的 Key (支持用户修改或清空后严格记忆)
+        prev_provider = getattr(self, '_current_selected_provider', None)
+        curr_key = self.input_llm_key.text().strip()
+        if prev_provider:
+            self._llm_provider_keys[prev_provider] = curr_key
+            if prev_provider in ("deepseek-chat", "deepseek-reasoner"):
+                self._llm_provider_keys["deepseek-chat"] = curr_key
+                self._llm_provider_keys["deepseek-reasoner"] = curr_key
+
+        self._current_selected_provider = new_provider
+
+        # 联动自动填充 Base URL 与 Model 默认值
+        preset = Config.LLM_PRESETS.get(new_provider)
+        if preset and new_provider != "custom":
+            self.input_llm_url.setText(preset["base_url"])
+            self.input_llm_model.setText(preset["model"])
+            target_key = self._llm_provider_keys.get(new_provider, "")
+            self.input_llm_key.setText(target_key)
+        elif new_provider == "custom":
+            target_key = self._llm_provider_keys.get("custom", "")
+            self.input_llm_key.setText(target_key)
+
+        if hasattr(self, 'lbl_test_llm_status'):
+            self.lbl_test_llm_status.setText("")
+
+    def _test_llm_connection(self):
+        key = self.input_llm_key.text().strip()
+        url = self.input_llm_url.text().strip()
+        model = self.input_llm_model.text().strip()
+
+        if not key:
+            self.lbl_test_llm_status.setText("请先填入有效的 API Key")
+            self.lbl_test_llm_status.setStyleSheet("color: #F59E0B; font-size: 11.5px; font-weight: 600;")
+            return
+        if not url:
+            self.lbl_test_llm_status.setText("请先填入 Base URL")
+            self.lbl_test_llm_status.setStyleSheet("color: #F59E0B; font-size: 11.5px; font-weight: 600;")
+            return
+        if not model:
+            self.lbl_test_llm_status.setText("请先填入模型名称 (Model)")
+            self.lbl_test_llm_status.setStyleSheet("color: #F59E0B; font-size: 11.5px; font-weight: 600;")
+            return
+
+        self.btn_test_llm.setEnabled(False)
+        self.lbl_test_llm_status.setText("正在测试大模型连通性...")
+        self.lbl_test_llm_status.setStyleSheet("color: #0284C7; font-size: 11.5px; font-weight: 600;")
+
+        import threading
+        def _worker():
+            try:
+                import time
+                from openai import OpenAI
+                client = OpenAI(api_key=key, base_url=url, timeout=12.0)
+                t0 = time.time()
+                resp = client.chat.completions.create(
+                    model=model,
+                    messages=[{"role": "user", "content": "hi"}],
+                    max_tokens=5,
+                    timeout=12.0
+                )
+                latency = int((time.time() - t0) * 1000)
+                msg = f"✓ 连通成功 (延迟 {latency}ms · 模型 {model} 响应正常)"
+                QMetaObject.invokeMethod(
+                    self,
+                    lambda: self._on_test_llm_finished(True, msg),
+                    Qt.ConnectionType.QueuedConnection
+                )
+            except Exception as e:
+                err_msg = str(e)
+                if len(err_msg) > 75:
+                    err_msg = err_msg[:75] + "..."
+                QMetaObject.invokeMethod(
+                    self,
+                    lambda: self._on_test_llm_finished(False, f"✗ 连接失败: {err_msg}"),
+                    Qt.ConnectionType.QueuedConnection
+                )
+
+        threading.Thread(target=_worker, daemon=True).start()
+
+    def _on_test_llm_finished(self, success: bool, msg: str):
+        self.btn_test_llm.setEnabled(True)
+        if success:
+            self.lbl_test_llm_status.setText(msg)
+            self.lbl_test_llm_status.setStyleSheet("color: #10B981; font-size: 11.5px; font-weight: 600;")
+        else:
+            self.lbl_test_llm_status.setText(msg)
+            self.lbl_test_llm_status.setStyleSheet("color: #EF4444; font-size: 11.5px; font-weight: 600;")
+
     def _preview_tts(self):
         voice = self.combo_voice_meeting.currentData() or "zh-CN-YunxiNeural"
         text = "您好，这是 DeskEcho 的当前语音播报试听，知识库已准备就绪。"
@@ -4127,15 +4269,37 @@ class MainWindow(QMainWindow):
     def _save_all_settings(self):
         updates = {}
         # LLM
+        provider_code = self.combo_llm_provider.currentData() or "custom"
+        updates["LLM_PROVIDER"] = provider_code
         new_llm_key = self.input_llm_key.text().strip()
-        if new_llm_key and not new_llm_key.startswith("••••"):
-            updates["OPENAI_API_KEY"] = new_llm_key
+        
+        # 激活的 OPENAI_API_KEY 与当前输入框保持严格同步
+        updates["OPENAI_API_KEY"] = new_llm_key
+        self._llm_provider_keys[provider_code] = new_llm_key
+        if provider_code in ("deepseek-chat", "deepseek-reasoner"):
+            self._llm_provider_keys["deepseek-chat"] = new_llm_key
+            self._llm_provider_keys["deepseek-reasoner"] = new_llm_key
+            updates["DEEPSEEK_API_KEY"] = new_llm_key
+        elif provider_code == "zhipu":
+            updates["ZHIPU_API_KEY"] = new_llm_key
+        elif provider_code == "qwen":
+            updates["DASHSCOPE_API_KEY"] = new_llm_key
+
+        # 持久化已记忆的其他服务商独立 Key (若未被当前提供商覆盖则补充写入)
+        for p_code, p_key in self._llm_provider_keys.items():
+            if p_code in ("deepseek-chat", "deepseek-reasoner") and "DEEPSEEK_API_KEY" not in updates:
+                updates["DEEPSEEK_API_KEY"] = p_key
+            elif p_code == "zhipu" and "ZHIPU_API_KEY" not in updates:
+                updates["ZHIPU_API_KEY"] = p_key
+            elif p_code == "qwen" and "DASHSCOPE_API_KEY" not in updates:
+                updates["DASHSCOPE_API_KEY"] = p_key
+
         updates["OPENAI_BASE_URL"] = self.input_llm_url.text().strip()
         updates["LLM_MODEL"] = self.input_llm_model.text().strip()
 
         # TTS
         updates["ENABLE_TTS"] = "true" if self.chk_enable_tts.isChecked() else "false"
-        updates["TTS_PROVIDER"] = "edge-tts" if "edge-tts" in self.combo_tts_provider.currentText() else "volcengine"
+        updates["TTS_PROVIDER"] = self.combo_tts_provider.currentData() or "edge-tts"
         updates["TTS_VOICE_MEETING"] = self.combo_voice_meeting.currentData() or "zh-CN-YunxiNeural"
         updates["TTS_VOICE_GENERAL"] = self.combo_voice_general.currentData() or "zh-CN-XiaoxiaoNeural"
         updates["TTS_VOICE_INSTRUCTION"] = self.combo_voice_instruction.currentData() or "zh-CN-YunjianNeural"
@@ -4154,6 +4318,7 @@ class MainWindow(QMainWindow):
             self.settings_status_lbl.setStyleSheet("color: #10B981; font-size: 11.5px; font-weight: 600;")
             if hasattr(self, 'hotkey_tag'):
                 self.hotkey_tag.setText(f"对讲热键: {Config.get_intercom_display_key()}")
+            self.settings_saved.emit(updates)
             QTimer.singleShot(4000, lambda: self.settings_status_lbl.setText(""))
         else:
             self.settings_status_lbl.setText("保存配置失败，请检查文件写入权限")
@@ -5928,7 +6093,7 @@ class MainWindow(QMainWindow):
 
         combo_style = get_modern_combobox_style(is_light)
         for combo_attr in ['combo_tts_provider', 'combo_voice_meeting', 'combo_voice_general',
-                          'combo_voice_instruction', 'combo_intercom_key']:
+                           'combo_voice_instruction', 'combo_intercom_key', 'combo_llm_provider']:
             if hasattr(self, combo_attr):
                 getattr(self, combo_attr).setStyleSheet(combo_style)
 
@@ -5953,6 +6118,39 @@ class MainWindow(QMainWindow):
             self.btn_preview_tts.setFixedHeight(32)
             self.btn_preview_tts.setIconSize(QSize(14, 14))
             self.btn_preview_tts.setStyleSheet("""
+                QPushButton {
+                    background: #F1F5F9;
+                    color: #0284C7;
+                    border: 1px solid #CBD5E1;
+                    border-radius: 6px;
+                    padding: 0px 14px;
+                    font-size: 11px;
+                    font-weight: 600;
+                }
+                QPushButton:hover {
+                    background: rgba(2, 132, 199, 0.1);
+                    border-color: #0284C7;
+                }
+            """ if is_light else """
+                QPushButton {
+                    background: rgba(255, 255, 255, 0.05);
+                    color: #38BDF8;
+                    border: 1px solid rgba(255, 255, 255, 0.12);
+                    border-radius: 6px;
+                    padding: 0px 14px;
+                    font-size: 11px;
+                    font-weight: 600;
+                }
+                QPushButton:hover {
+                    background: rgba(56, 189, 248, 0.15);
+                    border-color: #38BDF8;
+                }
+            """)
+        if hasattr(self, 'btn_test_llm'):
+            self.btn_test_llm.setFixedHeight(32)
+            self.btn_test_llm.setIconSize(QSize(14, 14))
+            self.btn_test_llm.setIcon(get_symbol_icon("bolt", color="#0284C7" if is_light else "#38BDF8", size=14))
+            self.btn_test_llm.setStyleSheet("""
                 QPushButton {
                     background: #F1F5F9;
                     color: #0284C7;

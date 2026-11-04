@@ -1,12 +1,14 @@
 {
-  "version": "0.2.22",
-  "release_date": "2026-11-03",
-  "title": "DeskEcho v0.2.22 移除顶栏菜单数字与保持一级导航纯净",
+  "version": "0.2.23",
+  "release_date": "2026-11-04",
+  "title": "DeskEcho v0.2.23 大模型预设快捷切换与支持 DeepSeek",
   "changelog": [
-    "响应操作员改进指令 (REQ-20261103170537-A254)：移除顶栏菜单项『会议记忆库』后截断且打架的伪数字，保持一级功能模块导航清晰自洽",
-    "各层级数据严密自洽：一级导航清爽纯净，二级日历看板展现月度统计，三级单日详情展现精准单日切片统计"
+    "响应操作员改进指令 (REQ-20261104084352-9AE8)：在系统设置中心新增大模型提供商预设切换 (智谱 GLM / DeepSeek 官方 / DeepSeek R1 深度推理 / 阿里通义千问 / 自定义)",
+    "自动联动 Base URL 与 Model 默认值，并独立记忆各服务商 API Key，切换免重复输入",
+    "提供大模型实时连通性轻量测试，支持在设置页一键验证密钥与网络连通性",
+    "核心全链路 (RAG / 摘要提取 / 意图重塑 / 改进指令) 动态热重载，无需重启应用即刻生效"
   ],
-  "download_url": "https://github.com/bababoyibibilabu/DeskEcho/releases/download/v0.2.22/DeskEcho.exe",
-  "zip_url": "https://github.com/bababoyibibilabu/DeskEcho/archive/refs/tags/v0.2.22.zip",
+  "download_url": "https://github.com/bababoyibibilabu/DeskEcho/releases/download/v0.2.23/DeskEcho.exe",
+  "zip_url": "https://github.com/bababoyibibilabu/DeskEcho/archive/refs/tags/v0.2.23.zip",
   "min_version": "0.1.0"
 }

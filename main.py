@@ -139,11 +139,19 @@ class DeskEchoApp:
         self.main_window.record_toggled.connect(self._on_main_record_toggled)
         self.main_window.inject_demo_requested.connect(self._inject_demo_record)
         self.main_window.tts_playback_finished.connect(self._on_tts_finished)
+        self.main_window.settings_saved.connect(self._on_settings_saved)
         self.tray.toggle_record_signal.connect(self._on_tray_record_toggled)
         self.tray.show_main_signal.connect(self._show_main_window)
         self.tray.open_update_signal.connect(self._open_update_page)
         self.tray.inject_demo_signal.connect(self._inject_demo_record)
         self.tray.quit_signal.connect(self.quit)
+
+    def _on_settings_saved(self, updates: dict):
+        if hasattr(self, 'rag') and self.rag:
+            self.rag.reload_config()
+        if hasattr(self, 'summarizer') and self.summarizer:
+            self.summarizer.reload_config()
+        print("[App] 系统设置已更新并完成核心组件热重载。")
 
     def _on_tts_finished(self):
         # 语音播报结束，短暂缓冲 0.3 秒以衰减房间余音，随后恢复背景录制
