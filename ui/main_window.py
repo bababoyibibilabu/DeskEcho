@@ -1902,9 +1902,11 @@ class MainWindow(QMainWindow):
     new_session_requested = pyqtSignal()
     session_switched = pyqtSignal(str)
     settings_saved = pyqtSignal(dict)
+    test_llm_finished_signal = pyqtSignal(bool, str)
 
     def __init__(self, meeting_store: MeetingStore):
         super().__init__()
+        self.test_llm_finished_signal.connect(self._on_test_llm_finished)
         app = QApplication.instance()
         if app and not isinstance(app.style(), NoFocusRectStyle):
             app.setStyle(NoFocusRectStyle(app.style()))
@@ -2963,6 +2965,11 @@ class MainWindow(QMainWindow):
                     background: rgba(56, 189, 248, 0.15);
                     border-color: #38BDF8;
                 }
+                QPushButton:disabled {
+                    background: rgba(255, 255, 255, 0.03);
+                    color: rgba(255, 255, 255, 0.25);
+                    border-color: rgba(255, 255, 255, 0.08);
+                }
             """)
         self.btn_restore_curr_slice.clicked.connect(lambda: self._restore_slice_useful(self.current_selected_record))
         t_action_layout.addWidget(self.btn_restore_curr_slice)
@@ -3948,7 +3955,9 @@ class MainWindow(QMainWindow):
         llm_key_box.addWidget(self.input_llm_key, 1)
 
         self.btn_toggle_llm_key = QPushButton()
-        self.btn_toggle_llm_key.setIcon(get_symbol_icon("visibility", color="#64748B" if is_light else "#94A3B8", size=14))
+        self.btn_toggle_llm_key.setFixedSize(34, 32)
+        self.btn_toggle_llm_key.setIconSize(QSize(15, 15))
+        self.btn_toggle_llm_key.setIcon(get_symbol_icon("visibility", color="#475569" if is_light else "#94A3B8", size=15))
         self.btn_toggle_llm_key.setToolTip("显示/隐藏密钥明文")
         self.btn_toggle_llm_key.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_toggle_llm_key.clicked.connect(self._toggle_llm_key_visibility)
@@ -4146,12 +4155,15 @@ class MainWindow(QMainWindow):
         stack.addWidget(scroll)
 
     def _toggle_llm_key_visibility(self):
+        is_light = ThemeManager.get_instance().is_light()
         if self.input_llm_key.echoMode() == QLineEdit.EchoMode.Password:
             self.input_llm_key.setEchoMode(QLineEdit.EchoMode.Normal)
-            self.btn_toggle_llm_key.setIcon(get_symbol_icon("visibility_off", color="#64748B" if ThemeManager.get_instance().is_light() else "#94A3B8", size=14))
+            self.btn_toggle_llm_key.setIcon(get_symbol_icon("visibility_off", color="#0284C7" if is_light else "#38BDF8", size=15))
+            self.btn_toggle_llm_key.setToolTip("隐藏密钥明文")
         else:
             self.input_llm_key.setEchoMode(QLineEdit.EchoMode.Password)
-            self.btn_toggle_llm_key.setIcon(get_symbol_icon("visibility", color="#64748B" if ThemeManager.get_instance().is_light() else "#94A3B8", size=14))
+            self.btn_toggle_llm_key.setIcon(get_symbol_icon("visibility", color="#475569" if is_light else "#94A3B8", size=15))
+            self.btn_toggle_llm_key.setToolTip("显示密钥明文")
 
     def _on_llm_provider_changed(self, index: int):
         new_provider = self.combo_llm_provider.currentData()
@@ -4210,30 +4222,30 @@ class MainWindow(QMainWindow):
             try:
                 import time
                 from openai import OpenAI
-                client = OpenAI(api_key=key, base_url=url, timeout=12.0)
+                client = OpenAI(api_key=key, base_url=url, timeout=8.0)
                 t0 = time.time()
                 resp = client.chat.completions.create(
                     model=model,
                     messages=[{"role": "user", "content": "hi"}],
                     max_tokens=5,
-                    timeout=12.0
+                    timeout=8.0
                 )
                 latency = int((time.time() - t0) * 1000)
                 msg = f"✓ 连通成功 (延迟 {latency}ms · 模型 {model} 响应正常)"
-                QMetaObject.invokeMethod(
-                    self,
-                    lambda: self._on_test_llm_finished(True, msg),
-                    Qt.ConnectionType.QueuedConnection
-                )
+                self.test_llm_finished_signal.emit(True, msg)
             except Exception as e:
-                err_msg = str(e)
-                if len(err_msg) > 75:
-                    err_msg = err_msg[:75] + "..."
-                QMetaObject.invokeMethod(
-                    self,
-                    lambda: self._on_test_llm_finished(False, f"✗ 连接失败: {err_msg}"),
-                    Qt.ConnectionType.QueuedConnection
-                )
+                err_str = str(e)
+                if "401" in err_str or "Authentication" in err_str or "invalid_api_key" in err_str:
+                    err_msg = "鉴权失败: API Key 无效或未激活"
+                elif "404" in err_str or "not_found" in err_str:
+                    err_msg = f"模型不存在或接口路径错误 ({model})"
+                elif "ConnectTimeout" in err_str or "timeout" in err_str.lower() or "Connection error" in err_str:
+                    err_msg = "网络连接超时，请检查 Base URL 或网络代理"
+                else:
+                    err_msg = err_str.replace("\n", " ").strip()
+                    if len(err_msg) > 65:
+                        err_msg = err_msg[:65] + "..."
+                self.test_llm_finished_signal.emit(False, f"✗ 连通失败: {err_msg}")
 
         threading.Thread(target=_worker, daemon=True).start()
 
@@ -5557,8 +5569,22 @@ class MainWindow(QMainWindow):
         is_light = tm.is_light()
         colors = tm.get_colors()
 
-        # 1. 全局窗口 QSS
+        # 1. 全局窗口 QSS 与全局 ToolTip 样式（确保任意主题下 ToolTip 均为高对比度清晰深色胶囊）
         self.setStyleSheet(tm.get_global_qss())
+        app = QApplication.instance()
+        if app:
+            app.setStyleSheet("""
+                QToolTip {
+                    background-color: #1E293B;
+                    color: #FFFFFF;
+                    border: 1px solid #334155;
+                    border-radius: 5px;
+                    padding: 5px 9px;
+                    font-size: 11px;
+                    font-weight: 500;
+                    font-family: 'Segoe UI', 'Microsoft YaHei UI', sans-serif;
+                }
+            """)
 
         # 2. 品牌卡与侧边栏 (通透无多余边框)
         if hasattr(self, 'brand_card'):
@@ -6057,7 +6083,42 @@ class MainWindow(QMainWindow):
         if hasattr(self, 'ext_desc'):
             self.ext_desc.setStyleSheet(f"color: {'#64748B' if is_light else '#94A3B8'}; font-size: 11px;")
         if hasattr(self, 'btn_toggle_llm_key'):
-            self.btn_toggle_llm_key.setIcon(get_symbol_icon("visibility", color="#0284C7" if is_light else "#38BDF8", size=14))
+            self.btn_toggle_llm_key.setFixedSize(34, 32)
+            self.btn_toggle_llm_key.setIconSize(QSize(15, 15))
+            is_pwd = self.input_llm_key.echoMode() == QLineEdit.EchoMode.Password
+            icon_name = "visibility" if is_pwd else "visibility_off"
+            icon_color = ("#475569" if is_pwd else "#0284C7") if is_light else ("#94A3B8" if is_pwd else "#38BDF8")
+            self.btn_toggle_llm_key.setIcon(get_symbol_icon(icon_name, color=icon_color, size=15))
+            if is_light:
+                self.btn_toggle_llm_key.setStyleSheet("""
+                    QPushButton {
+                        background-color: #F1F5F9;
+                        border: 1px solid #CBD5E1;
+                        border-radius: 6px;
+                    }
+                    QPushButton:hover {
+                        background-color: #E2E8F0;
+                        border-color: #94A3B8;
+                    }
+                    QPushButton:pressed {
+                        background-color: #CBD5E1;
+                    }
+                """)
+            else:
+                self.btn_toggle_llm_key.setStyleSheet("""
+                    QPushButton {
+                        background-color: rgba(255, 255, 255, 0.06);
+                        border: 1px solid rgba(255, 255, 255, 0.12);
+                        border-radius: 6px;
+                    }
+                    QPushButton:hover {
+                        background-color: rgba(255, 255, 255, 0.12);
+                        border-color: rgba(255, 255, 255, 0.25);
+                    }
+                    QPushButton:pressed {
+                        background-color: rgba(255, 255, 255, 0.18);
+                    }
+                """)
 
         input_style_light = """
             QLineEdit {
@@ -6130,6 +6191,11 @@ class MainWindow(QMainWindow):
                 QPushButton:hover {
                     background: rgba(2, 132, 199, 0.1);
                     border-color: #0284C7;
+                }
+                QPushButton:disabled {
+                    background: #E2E8F0;
+                    color: #94A3B8;
+                    border-color: #CBD5E1;
                 }
             """ if is_light else """
                 QPushButton {
