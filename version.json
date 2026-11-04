@@ -1,13 +1,13 @@
 {
-  "version": "0.2.25",
+  "version": "0.2.26",
   "release_date": "2026-11-04",
-  "title": "DeskEcho v0.2.25 优化API Key提示气泡对比度与主题自适应",
+  "title": "DeskEcho v0.2.26 彻底修复设置页滚动容器样式穿透导致的 QToolTip 纯黑异常",
   "changelog": [
-    "优化模型 API Key 输入框右侧小眼睛切换按钮悬浮气球提示样式，使其与全局主题动态联动自适应",
-    "在浅色主题下采用纯净明亮卡片背景 (#FFFFFF) 搭配深色高对比文字 (#0F172A) 与细腻轮廓线，彻底消除因背景过黑导致文字辨识困难的体验痛点",
-    "深色模式保持深蓝夜景高对比胶囊样式，并确保中英文多系统字阶清晰锐利"
+    "彻底修复设置中心与各面板滚动容器未限定类名选择器导致 background: transparent 异常级联穿透至宿主 ToolTip 原生窗口的隐蔽缺陷",
+    "为 API Key 明文切换按钮绑定强隔离的专属 QToolTip 样式，在浅色模式下呈现高对比度纯白底 (#FFFFFF) 与清晰深色文字 (#0F172A)，彻底根除黑底看不清字的问题",
+    "同步强化深色模式下悬浮气球边界可见性与字体渲染"
   ],
-  "download_url": "https://github.com/bababoyibibilabu/DeskEcho/releases/download/v0.2.25/DeskEcho.exe",
-  "zip_url": "https://github.com/bababoyibibilabu/DeskEcho/archive/refs/tags/v0.2.25.zip",
+  "download_url": "https://github.com/bababoyibibilabu/DeskEcho/releases/download/v0.2.26/DeskEcho.exe",
+  "zip_url": "https://github.com/bababoyibibilabu/DeskEcho/archive/refs/tags/v0.2.26.zip",
   "min_version": "0.1.0"
 }

@@ -3513,7 +3513,7 @@ class MainWindow(QMainWindow):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        scroll.viewport().setStyleSheet("background: transparent;")
+        scroll.viewport().setStyleSheet("QWidget { background: transparent; }")
         scroll.setStyleSheet("""
             QScrollArea {
                 border: none;
@@ -3522,7 +3522,8 @@ class MainWindow(QMainWindow):
         """)
 
         cards_container = QWidget()
-        cards_container.setStyleSheet("background: transparent;")
+        cards_container.setObjectName("cards_container")
+        cards_container.setStyleSheet("QWidget#cards_container { background: transparent; }")
         cards_vbox = QVBoxLayout(cards_container)
         cards_vbox.setContentsMargins(0, 0, 8, 20)
         cards_vbox.setSpacing(14)
@@ -3774,7 +3775,7 @@ class MainWindow(QMainWindow):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        scroll.viewport().setStyleSheet("background: transparent;")
+        scroll.viewport().setStyleSheet("QWidget { background: transparent; }")
         scroll.setStyleSheet("""
             QScrollArea {
                 border: none;
@@ -3783,7 +3784,8 @@ class MainWindow(QMainWindow):
         """)
 
         container = QWidget()
-        container.setStyleSheet("background: transparent;")
+        container.setObjectName("settings_container")
+        container.setStyleSheet("QWidget#settings_container { background: transparent; }")
         v_layout = QVBoxLayout(container)
         v_layout.setContentsMargins(4, 4, 12, 36)
         v_layout.setSpacing(14)
@@ -4342,11 +4344,12 @@ class MainWindow(QMainWindow):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        scroll.viewport().setStyleSheet("background: transparent;")
+        scroll.viewport().setStyleSheet("QWidget { background: transparent; }")
         scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
 
         container = QWidget()
-        container.setStyleSheet("background: transparent;")
+        container.setObjectName("update_container")
+        container.setStyleSheet("QWidget#update_container { background: transparent; }")
         v_layout = QVBoxLayout(container)
         v_layout.setContentsMargins(4, 4, 12, 36)
         v_layout.setSpacing(14)
@@ -6118,6 +6121,16 @@ class MainWindow(QMainWindow):
                     QPushButton:pressed {
                         background-color: #CBD5E1;
                     }
+                    QToolTip {
+                        background-color: #FFFFFF;
+                        color: #0F172A;
+                        border: 1px solid #CBD5E1;
+                        border-radius: 6px;
+                        padding: 6px 10px;
+                        font-size: 11.5px;
+                        font-weight: 500;
+                        font-family: 'Segoe UI', 'Microsoft YaHei UI', sans-serif;
+                    }
                 """)
             else:
                 self.btn_toggle_llm_key.setStyleSheet("""
@@ -6132,6 +6145,16 @@ class MainWindow(QMainWindow):
                     }
                     QPushButton:pressed {
                         background-color: rgba(255, 255, 255, 0.18);
+                    }
+                    QToolTip {
+                        background-color: #1E293B;
+                        color: #F8FAFC;
+                        border: 1px solid #475569;
+                        border-radius: 6px;
+                        padding: 6px 10px;
+                        font-size: 11.5px;
+                        font-weight: 500;
+                        font-family: 'Segoe UI', 'Microsoft YaHei UI', sans-serif;
                     }
                 """)
 
